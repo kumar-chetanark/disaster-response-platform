@@ -1,0 +1,428 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Aerial Assessment Form - Disaster Response Platform</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "on-tertiary-fixed": "#311400",
+                            "outline-variant": "#424754",
+                            "tertiary-fixed-dim": "#ffb786",
+                            "on-secondary-container": "#a9bad3",
+                            "secondary-container": "#3a4a5f",
+                            "primary": "#adc6ff",
+                            "on-tertiary": "#502400",
+                            "background": "#0b1326",
+                            "surface-dim": "#0b1326",
+                            "inverse-surface": "#dae2fd",
+                            "on-secondary": "#213145",
+                            "on-secondary-fixed": "#0b1c30",
+                            "on-tertiary-container": "#461f00",
+                            "surface-container-lowest": "#060e20",
+                            "surface-tint": "#adc6ff",
+                            "surface-variant": "#2d3449",
+                            "on-surface": "#dae2fd",
+                            "secondary-fixed-dim": "#b7c8e1",
+                            "on-background": "#dae2fd",
+                            "primary-fixed-dim": "#adc6ff",
+                            "primary-container": "#4d8eff",
+                            "surface-bright": "#31394d",
+                            "tertiary": "#ffb786",
+                            "on-primary": "#002e6a",
+                            "surface": "#0b1326",
+                            "on-error-container": "#ffdad6",
+                            "inverse-on-surface": "#283044",
+                            "on-error": "#690005",
+                            "primary-fixed": "#d8e2ff",
+                            "on-primary-container": "#00285d",
+                            "surface-container-low": "#131b2e",
+                            "surface-container": "#171f33",
+                            "surface-container-highest": "#2d3449",
+                            "inverse-primary": "#005ac2",
+                            "on-tertiary-fixed-variant": "#723600",
+                            "on-secondary-fixed-variant": "#38485d",
+                            "on-primary-fixed": "#001a42",
+                            "surface-container-high": "#222a3d",
+                            "secondary-fixed": "#d3e4fe",
+                            "error-container": "#93000a",
+                            "tertiary-container": "#df7412",
+                            "error": "#ffb4ab",
+                            "secondary": "#b7c8e1",
+                            "on-primary-fixed-variant": "#004395",
+                            "on-surface-variant": "#c2c6d6",
+                            "tertiary-fixed": "#ffdcc6",
+                            "outline": "#8c909f"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.125rem",
+                            "lg": "0.25rem",
+                            "xl": "0.5rem",
+                            "full": "0.75rem"
+                    },
+                    "spacing": {
+                            "sidebar-width": "240px",
+                            "stack-compact": "8px",
+                            "gutter": "16px",
+                            "container-padding": "24px",
+                            "unit": "4px",
+                            "header-height": "64px",
+                            "stack-dense": "4px"
+                    },
+                    "fontFamily": {
+                            "display-lg": ["Inter", "sans-serif"],
+                            "headline-sm": ["Inter", "sans-serif"],
+                            "body-sm": ["Inter", "sans-serif"],
+                            "headline-md": ["Inter", "sans-serif"],
+                            "body-base": ["Inter", "sans-serif"],
+                            "status-badge": ["Inter", "sans-serif"],
+                            "mono-label": ["JetBrains Mono", "monospace"]
+                    },
+                    "fontSize": {
+                            "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                            "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                            "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                            "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                            "body-base": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                            "status-badge": ["11px", {"lineHeight": "12px", "fontWeight": "700"}],
+                            "mono-label": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom scrollbar for dark theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b1326; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3449; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #424754; 
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-base antialiased min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-outline-variant bg-surface flex flex-col py-4 z-50">
+<!-- Header -->
+<div class="px-container-padding mb-8">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center border border-outline-variant overflow-hidden">
+<img alt="Operator Profile Avatar" class="w-full h-full object-cover" data-alt="A highly detailed close-up portrait of a professional male emergency response operator in his late 30s. He is wearing a dark tactical headset and a high-tech dark grey uniform with subtle reflective accents. The lighting is dramatic and cool-toned, with soft blue rim lighting reflecting off his headset. The background is slightly blurred showing glowing monitors in a dark command center. The image has a hyper-realistic, clinical, and serious tone fitting a high-stress operational environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdoogKa4i3vJTHgO0Cr2txuMh-YF5hqXZ2AF-dwRoibTP0avzILNP5SURsVVwxh44Ti5XX8u5_4LnVp99FA1IpVbeCGTo5Mghx9YRMtwDdSJotSacr0xP4XSoNahJAmYmSzfO5zaczMnLzC-W6R1ZdASO_0MpBXZ0riI-6kR_nBaOTFOvJRJP2pKJsY4Ftr41ZQ4Cvva441Sa_Om75kmE1dTNkHi6YYS86be-rFdsIdHo0bp7L0bxukw">
+</div>
+<div>
+<h1 class="font-headline-sm text-headline-sm font-bold text-on-surface leading-tight">Disaster Response<br>Platform</h1>
+</div>
+</div>
+<div class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Mission Control v2.4</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex-1 overflow-y-auto px-2 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="dashboard">dashboard</span>
+<span class="group-hover:text-on-surface transition-colors">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="warning">warning</span>
+<span class="group-hover:text-on-surface transition-colors">Incidents</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="map">map</span>
+<span class="group-hover:text-on-surface transition-colors">Operations Map</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-surface-container-highest text-primary font-bold border-l-2 border-primary group" href="#">
+<span class="material-symbols-outlined text-primary" data-icon="satellite_alt" data-weight="fill" style="font-variation-settings: 'FILL' 1;">satellite_alt</span>
+<span class="">Aerial Assessment</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="inventory_2">inventory_2</span>
+<span class="group-hover:text-on-surface transition-colors">Resources</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="groups">groups</span>
+<span class="group-hover:text-on-surface transition-colors">Response Teams</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="description">description</span>
+<span class="group-hover:text-on-surface transition-colors">Field Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="notifications_active">notifications_active</span>
+<span class="group-hover:text-on-surface transition-colors">Alerts</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="history">history</span>
+<span class="group-hover:text-on-surface transition-colors">Audit History</span>
+</a>
+</div>
+<!-- Footer -->
+<div class="px-2 mt-auto pt-4 border-t border-outline-variant space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="settings">settings</span>
+<span class="group-hover:text-on-surface transition-colors">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-body-base hover:bg-surface-container-highest transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-on-surface transition-colors" data-icon="help">help</span>
+<span class="group-hover:text-on-surface transition-colors">Support</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width flex-1 bg-background min-h-screen">
+<!-- Top App Bar equivalent for Form Context -->
+<header class="h-header-height sticky top-0 bg-surface/90 backdrop-blur-md border-b border-outline-variant flex items-center justify-between px-container-padding z-40">
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors p-2 -ml-2 rounded-lg hover:bg-surface-container-high">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div>
+<h2 class="font-headline-md text-headline-md font-semibold text-on-surface">Aerial Mission Assessment</h2>
+<div class="flex items-center gap-2 mt-1">
+<span class="font-mono-label text-mono-label text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">ID: SCAN-44A</span>
+<span class="text-outline text-body-sm">•</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Related Incident: <span class="text-on-surface font-medium">Cyclone Alpha 4</span></span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm bg-surface-container px-3 py-1.5 rounded-lg border border-outline-variant">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                    Live Sync Active
+                </div>
+<button class="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-body-sm font-medium rounded transition-colors">
+<span class="material-symbols-outlined text-sm">save</span>
+                    Save Draft
+                </button>
+</div>
+</header>
+<!-- Form Canvas -->
+<div class="max-w-4xl mx-auto p-container-padding pb-32">
+<form class="space-y-8">
+<!-- Section 1: Mission Metadata -->
+<section class="bg-surface rounded-xl border border-outline-variant overflow-hidden">
+<div class="bg-surface-container-high px-6 py-4 border-b border-outline-variant flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">info</span>
+<h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">1. Mission Metadata</h3>
+</div>
+<div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Mission Type</label>
+<div class="relative">
+<select class="w-full bg-background border border-outline-variant text-on-surface font-body-base rounded-lg px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors"><option selected="">Area Scan / Survey</option><option>Damage Assessment</option><option>Search &amp; Rescue Support</option><option>Resource Delivery</option><option>Evacuation / Route Assessment</option><option>Communication / Observation</option></select>
+<div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Time of Assessment (ZULU)</label>
+<input class="w-full bg-background border border-outline-variant text-on-surface font-mono-label rounded-lg px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary transition-colors [color-scheme:dark]" type="time" value="14:30">
+</div>
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Weather Conditions</label>
+<div class="relative">
+<select class="w-full bg-background border border-outline-variant text-on-surface font-body-base rounded-lg px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors"><option selected="">Area Scan / Survey</option><option>Damage Assessment</option><option>Search &amp; Rescue Support</option><option>Resource Delivery</option><option>Evacuation / Route Assessment</option><option>Communication / Observation</option></select>
+<div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Spatial Data -->
+<section class="bg-surface rounded-xl border border-outline-variant overflow-hidden">
+<div class="bg-surface-container-high px-6 py-4 border-b border-outline-variant flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">my_location</span>
+<h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">2. Spatial Data</h3>
+</div>
+<div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Area Surveyed</label>
+<input class="w-full bg-background border border-outline-variant text-on-surface font-body-base rounded-lg px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-outline" type="text" value="Sector 4 / Coastal">
+</div>
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Hazards Detected</label>
+<div class="flex flex-wrap gap-2">
+<label class="flex items-center gap-2 bg-background border border-outline-variant px-3 py-1.5 rounded cursor-pointer hover:bg-surface-container transition-colors has-[:checked]:border-error has-[:checked]:bg-error/10">
+<input checked="" class="rounded border-outline-variant text-error focus:ring-error focus:ring-offset-background bg-transparent" type="checkbox">
+<span class="font-body-sm text-on-surface">Flooding</span>
+</label>
+<label class="flex items-center gap-2 bg-background border border-outline-variant px-3 py-1.5 rounded cursor-pointer hover:bg-surface-container transition-colors has-[:checked]:border-error has-[:checked]:bg-error/10">
+<input checked="" class="rounded border-outline-variant text-error focus:ring-error focus:ring-offset-background bg-transparent" type="checkbox">
+<span class="font-body-sm text-on-surface">Downed Power Lines</span>
+</label>
+<label class="flex items-center gap-2 bg-background border border-outline-variant px-3 py-1.5 rounded cursor-pointer hover:bg-surface-container transition-colors has-[:checked]:border-tertiary has-[:checked]:bg-tertiary/10">
+<input class="rounded border-outline-variant text-tertiary focus:ring-tertiary focus:ring-offset-background bg-transparent" type="checkbox">
+<span class="font-body-sm text-on-surface">Debris</span>
+</label>
+<label class="flex items-center gap-2 bg-background border border-outline-variant px-3 py-1.5 rounded cursor-pointer hover:bg-surface-container transition-colors has-[:checked]:border-tertiary has-[:checked]:bg-tertiary/10">
+<input class="rounded border-outline-variant text-tertiary focus:ring-tertiary focus:ring-offset-background bg-transparent" type="checkbox">
+<span class="font-body-sm text-on-surface">Landslide Risk</span>
+</label>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Impact Analysis -->
+<section class="bg-surface rounded-xl border border-outline-variant overflow-hidden">
+<div class="bg-surface-container-high px-6 py-4 border-b border-outline-variant flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">analytics</span>
+<h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">3. Impact Analysis</h3>
+</div>
+<div class="p-6 space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Structures Affected</label>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 flex items-center pl-4 text-on-surface-variant material-symbols-outlined text-sm">home_work</span>
+<input class="w-full bg-background border border-outline-variant text-on-surface font-mono-label rounded-lg pl-10 pr-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary transition-colors" min="0" type="number" value="2">
+</div>
+</div>
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Roads/Accessibility</label>
+<div class="relative">
+<select class="w-full bg-background border border-outline-variant text-on-surface font-body-base rounded-lg px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors">
+<option>Clear</option>
+<option>Partially Blocked</option>
+<option selected="">3 roads blocked</option>
+<option>Impassable</option>
+</select>
+<div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">People Observed</label>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 flex items-center pl-4 text-on-surface-variant material-symbols-outlined text-sm">group</span>
+<input class="w-full bg-background border border-outline-variant text-on-surface font-body-base rounded-lg pl-10 pr-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary transition-colors" type="text" value="~15 in isolated pockets">
+</div>
+</div>
+</div>
+<!-- Mini map preview -->
+<div class="w-full h-48 bg-surface-container rounded-lg border border-outline-variant overflow-hidden relative" data-location="Coastal Sector 4">
+<img alt="Impact Map Reference" class="w-full h-full object-cover opacity-80 mix-blend-screen" data-alt="A highly detailed, professional satellite map interface of a coastal region shown in a dark mode digital dashboard style. Topographical lines and subtle grid overlays are visible in deep blues and greys. Three distinct red warning markers indicating blocked roads and one orange area highlight representing isolated pockets of people are precisely placed on the map. The map feels clinical, technical, and designed for disaster response analysis, free of any civilian mapping interface clutter." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfjlm1X12UG07CNDHHTortkbpl5ObuiUzuxQbqDs8W1j0tR4xES9MLxENuRBTnlcb_OcKIY1Bgi2sQrbGhPw6f9k4q-idWMhHl9QK5BQp3ZGbvA1g5DSGFzt-_6j8X9EXuMf1Jlh5eXcx7e0amsm3FTFx2jAa4OEOXhbYn58xKUgLe_oWWSXFxz8Y-FFnTm1r9stDmm9oCg8DV_XBTmxTizyCGTEAgcTlG_lUJRinGTVjKb6_HN3PYLw">
+<div class="absolute inset-0 ring-1 ring-inset ring-outline-variant/50 rounded-lg pointer-events-none"></div>
+<div class="absolute top-2 right-2 bg-background/90 backdrop-blur px-2 py-1 rounded text-[10px] font-mono-label text-on-surface-variant border border-outline-variant">
+                                LAT 45.123N / LON -90.442W
+                            </div>
+</div>
+</div>
+</section>
+<!-- Section 4: Resource Needs & Evacuation -->
+<section class="bg-surface rounded-xl border border-outline-variant overflow-hidden">
+<div class="bg-surface-container-high px-6 py-4 border-b border-outline-variant flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">local_shipping</span>
+<h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">4. Resource Needs &amp; Evacuation</h3>
+</div>
+<div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Recommended Resources</label>
+<textarea class="w-full bg-background border border-outline-variant text-on-surface font-body-base rounded-lg px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-outline resize-none" placeholder="Enter resource requirements..." rows="3">Water rescue teams (Swiftwater), Heavy debris removal equipment (Dozer), Portable lighting.</textarea>
+</div>
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Evacuation Route Status</label>
+<div class="space-y-3">
+<label class="flex items-center gap-3 bg-background border border-outline-variant p-3 rounded-lg cursor-pointer hover:bg-surface-container transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+<input class="w-4 h-4 text-primary bg-transparent border-outline-variant focus:ring-primary focus:ring-offset-background" name="evac_status" type="radio">
+<div class="flex-1">
+<div class="font-body-base text-on-surface font-medium">Routes Clear</div>
+<div class="font-body-sm text-on-surface-variant">Primary and secondary paths accessible.</div>
+</div>
+</label>
+<label class="flex items-center gap-3 bg-background border border-error p-3 rounded-lg cursor-pointer hover:bg-error/10 transition-colors has-[:checked]:border-error has-[:checked]:bg-error/10">
+<input checked="" class="w-4 h-4 text-error bg-transparent border-error focus:ring-error focus:ring-offset-background" name="evac_status" type="radio">
+<div class="flex-1">
+<div class="font-body-base text-error font-medium">Compromised</div>
+<div class="font-body-sm text-error/80">Air or specialized water extraction required.</div>
+</div>
+</label>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 5: Media & Notes -->
+<section class="bg-surface rounded-xl border border-outline-variant overflow-hidden">
+<div class="bg-surface-container-high px-6 py-4 border-b border-outline-variant flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">perm_media</span>
+<h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">5. Media &amp; Notes</h3>
+</div>
+<div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Media Upload (Images/Video)</label>
+<div class="w-full h-32 border-2 border-dashed border-outline-variant rounded-lg bg-background flex flex-col items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-2 group-hover:-translate-y-1 transition-transform">cloud_upload</span>
+<span class="font-body-sm">Click to browse or drag files here</span>
+<span class="text-xs mt-1 text-outline">Max 50MB per file</span>
+</div>
+<!-- Attached files list -->
+<div class="mt-3 space-y-2">
+<div class="flex items-center justify-between p-2 rounded bg-surface-container border border-outline-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant">image</span>
+<span class="font-body-sm text-on-surface truncate max-w-[200px]">aerial_scan_01.jpg</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-mono-label text-[10px] text-on-surface-variant">4.2 MB</span>
+<button class="text-on-surface-variant hover:text-error transition-colors" type="button"><span class="material-symbols-outlined text-sm">close</span></button>
+</div>
+</div>
+</div>
+</div>
+<div class="space-y-2">
+<label class="block font-body-sm text-body-sm text-on-surface-variant font-medium">Operator Observations</label>
+<textarea class="w-full h-[calc(100%-24px)] bg-background border border-outline-variant text-on-surface font-body-base rounded-lg px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-outline resize-none" placeholder="Additional field notes..." rows="5">Extensive coastal surge damage observed. Primary access bridge on Route 9 appears structurally compromised. Need engineering assessment before committing heavy ground vehicles.</textarea>
+</div>
+</div>
+</section>
+</form>
+</div>
+<!-- Fixed Footer Actions -->
+<footer class="fixed bottom-0 left-sidebar-width right-0 bg-surface/95 backdrop-blur border-t border-outline-variant px-container-padding py-4 z-40 flex items-center justify-between shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+<div class="flex items-center gap-6 w-1/2 max-w-md">
+<div class="flex-1 space-y-1">
+<div class="flex justify-between items-center">
+<label class="font-body-sm text-body-sm text-on-surface-variant font-medium">Assessment Confidence</label>
+<span class="font-mono-label text-mono-label text-primary">91%</span>
+</div>
+<div class="relative w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="absolute top-0 left-0 h-full bg-primary rounded-full" style="width: 91%;"></div>
+<input class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" max="100" min="0" type="range" value="91">
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-6 py-2.5 text-on-surface-variant font-body-base font-medium hover:text-on-surface transition-colors">
+                    Discard
+                </button>
+<button class="px-8 py-2.5 bg-primary hover:bg-primary-container text-on-primary font-body-base font-bold rounded shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="send" data-weight="fill" style="font-variation-settings: 'FILL' 1;">send</span>
+                    SUBMIT TO COMMAND
+                </button>
+</div>
+</footer>
+</main>
+
+
+</body></html>

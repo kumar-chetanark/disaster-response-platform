@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Disaster Response Platform - Command Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#d3e4fe",
+                        "inverse-on-surface": "#283044",
+                        "outline": "#8c909f",
+                        "on-tertiary-fixed": "#311400",
+                        "primary-container": "#4d8eff",
+                        "surface-tint": "#adc6ff",
+                        "error-container": "#93000a",
+                        "surface-variant": "#2d3449",
+                        "secondary-container": "#3a4a5f",
+                        "inverse-primary": "#005ac2",
+                        "on-background": "#dae2fd",
+                        "inverse-surface": "#dae2fd",
+                        "on-error-container": "#ffdad6",
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface-container-highest": "#2d3449",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "surface-container-low": "#131b2e",
+                        "on-secondary": "#213145",
+                        "outline-variant": "#424754",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "on-secondary-container": "#a9bad3",
+                        "tertiary-container": "#df7412",
+                        "on-error": "#690005",
+                        "background": "#0b1326",
+                        "surface-container-lowest": "#060e20",
+                        "on-primary": "#002e6a",
+                        "on-surface-variant": "#c2c6d6",
+                        "surface-bright": "#31394d",
+                        "primary": "#adc6ff",
+                        "on-tertiary": "#502400",
+                        "on-secondary-fixed": "#0b1c30",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "tertiary": "#ffb786",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-dim": "#0b1326",
+                        "surface": "#0b1326",
+                        "secondary": "#b7c8e1",
+                        "error": "#ffb4ab",
+                        "on-primary-fixed": "#001a42",
+                        "tertiary-fixed": "#ffdcc6",
+                        "on-tertiary-container": "#461f00",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "primary-fixed": "#d8e2ff",
+                        "on-primary-container": "#00285d",
+                        "surface-container": "#171f33",
+                        "on-surface": "#dae2fd",
+                        "surface-container-high": "#222a3d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "header-height": "56px",
+                        "sidebar-width": "200px",
+                        "container-padding": "24px"
+                    },
+                    "fontFamily": {
+                        "body-base": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "mono-label": ["JetBrains Mono"],
+                        "status-badge": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-base": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "display-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "mono-label": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "status-badge": ["11px", { "lineHeight": "12px", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .map-grid {
+            background-image: 
+                linear-gradient(to right, rgba(66, 71, 84, 0.1) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(66, 71, 84, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-base antialiased h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="w-sidebar-width h-screen fixed left-0 top-0 bg-surface-container border-r border-outline-variant flex flex-col py-4 z-40 mt-header-height">
+<ul class="flex flex-col flex-grow space-y-1 px-3">
+<li>
+<a class="flex items-center px-3 py-2.5 bg-surface-container-highest text-primary font-medium rounded-DEFAULT transition-colors hover:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-body-sm">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-3 py-2.5 text-on-surface-variant font-body-sm hover:bg-surface-container-highest rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">warning</span>
+<span>Incidents</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-3 py-2.5 text-on-surface-variant font-body-sm hover:bg-surface-container-highest rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">map</span>
+<span>Operations</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-3 py-2.5 text-on-surface-variant font-body-sm hover:bg-surface-container-highest rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">inventory_2</span>
+<span>Resources</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-3 py-2.5 text-on-surface-variant font-body-sm hover:bg-surface-container-highest rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">groups</span>
+<span>Teams</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-3 py-2.5 text-on-surface-variant font-body-sm hover:bg-surface-container-highest rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">satellite_alt</span>
+<span>Aerial</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-3 py-2.5 text-on-surface-variant font-body-sm hover:bg-surface-container-highest rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">campaign</span>
+<span class="flex-grow">Alerts</span>
+<span class="bg-surface-variant text-on-surface-variant font-mono-label text-[10px] px-1.5 py-0.5 rounded border border-outline-variant">3</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-3 py-2.5 text-on-surface-variant font-body-sm hover:bg-surface-container-highest rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">description</span>
+<span>Reports</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-3 py-2.5 text-on-surface-variant font-body-sm hover:bg-surface-container-highest rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">history</span>
+<span>Audit</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto px-3 pb-6">
+<ul class="flex flex-col space-y-1">
+<li>
+<a class="flex items-center px-3 py-2 text-on-surface-variant font-body-sm hover:bg-surface-container-highest rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined mr-3 text-[20px]">settings</span>
+<span>Settings</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- TopAppBar -->
+<header class="h-header-height fixed top-0 w-full bg-surface-container border-b border-outline-variant flex justify-between items-center px-6 z-50">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 bg-primary rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-surface text-[16px]">radar</span>
+</div>
+<h1 class="font-headline-sm text-[15px] font-bold text-on-surface tracking-tight">Disaster Response Platform</h1>
+</div>
+<div class="h-4 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-4 font-mono-label text-[11px] text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+<span class="uppercase tracking-wider">System Live</span>
+</div>
+<span class="text-outline-variant">•</span>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">sync</span>
+<span>Last Sync: 10s ago</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="text-right mr-2 hidden md:block">
+<div class="font-body-sm text-on-surface font-medium leading-tight">Cmdr. J. Vance</div>
+<div class="text-[11px] text-on-surface-variant font-mono-label uppercase tracking-wider">Authority Level 5</div>
+</div>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">shield_person</span>
+</div>
+</div>
+</header>
+<!-- Main Content Wrapper -->
+<div class="flex-1 ml-sidebar-width flex flex-col relative h-full mt-header-height bg-surface">
+<!-- Scrollable Dashboard Content -->
+<main class="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
+<!-- 3. Active Incident Banner -->
+<section class="bg-surface-container-low border border-error/30 rounded-lg p-5 relative overflow-hidden flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-error"></div>
+<div class="flex flex-col gap-1 pl-2">
+<div class="flex items-center gap-2 mb-1">
+<span class="bg-error/20 text-error px-2 py-0.5 rounded text-[10px] font-mono-label font-bold uppercase tracking-wider border border-error/30">Active Crisis</span>
+</div>
+<h2 class="font-display-lg text-[24px] text-on-surface mb-1">Cyclone Alpha 4 - CRITICAL</h2>
+<div class="flex items-center gap-4 text-on-surface-variant font-mono-label text-[11px]">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">location_on</span>
+<span>Sector 7G, Coastal Region</span>
+</div>
+</div>
+<div class="flex gap-2 mt-2"><button class="px-3 py-1.5 font-mono-label text-[10px] border border-outline-variant text-on-surface hover:bg-surface-container transition-colors rounded uppercase tracking-wider">View Incident</button><button class="px-3 py-1.5 font-mono-label text-[10px] border border-outline-variant text-on-surface hover:bg-surface-container transition-colors rounded uppercase tracking-wider">Resource Recommendations</button></div></div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-8 bg-surface px-6 py-4 rounded border border-outline-variant">
+<div class="flex flex-col">
+<span class="text-on-surface-variant font-mono-label text-[10px] uppercase tracking-wider mb-1">Affected Pop.</span>
+<span class="font-headline-md text-error">2.4M</span>
+</div>
+<div class="flex flex-col">
+<span class="text-on-surface-variant font-mono-label text-[10px] uppercase tracking-wider mb-1">Affected Area</span>
+<span class="font-headline-md text-on-surface">1,420 <span class="text-[12px] font-normal text-on-surface-variant">sq km</span></span>
+</div>
+<div class="flex flex-col">
+<span class="text-on-surface-variant font-mono-label text-[10px] uppercase tracking-wider mb-1">Priority Level</span>
+<span class="font-headline-md text-error">Level 1</span>
+</div>
+<div class="flex flex-col">
+<span class="text-on-surface-variant font-mono-label text-[10px] uppercase tracking-wider mb-1">Resource Cov.</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-tertiary">84%</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. Secondary Row -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Priority Incidents -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg flex flex-col">
+<div class="px-4 py-3 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+<h3 class="font-headline-sm text-[14px] text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">format_list_numbered</span> Priority Incidents
+                    </h3>
+</div>
+<div class="p-3 flex flex-col gap-2">
+<div class="flex items-center justify-between p-3 bg-surface-container border border-outline-variant rounded hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-error"></div>
+<div>
+<div class="font-body-sm font-medium text-on-surface">Incident A - Central Grid Failure</div>
+<div class="font-mono-label text-[10px] text-on-surface-variant mt-0.5">Est. Impact: Severe</div>
+</div>
+</div>
+<span class="bg-error/10 text-error px-2 py-1 rounded text-[10px] font-mono-label uppercase border border-error/20">Critical</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container border border-outline-variant rounded hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<div>
+<div class="font-body-sm font-medium text-on-surface">Incident B - Highway 4 Flooding</div>
+<div class="font-mono-label text-[10px] text-on-surface-variant mt-0.5">Est. Impact: Moderate</div>
+</div>
+</div>
+<span class="bg-tertiary/10 text-tertiary px-2 py-1 rounded text-[10px] font-mono-label uppercase border border-tertiary/20">High</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container border border-outline-variant rounded hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-primary-fixed-dim"></div>
+<div>
+<div class="font-body-sm font-medium text-on-surface">Incident C - Comms Tower Delta Offline</div>
+<div class="font-mono-label text-[10px] text-on-surface-variant mt-0.5">Est. Impact: Low</div>
+</div>
+</div>
+<span class="bg-primary-container/20 text-primary-fixed-dim px-2 py-1 rounded text-[10px] font-mono-label uppercase border border-primary-container/30">Medium</span>
+</div>
+</div>
+</div>
+<!-- Active Alerts -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg flex flex-col">
+<div class="px-4 py-3 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+<h3 class="font-headline-sm text-[14px] text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">notifications_active</span> Active Alerts
+                    </h3>
+<span class="font-mono-label text-[10px] text-on-surface-variant">Live Feed</span>
+</div>
+<div class="p-3 flex flex-col gap-2 overflow-y-auto max-h-[220px]">
+<div class="pl-3 py-2 border-l-2 border-error">
+<div class="font-mono-label text-[10px] text-outline-variant mb-1">10:42 AM - INFRASTRUCTURE</div>
+<div class="font-body-sm text-on-surface">Hospital C power issue detected. Backup generators engaged but showing low fuel reserves.</div>
+</div>
+<div class="pl-3 py-2 border-l-2 border-tertiary">
+<div class="font-mono-label text-[10px] text-outline-variant mb-1">10:28 AM - CIVIL</div>
+<div class="font-body-sm text-on-surface">Evacuation warning issued for Lowland Sector 4. Traffic congestion reported on exit routes.</div>
+</div>
+<div class="pl-3 py-2 border-l-2 border-primary-fixed-dim">
+<div class="font-mono-label text-[10px] text-outline-variant mb-1">10:15 AM - METEO</div>
+<div class="font-body-sm text-on-surface">Weather update: Sustained winds decreasing, but precipitation expected to increase by 20mm/hr.</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. Resource Allocation -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden">
+<div class="px-4 py-3 border-b border-outline-variant bg-surface-container-low flex justify-between items-center">
+<h3 class="font-headline-sm text-[14px] text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">assignment_turned_in</span> Resource Allocation Advisory
+                </h3>
+<span class="bg-surface-variant px-2 py-0.5 rounded text-[10px] font-mono-label text-on-surface-variant border border-outline-variant uppercase tracking-wider">AI RECOMMENDS / AUTHORITY DECIDES</span>
+</div>
+<div class="p-4 flex flex-col gap-4">
+<!-- Advisory 1 -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-surface border border-outline-variant rounded">
+<div class="flex items-start gap-4"><div class="w-10 h-10 rounded bg-primary-container/10 flex items-center justify-center border border-primary-container/20 text-primary mt-1 md:mt-0"><span class="material-symbols-outlined">medical_services</span></div><div><div class="flex items-center gap-2 mb-1"><button class="px-3 py-1.5 font-mono-label text-[11px] border border-outline-variant text-on-surface hover:bg-surface-container transition-colors rounded">Review</button><span class="font-body-sm font-semibold text-on-surface">Medical Team Alpha</span><span class="material-symbols-outlined text-[14px] text-outline-variant">arrow_forward</span><span class="font-body-sm font-semibold text-on-surface">Incident A</span></div><div class="font-mono-label text-[10px] text-primary mb-1">12 personnel · 3 vehicles · ~18 km</div><p class="font-body-sm text-on-surface-variant text-[12px]"><span class="text-outline-variant font-medium">Reason:</span> Medical capability + proximity + incident severity</p><span class="inline-block mt-2 font-mono-label text-[10px] bg-tertiary/10 text-tertiary px-1.5 py-0.5 rounded border border-tertiary/20">RECOMMENDED</span></div></div>
+<div class="flex items-center gap-2"><button class="px-3 py-1.5 font-mono-label text-[11px] border border-outline-variant text-on-surface hover:bg-surface-container transition-colors rounded">Review</button>
+<button class="px-3 py-1.5 font-mono-label text-[11px] border border-outline-variant text-on-surface hover:bg-surface-container transition-colors rounded">Modify</button>
+<button class="px-3 py-1.5 font-mono-label text-[11px] border border-outline-variant text-error hover:bg-error/10 transition-colors rounded">Reject</button>
+<button class="px-4 py-1.5 font-mono-label text-[11px] bg-primary text-on-primary hover:bg-primary-fixed transition-colors rounded font-bold">Approve</button>
+</div>
+</div>
+<!-- Advisory 2 -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-surface border border-outline-variant rounded">
+<div class="flex items-start gap-4"><div class="w-10 h-10 rounded bg-primary-container/10 flex items-center justify-center border border-primary-container/20 text-primary mt-1 md:mt-0"><span class="material-symbols-outlined">directions_boat</span></div><div><div class="flex items-center gap-2 mb-1"><button class="px-3 py-1.5 font-mono-label text-[11px] border border-outline-variant text-on-surface hover:bg-surface-container transition-colors rounded">Review</button><span class="font-body-sm font-semibold text-on-surface">Swift Water Boat Unit 3</span><span class="material-symbols-outlined text-[14px] text-outline-variant">arrow_forward</span><span class="font-body-sm font-semibold text-on-surface">Incident B</span></div><div class="font-mono-label text-[10px] text-primary mb-1">2 boats · 8 personnel · ~24 km</div><p class="font-body-sm text-on-surface-variant text-[12px]"><span class="text-outline-variant font-medium">Reason:</span> Flood rescue capability + proximity + resource availability</p><span class="inline-block mt-2 font-mono-label text-[10px] bg-tertiary/10 text-tertiary px-1.5 py-0.5 rounded border border-tertiary/20">RECOMMENDED</span></div></div>
+<div class="flex items-center gap-2"><button class="px-3 py-1.5 font-mono-label text-[11px] border border-outline-variant text-on-surface hover:bg-surface-container transition-colors rounded">Review</button>
+<button class="px-3 py-1.5 font-mono-label text-[11px] border border-outline-variant text-on-surface hover:bg-surface-container transition-colors rounded">Modify</button>
+<button class="px-3 py-1.5 font-mono-label text-[11px] border border-outline-variant text-error hover:bg-error/10 transition-colors rounded">Reject</button>
+<button class="px-4 py-1.5 font-mono-label text-[11px] bg-primary text-on-primary hover:bg-primary-fixed transition-colors rounded font-bold">Approve</button>
+</div>
+</div>
+</div>
+</section>
+<!-- 6. Bottom Section -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-64">
+<!-- Contextual Map -->
+<div class="bg-surface border border-outline-variant rounded-lg flex flex-col overflow-hidden relative">
+<div class="absolute top-2 left-2 z-10 bg-surface/90 border border-outline-variant px-2 py-1 rounded backdrop-blur text-[10px] font-mono-label text-on-surface">
+                    Incident Map - Overview
+                </div>
+<div class="flex-1 w-full bg-surface-container-lowest relative map-grid">
+<div class="absolute inset-0 opacity-30 mix-blend-luminosity" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDLT0WAunbHDZIBiC6ohqWuiFLz-KwI5wn_Ng9UxGyzeS842UAiMOo8xF3VDvfuunGx0c4ltGgKxPMhhybmiN0s9wcgX97jJRdCduvW9cK-eSGu1hUzKXAlCzutaepkPuf8P6QhkGrgv_RMSNuCMB857pIx74SJv8tHIgHIBpG1f3-uoPsVfJ2hnuCR7t8vpqlX0JT5haIUs3I0D5qgLYhWoOo85EJLYfiEXJNrc9geUZTYSduknA2hTQ'); background-size: cover; background-position: center;"></div>
+<!-- Map blips -->
+<div class="absolute top-[40%] left-[30%] w-3 h-3 bg-error rounded-full animate-pulse shadow-[0_0_8px_rgba(255,180,171,0.6)]"></div>
+<div class="absolute top-[60%] left-[60%] w-2 h-2 bg-tertiary rounded-full shadow-[0_0_6px_rgba(255,183,134,0.6)]"></div>
+</div>
+</div>
+<!-- Aerial / Field Update -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg flex flex-col overflow-hidden"><div class="flex border-b border-outline-variant bg-surface-container-low"><button class="px-4 py-3 font-headline-sm text-[13px] text-primary border-b-2 border-primary flex items-center gap-2 bg-surface-container-lowest"><span class="material-symbols-outlined text-[18px]">satellite_alt</span> Aerial Dispatch</button><button class="px-4 py-3 font-headline-sm text-[13px] text-on-surface-variant flex items-center gap-2 hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[18px]">analytics</span> Field Update</button></div><div class="p-4 flex flex-col gap-3 flex-1 overflow-y-auto"><div class="flex flex-col gap-2"><div class="flex justify-between items-center p-2 bg-surface border border-outline-variant rounded"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-[16px] text-emerald-500">precision_manufacturing</span><span class="font-body-sm text-on-surface">Drone Alpha</span></div><div class="flex items-center gap-3"><span class="text-[10px] font-mono-label text-emerald-500 uppercase">Available</span><button class="px-3 py-1 bg-primary text-on-primary font-mono-label text-[10px] font-bold rounded hover:bg-primary-fixed transition-colors uppercase tracking-wider">Dispatch</button></div></div><div class="flex justify-between items-center p-2 bg-surface border border-outline-variant rounded"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-[16px] text-emerald-500">helicopter</span><span class="font-body-sm text-on-surface">Helicopter 02</span></div><div class="flex items-center gap-3"><span class="text-[10px] font-mono-label text-emerald-500 uppercase">Available</span><button class="px-3 py-1 bg-primary text-on-primary font-mono-label text-[10px] font-bold rounded hover:bg-primary-fixed transition-colors uppercase tracking-wider">Dispatch</button></div></div><div class="flex justify-between items-center p-2 bg-surface border border-outline-variant rounded"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-[16px] text-tertiary">helicopter</span><span class="font-body-sm text-on-surface">Rescue Helicopter</span></div><span class="text-[10px] font-mono-label text-tertiary uppercase">In Use</span></div></div></div><div class="hidden p-4 flex flex-col gap-3 flex-1"><div class="border-l-2 border-primary pl-3 mb-2"><div class="font-mono-label text-[10px] text-outline-variant uppercase mb-1">Mission Summary</div><div class="font-body-sm text-on-surface font-medium">Area Scan · Sector 4</div></div><ul class="space-y-1 font-body-sm text-[12px] text-on-surface-variant"><li class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-error">block</span> 3 roads inaccessible</li><li class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-error">home_repair_service</span> 2 structures damaged</li><li class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-tertiary">warning</span> 1 evacuation route blocked</li></ul><div class="mt-auto flex items-center justify-between"><div class="text-[11px] font-mono-label text-on-surface-variant">Confidence: <span class="text-emerald-500">91%</span></div><button class="px-3 py-1.5 border border-outline-variant text-on-surface font-mono-label text-[10px] rounded hover:bg-surface-container transition-colors uppercase">View Assessment</button></div></div></div>
+</section>
+</main>
+</div>
+</body></html>
