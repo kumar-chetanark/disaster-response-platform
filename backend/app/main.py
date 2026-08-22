@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import health, citizen_reports, incidents, resources, operations, assessments, alerts
+from app.routers import health, citizen_reports, incidents, resources, operations, assessments, alerts, reports
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Disaster Response Platform REST API",
-    version="0.7.0",
+    version="0.8.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -28,6 +28,7 @@ app.include_router(resources.router, prefix=settings.API_V1_PREFIX)
 app.include_router(operations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(assessments.router, prefix=settings.API_V1_PREFIX)
 app.include_router(alerts.router, prefix=settings.API_V1_PREFIX)
+app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 def root():
@@ -41,4 +42,5 @@ def root():
         "operations": f"{settings.API_V1_PREFIX}/operations",
         "assessments": f"{settings.API_V1_PREFIX}/assessments",
         "alerts": f"{settings.API_V1_PREFIX}/alerts",
+        "reports": f"{settings.API_V1_PREFIX}/reports",
     }

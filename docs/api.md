@@ -78,3 +78,65 @@
 ## Planned Endpoints (Subsequent Phases)
 - `GET /api/reports` — Historical debriefs and PDF generation
 - `POST /api/reports` — Create after-action debrief dossier
+
+---
+
+## 8. Reports & PDF Dossier API (`/api/reports`)
+
+### 8.1 List Operational Reports
+`GET /api/reports`
+- **Query Params**:
+  - `incident_id` (optional, string): Filter reports by linked canonical incident ID.
+  - `report_type` (optional, string): Filter by `SITREP`, `AFTER_ACTION`, `DAMAGE_ASSESSMENT`, `RESOURCE_AUDIT`.
+  - `page` (integer, default `1`): Pagination page number.
+  - `page_size` (integer, default `20`): Page size limit (1-100).
+- **Response**: `200 OK`
+```json
+{
+  "items": [
+    {
+      "id": "rep-sitrep-101",
+      "incident_id": "inc-a",
+      "incident_title": "Cyclone Alpha 4",
+      "report_type": "SITREP",
+      "title": "Cyclone Alpha 4 — Executive Command SITREP & Impact Debrief",
+      "author": "Commander J. Sterling (SDMA Crisis Desk)",
+      "summary": "Landfall recorded at 09:30 UTC. High-resolution telemetry and aerial UAV reconnaissance confirm severe storm surge across Coastal Basin Sector 7G.",
+      "metrics_summary": "Affected: 12,500 | Evacuated: 1,420 | Casualties: 0 | Resource Coverage: 85%",
+      "tags": "cyclone,evacuation,drone_recon,sitrep",
+      "created_at": "2026-08-22 09:30 AM"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20,
+  "total_pages": 1
+}
+```
+
+### 8.2 Get Report by ID
+`GET /api/reports/{id}`
+- **Response**: `200 OK` (ReportResponse object) or `404 Not Found`.
+
+### 8.3 Create Operational Report
+`POST /api/reports`
+- **Body**:
+```json
+{
+  "incident_id": "inc-a",
+  "report_type": "AFTER_ACTION",
+  "title": "Sector 7G Flood Recovery After-Action Review",
+  "author": "Chief Operations Director",
+  "summary": "Full summary of evacuation efficiency and resource deployment.",
+  "metrics_summary": "Evacuation Rate: 99.4%",
+  "tags": "flood,evacuation,review"
+}
+```
+- **Response**: `201 Created`
+
+### 8.4 Generate Official PDF Dossier
+`GET /api/reports/{id}/pdf`
+- **Response**: `200 OK`
+- **Content-Type**: `application/pdf`
+- **Content-Disposition**: `inline; filename="report_{id}.pdf"`
+- Generates a full multi-section PDF document containing executive summary, canonical incident metadata, multi-channel corroboration ledgers, field reconnaissance surveys, authority operations, resource allocations, and telemetry warning alerts.

@@ -409,9 +409,70 @@ class PlatformDataService {
     return this.inMemoryAerialAssets
   }
 
-  // Reports
-  async getReports(): Promise<PlatformReport[]> {
-    return this.inMemoryReports
+  // Reports -> GET /api/reports, POST /api/reports, GET /api/reports/{id}/pdf
+  async getReports(incidentId?: string, reportType?: string): Promise<PlatformReport[]> {
+    try {
+      const params = new URLSearchParams()
+      if (incidentId) params.append('incident_id', incidentId)
+      if (reportType && reportType !== 'ALL') params.append('report_type', reportType)
+      const res = await fetch(`${API_BASE_URL}/api/reports?${params.toString()}`)
+      if (res.ok) {
+        const data = await res.json()
+        return (data.items || []).map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          type: r.report_type || 'INCIDENT_SUMMARY',
+          date: r.created_at || 'Just now',
+          author: r.author || 'Command Desk',
+          incidentId: r.incident_id,
+          incidentTitle: r.incident_title,
+          summary: r.summary,
+          tags: r.tags ? r.tags.split(',') : [],
+          format: 'PDF',
+          downloadUrl: `${API_BASE_URL}/api/reports/${r.id}/pdf`,
+        }))
+      }
+    } catch (err) {
+      console.warn('Backend /api/reports unavailable:', err)
+    }
+    return []
+  }
+
+  async createReport(report: {
+    incident_id?: string
+    report_type: string
+    title: string
+    author: string
+    summary: string
+    metrics_summary?: string
+    tags?: string
+  }): Promise<PlatformReport | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(report),
+      })
+      if (res.ok) {
+        const r = await res.json()
+        return {
+          id: r.id,
+          title: r.title,
+          type: r.report_type,
+          date: r.created_at,
+          author: r.author,
+          incidentId: r.incident_id,
+          incidentTitle: r.incident_title,
+          summary: r.summary,
+          tags: r.tags ? r.tags.split(',') : [],
+          format: 'PDF',
+          downloadUrl: `${API_BASE_URL}/api/reports/${r.id}/pdf`,
+        }
+      }
+    } catch (err) {
+      console.error('Failed to create report on backend:', err)
+    }
+    return null
   }
 
   // Citizen Report Submission -> POST /api/citizen-reports

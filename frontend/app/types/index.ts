@@ -285,16 +285,21 @@ export type ReportType =
   | 'Authority Decision Log'
 
 export interface PlatformReport {
+  id: string
+  title: string
+  reportType?: ReportType | string
+  type?: string
+  timestamp?: string
+  date?: string
   generatedAt?: string
   incidentId?: string
-  metrics?: Record<string, any>
-  id: string
-  reportType: ReportType
-  title: string
-  timestamp: string
+  incidentTitle?: string
   relatedIncidentId?: string
   author: string
   summary: string
-  metricsSummary: string
-  tags: string[]
+  metricsSummary?: string
+  metrics?: Record<string, any>
+  tags?: string[]
+  format?: string
+  downloadUrl?: string
 }

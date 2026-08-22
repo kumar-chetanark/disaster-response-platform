@@ -9,13 +9,53 @@ from app.models.resource import Resource
 from app.models.resource_allocation import ResourceAllocation
 from app.models.operation import Operation
 from app.models.alert import Alert
+from app.models.report import Report
 
 def seed_database():
     db = SessionLocal()
     
     # Check if already seeded
     if db.query(Incident).filter(Incident.id == "inc-a").first():
-        print("Database already contains seed data.")
+        if db.query(Report).count() == 0:
+            print("Seeding missing reports...")
+            reports = [
+                Report(
+                    id="rep-sitrep-101",
+                    incident_id="inc-a",
+                    report_type="SITREP",
+                    title="Cyclone Alpha 4 — Executive Command SITREP & Impact Debrief",
+                    author="Commander J. Sterling (SDMA Crisis Desk)",
+                    summary="Landfall recorded at 09:30 UTC. High-resolution telemetry and aerial UAV reconnaissance confirm severe storm surge across Coastal Basin Sector 7G. 15 civilians extracted from critical water-logging zones. Mobile trauma units active.",
+                    metrics_summary="Affected: 12,500 | Evacuated: 1,420 | Casualties: 0 | Resource Coverage: 85%",
+                    tags="cyclone,evacuation,drone_recon,sitrep",
+                    created_at=datetime.utcnow(),
+                ),
+                Report(
+                    id="rep-afteraction-202",
+                    incident_id="inc-b",
+                    report_type="AFTER_ACTION",
+                    title="Industrial Chemical Storage Spill — Incident Mitigation Debrief",
+                    author="Chief Hazmat Inspector V. Vance",
+                    summary="Atmospheric dispersion sensors logged rapid dissipation of toxic vapor clouds following emergency perimeter foaming. Zero residential sector breach.",
+                    metrics_summary="Air Quality Index: Normalized (42 AQI) | Containment: 100%",
+                    tags="chemical_spill,hazmat,after_action",
+                    created_at=datetime.utcnow(),
+                ),
+                Report(
+                    id="rep-audit-303",
+                    incident_id=None,
+                    report_type="RESOURCE_AUDIT",
+                    title="Central Regional Disaster Depot — Fleet Readiness & Stockpile Audit",
+                    author="Logistics Controller K. Adams",
+                    summary="Complete audit of all disaster response vehicles, aerial drones, and relief stockpiles. All emergency generators and medical units verified operational.",
+                    metrics_summary="Fleet Readiness: 98% | Food Rations: 14 Days | Medical Kits: 150",
+                    tags="logistics,inventory,audit",
+                    created_at=datetime.utcnow(),
+                ),
+            ]
+            db.add_all(reports)
+            db.commit()
+        print("Database contains seed data.")
         db.close()
         return
 
