@@ -1,24 +1,202 @@
-﻿export interface PriorityIncident {
+// ==========================================
+// UNIFIED DOMAIN TYPES (Shared Application State)
+// ==========================================
+
+export type UserRole = 'CITIZEN' | 'AUTHORITY'
+
+export interface UserSession {
+  role: UserRole
+  userName?: string
+  badgeId?: string
+  authorityLevel?: number
+}
+
+// 1. INCIDENTS & CORRELATION
+export type IncidentSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+export type IncidentStatus = 'ACTIVE' | 'MONITORING' | 'RESOLVED' | 'UNRESOLVED'
+export type IncidentCategory =
+  | 'Flood'
+  | 'Cyclone'
+  | 'Fire'
+  | 'Landslide'
+  | 'Building damage'
+  | 'Road blockage'
+  | 'Medical emergency'
+  | 'Other'
+
+export type ReportSourceType = 'CITIZEN' | 'NEWS' | 'GOVERNMENT' | 'WEATHER' | 'FIELD_ASSESSMENT' | 'SMS' | 'IVR'
+
+export interface CorroboratingReport {
+  id: string
+  sourceType: ReportSourceType
+  sourceLabel: string
+  timestamp: string
+  summary: string
+  rawContent?: string
+  confidence?: number
+  channelBadge?: string
+  citizenContact?: string
+}
+
+export interface IncidentTimelineEvent {
+  id: string
+  timestamp: string
+  title: string
+  description: string
+  type: 'INGESTION' | 'SEVERITY_UPDATE' | 'AERIAL_ASSESSMENT' | 'RESOURCE_ALLOCATION' | 'AUTHORITY_ACTION' | 'OPERATION_DISPATCH'
+  badgeColor?: 'error' | 'primary' | 'tertiary' | 'emerald'
+}
+
+export interface Incident {
   id: string
   title: string
+  category: IncidentCategory
+  type: 'flood' | 'cyclone' | 'earthquake' | 'wildfire' | 'infrastructure'
   location: string
+  sector: string
   impact: string
-  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+  severity: IncidentSeverity
+  status: IncidentStatus
   timeReported: string
+  lastUpdated: string
+  affectedPopulationEst: string
+  affectedAreaSqKm: number
+  resourceCoverage: string
+  priorityLevel: string
+  isFieldVerified?: boolean
+  structuresAffectedCount?: number
+  peopleTrappedCount?: number
+  roadsAccessibility?: string
+  sourceCounts: {
+    citizenReports: number
+    newsReports: number
+    governmentReports: number
+    weatherReports: number
+    fieldAssessments: number
+  }
+  reports: CorroboratingReport[]
+  timeline: IncidentTimelineEvent[]
+  associatedOperations: string[]
+  recommendedResourceIds?: string[]
+  allocatedResourceIds?: string[]
 }
+
+export type PriorityIncident = Incident
+
+// 2. CITIZEN SUBMISSION
+export interface CitizenReportSubmission {
+  id: string
+  whatHappened: string
+  category: IncidentCategory
+  location: string
+  affectedPeople?: string
+  isImmediateDanger: boolean
+  isPeopleTrapped: boolean
+  description: string
+  citizenContact?: string
+  submittedAt: string
+}
+
+// 3. ALERTS
+export type AlertCategory = 'METEO' | 'CIVIL' | 'INFRASTRUCTURE' | 'MEDICAL' | 'GOVERNMENT' | 'SATELLITE'
+export type AlertSeverity = 'critical' | 'warning' | 'info'
 
 export interface ActiveAlert {
   id: string
   time: string
-  category: 'INFRASTRUCTURE' | 'CIVIL' | 'METEO' | 'MEDICAL'
+  category: AlertCategory
+  source: string
+  location: string
   message: string
-  severity?: 'critical' | 'warning' | 'info'
+  severity: AlertSeverity
+  relatedIncidentId?: string
+  relatedIncidentTitle?: string
+  isReviewedByAuthority: boolean
 }
 
+// 4. OPERATIONS
+export type OperationType =
+  | 'Rescue Team Mission'
+  | 'Medical Emergency Response'
+  | 'Police / Security Perimeter'
+  | 'Drone Reconnaissance'
+  | 'Helicopter Air Evacuation'
+  | 'Boat Swift-Water Rescue'
+  | 'Heavy Route Clearance'
+  | 'Supply Logistics Drop'
+
+export type OperationState =
+  | 'PLANNED'
+  | 'DISPATCHED'
+  | 'IN TRANSIT'
+  | 'IN OPERATION'
+  | 'COMPLETED'
+  | 'CANCELLED'
+
+export interface OperationRecord {
+  id: string
+  operationType: OperationType
+  incidentId: string
+  incidentTitle: string
+  resourceId: string
+  resourceName: string
+  location: string
+  state: OperationState
+  dispatchedTime: string
+  estimatedCompletion: string
+  authorizedBy: string
+  missionObjective: string
+  fieldUpdates: string[]
+}
+
+// 5. RESOURCES & INVENTORY
+export type ResourceCategory =
+  | 'medical'
+  | 'police_army'
+  | 'rescue'
+  | 'aerial'
+  | 'water'
+  | 'land'
+  | 'shelter'
+  | 'supplies'
+
+export type ResourceStatus =
+  | 'AVAILABLE'
+  | 'RECOMMENDED'
+  | 'AUTHORITY APPROVED'
+  | 'ALLOCATED'
+  | 'IN OPERATION'
+  | 'IN USE'
+  | 'COMPLETED'
+
+export interface ResourceUnit {
+  id: string
+  name: string
+  category: ResourceCategory
+  status: ResourceStatus
+  location: string
+  personnelCount: number
+  equipmentDetails: string
+  assignedIncidentId?: string
+  assignedOperationId?: string
+  etaMinutes?: number
+  // For Shelters
+  shelterCapacity?: number
+  shelterOccupied?: number
+  // For Supplies
+  suppliesFoodDays?: number
+  suppliesFoodPeople?: number
+  suppliesMedicineCount?: number
+  suppliesClothingCount?: number
+}
+
+// 6. ADVISORY ALLOCATION (9-Step Process)
 export interface AllocationAdvisory {
   id: string
+  resourceId?: string
   resourceName: string
-  resourceCategory: 'medical' | 'boat' | 'aviation' | 'engineering'
+  resourceCategory: 'medical' | 'boat' | 'aviation' | 'engineering' | 'rescue'
+  targetIncidentId?: string
   targetIncident: string
   details: string
   reason: string
@@ -32,12 +210,12 @@ export interface AllocationAdvisory {
   }
 }
 
-export interface AerialAsset {
-  id: string
-  name: string
-  type: 'drone' | 'helicopter'
-  status: 'AVAILABLE' | 'IN USE' | 'DISPATCHED'
-}
+// 7. ASSESSMENTS (Generalized Mode: Drone, Helicopter, Land, Water)
+export type AssessmentMode =
+  | 'Aerial — Drone'
+  | 'Aerial — Helicopter'
+  | 'Land Team / Vehicle'
+  | 'Water / Boat Team'
 
 export type MissionType =
   | 'Area Scan / Survey'
@@ -47,10 +225,20 @@ export type MissionType =
   | 'Evacuation / Route Assessment'
   | 'Communication / Observation'
 
-export interface AerialAssessmentSubmission {
+export interface AerialAsset {
+  id: string
+  name: string
+  type: 'drone' | 'helicopter' | 'land_unit' | 'boat'
+  status: 'AVAILABLE' | 'IN USE' | 'DISPATCHED'
+  batteryOrFuel?: string
+  operatorTeam?: string
+}
+
+export interface AssessmentSubmission {
   id: string
   relatedIncidentId: string
   relatedIncidentTitle: string
+  assessmentMode: AssessmentMode
   assetId: string
   assetName: string
   missionType: MissionType
@@ -67,4 +255,26 @@ export interface AerialAssessmentSubmission {
   operatorObservations: string
   confidenceScore: number
   submittedAt: string
+}
+
+export type AerialAssessmentSubmission = AssessmentSubmission
+
+// 8. REPORTS (Historical records absorbing audit functionality)
+export type ReportType =
+  | 'Incident Debrief'
+  | 'Assessment Mission Report'
+  | 'Operation After-Action'
+  | 'Resource Utilization'
+  | 'Authority Decision Log'
+
+export interface PlatformReport {
+  id: string
+  reportType: ReportType
+  title: string
+  timestamp: string
+  relatedIncidentId?: string
+  author: string
+  summary: string
+  metricsSummary: string
+  tags: string[]
 }

@@ -1,37 +1,43 @@
-﻿'use client'
+'use client'
 
 import React, { useState } from 'react'
-import { MissionType, AerialAssessmentSubmission, AerialAsset } from '../../types'
+import { MissionType, AssessmentMode, AssessmentSubmission, AerialAsset } from '../../types'
 
-interface AerialAssessmentFormProps {
+interface AssessmentFormProps {
   initialIncidentTitle?: string
   initialAsset?: AerialAsset | null
-  onSubmit: (data: AerialAssessmentSubmission) => void
+  onSubmit: (data: AssessmentSubmission) => void
   onBackToDashboard: () => void
 }
 
-export default function AerialAssessmentForm({
-  initialIncidentTitle = 'Cyclone Alpha 4',
+export default function AssessmentForm({
+  initialIncidentTitle = 'Cyclone Alpha 4 — Sector 7G Coastal Basin',
   initialAsset,
   onSubmit,
   onBackToDashboard,
-}: AerialAssessmentFormProps) {
-  // Form State
+}: AssessmentFormProps) {
+  // Assessment Mode State (Generalized: Drone, Helicopter, Land, Water)
+  const [assessmentMode, setAssessmentMode] = useState<AssessmentMode>('Aerial — Drone')
   const [missionId] = useState('SCAN-44A')
   const [missionType, setMissionType] = useState<MissionType>('Area Scan / Survey')
   const [assessmentTime, setAssessmentTime] = useState('14:30')
   const [weatherCondition, setWeatherCondition] = useState('Coastal Gale (35kt), Heavy Rain')
-  const [areaSurveyed, setAreaSurveyed] = useState('Sector 4 / Coastal')
+  const [areaSurveyed, setAreaSurveyed] = useState('Sector 7G / Coastal Basin')
   
   const [hazards, setHazards] = useState<string[]>([
     'Flooding',
     'Downed Power Lines',
-    'Debris'
+    'Debris',
   ])
   
   const [structuresAffected, setStructuresAffected] = useState<number>(2)
   const [roadAccessibility, setRoadAccessibility] = useState('3 roads blocked')
   const [peopleObserved, setPeopleObserved] = useState('~15 in isolated pockets')
+  
+  // Mission-Specific Dynamic Fields
+  const [deliveryStatus, setDeliveryStatus] = useState('In Transit - Drop Zone 4')
+  const [commsStatus, setCommsStatus] = useState('Repeater Tower Delta Offline (30% coverage drop)')
+  const [evacRouteRisk, setEvacRouteRisk] = useState('High - Route 9 Bridge cracked')
   
   const [recommendedResources, setRecommendedResources] = useState(
     'Water rescue teams (Swiftwater), Heavy debris removal equipment (Dozer), Portable lighting.'
@@ -39,8 +45,8 @@ export default function AerialAssessmentForm({
   const [evacuationStatus, setEvacuationStatus] = useState<'Routes Clear' | 'Compromised'>('Compromised')
   
   const [mediaFiles, setMediaFiles] = useState<string[]>([
-    'aerial_scan_01.jpg',
-    'thermal_infrared_02.png'
+    'field_recon_scan_01.jpg',
+    'thermal_infrared_02.png',
   ])
   
   const [operatorObservations, setOperatorObservations] = useState(
@@ -66,10 +72,11 @@ export default function AerialAssessmentForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const submission: AerialAssessmentSubmission = {
+    const submission: AssessmentSubmission = {
       id: missionId,
       relatedIncidentId: 'inc-a',
       relatedIncidentTitle: initialIncidentTitle,
+      assessmentMode,
       assetId: initialAsset?.id || 'drone-1',
       assetName: initialAsset?.name || 'Drone Alpha',
       missionType,
@@ -83,7 +90,7 @@ export default function AerialAssessmentForm({
       recommendedResources,
       evacuationStatus,
       mediaFiles,
-      operatorObservations,
+      operatorObservations: `${operatorObservations} | Mission Type: ${missionType} (${assessmentMode})`,
       confidenceScore,
       submittedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
@@ -91,33 +98,33 @@ export default function AerialAssessmentForm({
   }
 
   return (
-    <div className="flex-1 bg-background min-h-screen pb-32">
-      {/* Top App Bar equivalent for Form Context */}
-      <header className="h-header-height sticky top-0 bg-surface/90 backdrop-blur-md border-b border-outline-variant flex items-center justify-between px-container-padding z-30">
+    <div className="flex-1 bg-background h-full overflow-y-auto flex flex-col scrollbar-thin">
+      {/* Top Header - Sticky */}
+      <header className="h-header-height sticky top-0 bg-surface/95 backdrop-blur-md border-b border-outline-variant flex items-center justify-between px-6 z-30 shrink-0">
         <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={onBackToDashboard}
-            className="text-on-surface-variant hover:text-on-surface transition-colors p-2 -ml-2 rounded-lg hover:bg-surface-container-high flex items-center"
+            className="text-on-surface-variant hover:text-on-surface transition-colors p-2 -ml-2 rounded-lg hover:bg-surface-container-high flex items-center cursor-pointer"
             title="Return to Command Dashboard"
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
           <div>
             <h2 className="font-headline-md text-headline-md font-semibold text-on-surface">
-              Aerial Mission Assessment
+              Field Assessment Ingestion Console
             </h2>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="font-mono-label text-[11px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-                ID: {missionId}
+                MISSION ID: {missionId}
               </span>
               <span className="text-outline-variant text-[11px]">|</span>
               <span className="font-body-sm text-[12px] text-on-surface-variant">
-                Asset: <span className="text-primary font-medium">{initialAsset?.name || 'Drone Alpha'}</span>
+                Resource: <span className="text-primary font-medium">{initialAsset?.name || 'Drone Alpha'}</span>
               </span>
               <span className="text-outline-variant text-[11px]">|</span>
               <span className="font-body-sm text-[12px] text-on-surface-variant">
-                Related Incident: <span className="text-on-surface font-medium">{initialIncidentTitle}</span>
+                Target: <span className="text-on-surface font-medium">{initialIncidentTitle}</span>
               </span>
             </div>
           </div>
@@ -125,14 +132,14 @@ export default function AerialAssessmentForm({
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-on-surface-variant font-body-sm bg-surface-container px-3 py-1.5 rounded-lg border border-outline-variant text-[12px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Field Link Active
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            Field Telemetry Link Active
           </div>
 
           <button
             type="button"
             onClick={handleSaveDraft}
-            className="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-body-sm text-[12px] font-medium rounded transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-body-sm text-[12px] font-medium rounded transition-colors cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">save</span>
             {draftSaved ? 'Draft Saved!' : 'Save Draft'}
@@ -140,45 +147,56 @@ export default function AerialAssessmentForm({
         </div>
       </header>
 
-      {/* Form Canvas */}
-      <div className="max-w-4xl mx-auto p-container-padding pt-6 pb-24">
+      {/* Fully Scrollable Form Body Container */}
+      <div className="max-w-4xl w-full mx-auto p-6 space-y-6 pb-28">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Section 1: Mission Metadata */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden">
+          {/* Section 1: Mission Metadata & Mode */}
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
             <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center gap-3">
               <span className="material-symbols-outlined text-primary text-[20px]">info</span>
               <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
-                1. Mission Metadata
+                1. Mission Metadata &amp; Assessment Mode
               </h3>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
-                  Mission Type
+                  Assessment Mode
                 </label>
-                <div className="relative">
-                  <select
-                    value={missionType}
-                    onChange={(e) => setMissionType(e.target.value as MissionType)}
-                    className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors"
-                  >
-                    <option value="Area Scan / Survey">Area Scan / Survey</option>
-                    <option value="Damage Assessment">Damage Assessment</option>
-                    <option value="Search & Rescue Support">Search &amp; Rescue Support</option>
-                    <option value="Resource Delivery">Resource Delivery</option>
-                    <option value="Evacuation / Route Assessment">Evacuation / Route Assessment</option>
-                    <option value="Communication / Observation">Communication / Observation</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-on-surface-variant">
-                    <span className="material-symbols-outlined text-[18px]">expand_more</span>
-                  </div>
-                </div>
+                <select
+                  value={assessmentMode}
+                  onChange={(e) => setAssessmentMode(e.target.value as AssessmentMode)}
+                  className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
+                >
+                  <option value="Aerial — Drone">Aerial — Drone</option>
+                  <option value="Aerial — Helicopter">Aerial — Helicopter</option>
+                  <option value="Land Team / Vehicle">Land Team / Vehicle</option>
+                  <option value="Water / Boat Team">Water / Boat Team</option>
+                </select>
               </div>
 
               <div className="space-y-2">
                 <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
-                  Time of Assessment (ZULU)
+                  Mission Objective Type
+                </label>
+                <select
+                  value={missionType}
+                  onChange={(e) => setMissionType(e.target.value as MissionType)}
+                  className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
+                >
+                  <option value="Area Scan / Survey">1. Area Scan / Survey</option>
+                  <option value="Damage Assessment">2. Damage Assessment</option>
+                  <option value="Search & Rescue Support">3. Search &amp; Rescue Support</option>
+                  <option value="Resource Delivery">4. Resource Delivery</option>
+                  <option value="Evacuation / Route Assessment">5. Evacuation / Route Assessment</option>
+                  <option value="Communication / Observation">6. Communication / Observation</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+                  Assessment Time (ZULU)
                 </label>
                 <input
                   type="time"
@@ -196,19 +214,19 @@ export default function AerialAssessmentForm({
                   type="text"
                   value={weatherCondition}
                   onChange={(e) => setWeatherCondition(e.target.value)}
-                  placeholder="e.g. Gale winds, clear, etc."
+                  placeholder="e.g. Gale winds, heavy rain"
                   className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 />
               </div>
             </div>
           </section>
 
-          {/* Section 2: Spatial Data */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden">
+          {/* Section 2: Spatial Data & Hazards */}
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
             <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center gap-3">
               <span className="material-symbols-outlined text-primary text-[20px]">my_location</span>
               <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
-                2. Spatial Data &amp; Hazards
+                2. Spatial Data &amp; Hazards Detected
               </h3>
             </div>
 
@@ -242,7 +260,7 @@ export default function AerialAssessmentForm({
                         key={hazard.name}
                         type="button"
                         onClick={() => toggleHazard(hazard.name)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded border transition-colors text-[12px] font-body-sm ${
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded border transition-colors text-[12px] font-body-sm cursor-pointer ${
                           isChecked
                             ? hazard.color === 'error'
                               ? 'border-error/60 bg-error/15 text-error font-medium'
@@ -262,20 +280,25 @@ export default function AerialAssessmentForm({
             </div>
           </section>
 
-          {/* Section 3: Impact Analysis */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden">
-            <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-[20px]">analytics</span>
-              <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
-                3. Impact Analysis
-              </h3>
+          {/* Section 3: Impact Analysis (Mission-Specific Ingestion) */}
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
+            <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-[20px]">analytics</span>
+                <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
+                  3. Impact Analysis ({missionType})
+                </h3>
+              </div>
+              <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 uppercase">
+                Mode: {assessmentMode}
+              </span>
             </div>
 
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
-                    Structures Affected
+                    Structures Damaged
                   </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant material-symbols-outlined text-[18px]">
@@ -299,12 +322,12 @@ export default function AerialAssessmentForm({
                     <select
                       value={roadAccessibility}
                       onChange={(e) => setRoadAccessibility(e.target.value)}
-                      className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors"
+                      className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors cursor-pointer"
                     >
                       <option value="Clear">Clear</option>
                       <option value="Partially Blocked">Partially Blocked</option>
                       <option value="3 roads blocked">3 roads blocked</option>
-                      <option value="Impassable">Impassable (Air Access Only)</option>
+                      <option value="Impassable">Impassable (Air/Boat Access Only)</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-on-surface-variant">
                       <span className="material-symbols-outlined text-[18px]">expand_more</span>
@@ -330,9 +353,45 @@ export default function AerialAssessmentForm({
                 </div>
               </div>
 
+              {/* Dynamic Mission-Specific Fields */}
+              {missionType === 'Resource Delivery' && (
+                <div className="p-3 bg-surface-container rounded border border-outline-variant text-[12px] space-y-1.5 animate-in fade-in">
+                  <label className="font-mono-label text-[10px] text-primary uppercase font-bold">Delivery Drop Telemetry</label>
+                  <input
+                    type="text"
+                    value={deliveryStatus}
+                    onChange={(e) => setDeliveryStatus(e.target.value)}
+                    className="w-full bg-background border border-outline-variant text-on-surface font-body-sm text-[12px] rounded px-3 py-1.5"
+                  />
+                </div>
+              )}
+
+              {missionType === 'Communication / Observation' && (
+                <div className="p-3 bg-surface-container rounded border border-outline-variant text-[12px] space-y-1.5 animate-in fade-in">
+                  <label className="font-mono-label text-[10px] text-primary uppercase font-bold">Comms Relay Telemetry</label>
+                  <input
+                    type="text"
+                    value={commsStatus}
+                    onChange={(e) => setCommsStatus(e.target.value)}
+                    className="w-full bg-background border border-outline-variant text-on-surface font-body-sm text-[12px] rounded px-3 py-1.5"
+                  />
+                </div>
+              )}
+
+              {missionType === 'Evacuation / Route Assessment' && (
+                <div className="p-3 bg-surface-container rounded border border-outline-variant text-[12px] space-y-1.5 animate-in fade-in">
+                  <label className="font-mono-label text-[10px] text-primary uppercase font-bold">Evacuation Route Hazard Level</label>
+                  <input
+                    type="text"
+                    value={evacRouteRisk}
+                    onChange={(e) => setEvacRouteRisk(e.target.value)}
+                    className="w-full bg-background border border-outline-variant text-on-surface font-body-sm text-[12px] rounded px-3 py-1.5"
+                  />
+                </div>
+              )}
+
               {/* Impact Visualization / Spatial Canvas */}
               <div className="w-full h-44 bg-surface-container-lowest rounded border border-outline-variant overflow-hidden relative map-grid flex items-center justify-center">
-                {/* SVG Coastline & Telemetry Markers */}
                 <svg
                   viewBox="0 0 600 180"
                   className="w-full h-full object-cover opacity-50 text-outline"
@@ -344,14 +403,12 @@ export default function AerialAssessmentForm({
                   <path d="M 0,110 Q 120,80 200,120 T 400,90 T 600,130" stroke="#38bdf8" strokeDasharray="4 4" />
                 </svg>
 
-                {/* Drone Flight Path Line */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none">
                   <line x1="120" y1="50" x2="320" y2="90" stroke="#adc6ff" strokeWidth="2" strokeDasharray="5 3" />
                   <circle cx="320" cy="90" r="5" fill="#adc6ff" className="animate-ping" />
                   <circle cx="320" cy="90" r="4" fill="#adc6ff" />
                 </svg>
 
-                {/* Road block pins */}
                 <div className="absolute top-[45%] left-[22%] flex items-center gap-1 bg-error/90 border border-error px-2 py-0.5 rounded text-[10px] font-mono-label text-white shadow-md">
                   <span className="material-symbols-outlined text-[12px]">block</span>
                   Route 9 Blocked
@@ -359,7 +416,7 @@ export default function AerialAssessmentForm({
 
                 <div className="absolute top-[60%] left-[55%] flex items-center gap-1 bg-tertiary-container/90 border border-tertiary px-2 py-0.5 rounded text-[10px] font-mono-label text-white shadow-md">
                   <span className="material-symbols-outlined text-[12px]">group</span>
-                  ~15 Trapped (Sector 4)
+                  ~15 Trapped (Sector 7G)
                 </div>
 
                 <div className="absolute top-2 right-2 bg-background/90 backdrop-blur px-2.5 py-1 rounded text-[10px] font-mono-label text-on-surface-variant border border-outline-variant">
@@ -370,7 +427,7 @@ export default function AerialAssessmentForm({
           </section>
 
           {/* Section 4: Resource Needs & Evacuation */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden">
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
             <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center gap-3">
               <span className="material-symbols-outlined text-primary text-[20px]">local_shipping</span>
               <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
@@ -381,7 +438,7 @@ export default function AerialAssessmentForm({
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
-                  Recommended Resources
+                  Recommended Field Resources
                 </label>
                 <textarea
                   rows={3}
@@ -400,7 +457,7 @@ export default function AerialAssessmentForm({
                   <button
                     type="button"
                     onClick={() => setEvacuationStatus('Routes Clear')}
-                    className={`w-full text-left flex items-center gap-3 p-3 rounded border transition-colors ${
+                    className={`w-full text-left flex items-center gap-3 p-3 rounded border transition-colors cursor-pointer ${
                       evacuationStatus === 'Routes Clear'
                         ? 'border-emerald-500/60 bg-emerald-950/20'
                         : 'border-outline-variant bg-background hover:bg-surface-container'
@@ -424,7 +481,7 @@ export default function AerialAssessmentForm({
                   <button
                     type="button"
                     onClick={() => setEvacuationStatus('Compromised')}
-                    className={`w-full text-left flex items-center gap-3 p-3 rounded border transition-colors ${
+                    className={`w-full text-left flex items-center gap-3 p-3 rounded border transition-colors cursor-pointer ${
                       evacuationStatus === 'Compromised'
                         ? 'border-error/60 bg-error/15'
                         : 'border-outline-variant bg-background hover:bg-surface-container'
@@ -449,8 +506,8 @@ export default function AerialAssessmentForm({
             </div>
           </section>
 
-          {/* Section 5: Media & Operator Notes */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden">
+          {/* Section 5: Media & Notes */}
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
             <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center gap-3">
               <span className="material-symbols-outlined text-primary text-[20px]">perm_media</span>
               <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
@@ -461,19 +518,16 @@ export default function AerialAssessmentForm({
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
-                  Attached Aerial Telemetry / Imagery
+                  Attached Field Telemetry / Imagery
                 </label>
-                
-                {/* Upload box */}
                 <div className="w-full h-24 border-2 border-dashed border-outline-variant rounded bg-background flex flex-col items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors cursor-pointer group">
                   <span className="material-symbols-outlined text-[24px] mb-1 group-hover:-translate-y-0.5 transition-transform">
                     cloud_upload
                   </span>
-                  <span className="font-body-sm text-[12px]">Click to attach additional reconnaissance imagery</span>
+                  <span className="font-body-sm text-[12px]">Click to attach field reconnaissance files</span>
                   <span className="text-[10px] text-outline-variant">GeoTIFF, JPG, PNG up to 50MB</span>
                 </div>
 
-                {/* Attached files list */}
                 <div className="space-y-1.5">
                   {mediaFiles.map((file) => (
                     <div
@@ -487,7 +541,7 @@ export default function AerialAssessmentForm({
                       <button
                         type="button"
                         onClick={() => removeMediaFile(file)}
-                        className="text-on-surface-variant hover:text-error transition-colors"
+                        className="text-on-surface-variant hover:text-error transition-colors cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[16px]">close</span>
                       </button>
@@ -511,9 +565,9 @@ export default function AerialAssessmentForm({
             </div>
           </section>
 
-          {/* Form Action Submit / Slider Section */}
+          {/* Form Action Submit / Confidence Slider Bar */}
           <div className="pt-2">
-            <div className="bg-surface-container-low border border-outline-variant p-4 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="bg-surface-container-low border border-outline-variant p-4 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
               <div className="flex-1 w-full max-w-sm space-y-1">
                 <div className="flex justify-between items-center">
                   <label className="font-body-sm text-[12px] text-on-surface-variant font-medium">
@@ -543,14 +597,14 @@ export default function AerialAssessmentForm({
                 <button
                   type="button"
                   onClick={onBackToDashboard}
-                  className="px-5 py-2 text-on-surface-variant font-body-sm font-medium hover:text-on-surface transition-colors rounded border border-outline-variant"
+                  className="px-5 py-2 text-on-surface-variant font-body-sm font-medium hover:text-on-surface transition-colors rounded border border-outline-variant cursor-pointer"
                 >
                   Discard &amp; Return
                 </button>
 
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[12px] font-bold rounded shadow transition-all flex items-center gap-2 uppercase tracking-wider"
+                  className="px-6 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[12px] font-bold rounded shadow transition-all flex items-center gap-2 uppercase tracking-wider cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">send</span>
                   SUBMIT TO COMMAND
