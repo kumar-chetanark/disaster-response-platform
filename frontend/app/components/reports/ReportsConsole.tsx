@@ -1,78 +1,81 @@
 'use client'
 
 import React, { useState } from 'react'
-import { PlatformReport, ReportType, Incident } from '../../types'
+import { PlatformReport } from '../../types'
 import SearchInput from '../common/SearchInput'
 import DetailsHeader from '../common/DetailsHeader'
 import IncidentReportPreviewModal from './preview/IncidentReportPreviewModal'
 
 interface ReportsConsoleProps {
-  reports: PlatformReport[]
-  incidents?: Incident[]
-  selectedReportId: string | null
-  onSelectReport: (id: string) => void
-  onNavigateToIncident?: (incidentId: string) => void
+  incidents?: any[]
+  onNavigateToIncident?: (incId: string) => void
+  reports?: PlatformReport[]
+  selectedReportId?: string | null
+  onSelectReport?: (reportId: string) => void
+  onGenerateReport?: () => void
 }
 
 export default function ReportsConsole({
-  reports,
-  incidents = [],
-  selectedReportId,
+  reports: initialReports = [],
+  selectedReportId: initialSelectedId,
   onSelectReport,
-  onNavigateToIncident,
+  onGenerateReport,
 }: ReportsConsoleProps) {
-  const [filterType, setFilterType] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedIncidentForPdf, setSelectedIncidentForPdf] = useState<string>(incidents[0]?.id || 'inc-a')
-  
-  // Preview modal state (fixes blank page)
-  const [previewIncident, setPreviewIncident] = useState<Incident | null>(null)
+  const [filterType, setFilterType] = useState<string>('ALL')
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(initialSelectedId || null)
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+  const [isMobileDetailView, setIsMobileDetailView] = useState(false)
 
-  const selectedRep =
-    reports.find((r) => r.id === selectedReportId) || reports[0]
+  // Use provided reports or empty list
+  const reportsList = initialReports
 
-  const filteredReports = reports.filter((r) => {
-    const matchesType = filterType === 'ALL' || r.reportType === filterType
+  const filteredReports = reportsList.filter((rep) => {
+    const matchesType =
+      filterType === 'ALL' || rep.reportType.toLowerCase() === filterType.toLowerCase()
     const matchesSearch =
-      r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.id.toLowerCase().includes(searchQuery.toLowerCase())
+      rep.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      rep.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      rep.author.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesType && matchesSearch
   })
 
-  const handleOpenPreview = (incidentId: string) => {
-    const inc = incidents.find((i) => i.id === incidentId) || incidents[0]
-    if (inc) {
-      setPreviewIncident(inc)
+  const selectedReport =
+    reportsList.find((r) => r.id === selectedReportId) || filteredReports[0] || null
+
+  const handleSelect = (rep: PlatformReport) => {
+    setSelectedReportId(rep.id)
+    if (onSelectReport) {
+      onSelectReport(rep.id)
     }
+    setIsMobileDetailView(true)
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-surface overflow-hidden">
-      {/* Header / Filter Toolbar */}
-      <div className="px-6 py-3.5 border-b border-outline-variant bg-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+    <div className="flex-1 flex flex-col h-full bg-surface overflow-hidden w-full">
+      {/* Header Toolbar */}
+      <div className="px-4 sm:px-6 py-3.5 border-b border-outline-variant bg-surface-container flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+          <div className="w-8 h-8 rounded bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
             <span className="material-symbols-outlined text-[20px]">description</span>
           </div>
           <div>
             <h2 className="font-headline-sm text-[15px] font-bold text-on-surface">
-              Platform Intelligence &amp; Historical Reports
+              Operational Reports &amp; After-Action Debriefs
             </h2>
-            <p className="font-body-sm text-[11px] text-on-surface-variant">
-              Unified mission debriefs, operational after-actions, and authority decision records
+            <p className="font-body-sm text-[11px] text-on-surface-variant hidden sm:block">
+              Synthesized situation intelligence dossiers, casualty metrics, and printable PDF exports
             </p>
           </div>
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* Search and Filters */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <SearchInput
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Search reports, authors..."
-            className="w-56"
+            placeholder="Search report archive..."
+            className="flex-1 sm:w-56"
           />
 
           <select
@@ -80,203 +83,205 @@ export default function ReportsConsole({
             onChange={(e) => setFilterType(e.target.value)}
             className="bg-background border border-outline-variant text-on-surface font-mono-label text-[11px] rounded px-2.5 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary appearance-none pr-7 cursor-pointer"
           >
-            <option value="ALL">Type: ALL</option>
-            <option value="Incident Debrief">Incident Debrief</option>
-            <option value="Assessment Mission Report">Assessment Report</option>
-            <option value="Operation After-Action">Operation After-Action</option>
-            <option value="Resource Utilization">Resource Utilization</option>
-            <option value="Authority Decision Log">Authority Decision Log</option>
+            <option value="ALL">All Types</option>
+            <option value="SITREP">SITREP</option>
+            <option value="AFTER_ACTION">AFTER ACTION</option>
+            <option value="DAMAGE_ASSESSMENT">DAMAGE ASSESSMENT</option>
+            <option value="RESOURCE_AUDIT">RESOURCE AUDIT</option>
           </select>
+
+          <button
+            type="button"
+            onClick={() => setIsPreviewModalOpen(true)}
+            className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center gap-1.5 shadow"
+          >
+            <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+            Preview &amp; Print PDF
+          </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Split Layout */}
+      <div className="flex-1 flex overflow-hidden w-full relative">
         {/* LEFT PANE: Reports List */}
-        <div className="w-full md:w-5/12 lg:w-4/12 border-r border-outline-variant flex flex-col h-full bg-surface-container-lowest">
-          {/* Quick PDF Generator Bar */}
-          <div className="p-3 bg-surface-container-low border-b border-outline-variant space-y-2 shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="font-mono-label text-[10px] text-primary uppercase font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
-                Export Incident PDF Dossier
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedIncidentForPdf}
-                onChange={(e) => setSelectedIncidentForPdf(e.target.value)}
-                className="flex-1 bg-background border border-outline-variant text-on-surface font-mono-label text-[11px] rounded px-2 py-1 cursor-pointer truncate"
-              >
-                {incidents.map((inc) => (
-                  <option key={inc.id} value={inc.id}>
-                    {inc.id.toUpperCase()} — {inc.title}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => handleOpenPreview(selectedIncidentForPdf)}
-                className="px-2.5 py-1 bg-primary text-on-primary font-mono-label text-[10px] font-bold rounded uppercase hover:bg-primary-container shrink-0 cursor-pointer flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-[13px]">visibility</span>
-                View &amp; PDF
-              </button>
-            </div>
-          </div>
-
-          <div className="px-4 py-2 bg-surface-container-high border-b border-outline-variant flex items-center justify-between shrink-0">
+        <div
+          className={`w-full md:w-5/12 lg:w-4/12 border-r border-outline-variant flex flex-col h-full bg-surface-container-lowest transition-all ${
+            isMobileDetailView ? 'hidden md:flex' : 'flex'
+          }`}
+        >
+          <div className="px-4 py-2.5 bg-surface-container-low border-b border-outline-variant flex items-center justify-between shrink-0">
             <span className="font-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider">
-              {filteredReports.length} Documented Records
+              {filteredReports.length} Historical Dossiers
             </span>
             <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-              Historical Ledger
+              Debrief Archive
             </span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin">
-            {filteredReports.map((rep) => {
-              const isSelected = selectedRep?.id === rep.id
-              return (
-                <div
-                  key={rep.id}
-                  onClick={() => onSelectReport(rep.id)}
-                  className={`p-3 rounded border transition-all cursor-pointer flex flex-col gap-1.5 relative ${
-                    isSelected
-                      ? 'bg-surface-container-highest border-primary shadow-sm ring-1 ring-primary/40'
-                      : 'bg-surface-container-low border-outline-variant hover:border-outline hover:bg-surface-container'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
+            {filteredReports.length === 0 ? (
+              <div className="p-8 text-center text-on-surface-variant font-mono-label text-[12px] space-y-2">
+                <span className="material-symbols-outlined text-[32px] text-outline block mx-auto">
+                  folder_open
+                </span>
+                <p>Report archive is available once report records are generated.</p>
+              </div>
+            ) : (
+              filteredReports.map((rep) => {
+                const isSelected = selectedReport?.id === rep.id
+                return (
+                  <div
+                    key={rep.id}
+                    onClick={() => handleSelect(rep)}
+                    className={`p-3.5 rounded border transition-all cursor-pointer flex flex-col gap-2 relative ${
+                      isSelected
+                        ? 'bg-surface-container-highest border-primary shadow-sm ring-1 ring-primary/40'
+                        : 'bg-surface-container-low border-outline-variant hover:border-outline hover:bg-surface-container'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-mono-label text-[10px] text-primary font-bold">
                           {rep.id}
                         </span>
-                        <span className="text-outline-variant text-[10px]">•</span>
-                        <span className="font-mono-label text-[9px] bg-surface text-on-surface-variant px-1.5 py-0.2 rounded border border-outline-variant uppercase">
+                        <span className="font-mono-label text-[9px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.2 rounded uppercase font-bold">
                           {rep.reportType}
                         </span>
                       </div>
-                      <h4 className="font-body-sm font-semibold text-[13px] text-on-surface mt-0.5 leading-snug">
-                        {rep.title}
-                      </h4>
+                      <span className="font-mono-label text-[10px] text-on-surface-variant">
+                        {rep.generatedAt}
+                      </span>
                     </div>
 
-                    <span className="font-mono-label text-[9px] text-on-surface-variant shrink-0">
-                      {rep.timestamp}
-                    </span>
-                  </div>
+                    <h4 className="font-headline-sm font-semibold text-[13px] text-on-surface leading-snug">
+                      {rep.title}
+                    </h4>
 
-                  <p className="font-body-sm text-[11px] text-outline line-clamp-2">
-                    {rep.summary}
-                  </p>
-
-                  <div className="pt-2 border-t border-outline-variant/60 flex items-center justify-between text-[10px] font-mono-label text-on-surface-variant">
-                    <span>Author: {rep.author}</span>
-                    <span className="text-primary">{rep.metricsSummary}</span>
+                    <div className="flex items-center justify-between text-[11px] text-on-surface-variant font-mono-label">
+                      <span className="truncate">{rep.author}</span>
+                      <span className="text-[10px] text-emerald-400">PDF Ready</span>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </div>
         </div>
 
-        {/* RIGHT PANE: Selected Report Detail Dossier */}
-        <div className="flex-1 flex flex-col h-full bg-surface overflow-y-auto p-5 space-y-5 scrollbar-thin">
-          {selectedRep ? (
+        {/* RIGHT PANE: Selected Report Master Dossier */}
+        <div
+          className={`flex-1 flex flex-col h-full bg-surface overflow-y-auto p-4 sm:p-5 space-y-4 scrollbar-thin transition-all min-w-0 ${
+            isMobileDetailView ? 'flex w-full' : 'hidden md:flex'
+          }`}
+        >
+          {selectedReport ? (
             <>
-              {/* 1. Compact Consistent Details Header */}
+              {/* Mobile Back Button */}
+              <div className="md:hidden pb-1">
+                <button
+                  type="button"
+                  onClick={() => setIsMobileDetailView(false)}
+                  className="flex items-center gap-1.5 text-primary hover:text-on-surface font-mono-label text-[12px] font-bold py-1.5 px-2.5 rounded bg-surface-container border border-outline-variant cursor-pointer w-fit"
+                >
+                  <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                  ← Back to Reports Archive
+                </button>
+              </div>
+
+              {/* 1. Header */}
               <DetailsHeader
-                badgeId={`REPORT ID: ${selectedRep.id}`}
-                title={selectedRep.title}
-                statusText={`TYPE: ${selectedRep.reportType}`}
+                badgeId={`REPORT DOSSIER: ${selectedReport.id}`}
+                title={selectedReport.title}
+                severityBadge={selectedReport.reportType}
+                statusText="ARCHIVED DEBRIEF"
                 statusColor="primary"
                 accentColor="primary"
                 subItems={[
-                  { label: 'Author', value: selectedRep.author, icon: 'person' },
-                  { label: 'Timestamp', value: selectedRep.timestamp },
-                  ...(selectedRep.relatedIncidentId
-                    ? [{ label: 'Incident Ref', value: selectedRep.relatedIncidentId.toUpperCase(), highlight: true }]
-                    : []),
+                  { label: 'Author / Authority', value: selectedReport.author, icon: 'person' },
+                  { label: 'Linked Incident', value: selectedReport.incidentId || 'Central Command', highlight: true },
+                  { label: 'Date Generated', value: selectedReport.generatedAt || 'Today', icon: 'calendar_today' },
+                  { label: 'Classification', value: 'OFFICIAL USE ONLY' },
                 ]}
-                extraAction={
-                  selectedRep.relatedIncidentId ? (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenPreview(selectedRep.relatedIncidentId!)}
-                      className="px-3.5 py-1.5 bg-surface-container-high hover:bg-surface-bright text-primary border border-outline-variant font-mono-label text-[11px] font-bold rounded uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">picture_as_pdf</span>
-                      View &amp; PDF
-                    </button>
-                  ) : undefined
-                }
               />
 
               {/* 2. Executive Summary */}
               <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-2.5">
-                <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
+                <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2 pb-2 border-b border-outline-variant">
                   <span className="material-symbols-outlined text-primary text-[18px]">summarize</span>
-                  Executive Summary &amp; Findings
+                  Executive Summary &amp; Operational Narrative
                 </h4>
-                <p className="font-body-base text-[13px] text-on-surface bg-surface-container p-3.5 rounded border border-outline-variant leading-relaxed">
-                  {selectedRep.summary}
+                <p className="font-body-base text-[13px] text-on-surface bg-surface-container p-3 rounded border border-outline-variant leading-relaxed">
+                  {selectedReport.summary}
                 </p>
               </section>
 
-              {/* 3. Tags and Indexing */}
-              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-2.5">
-                <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-[16px]">label</span>
-                  Intelligence Tags &amp; Taxonomies
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedRep.tags.map((tag, idx) => (
-                    <span
-                      key={idx}
-                      className="bg-surface px-2.5 py-1 rounded text-[10px] font-mono-label text-primary border border-outline-variant"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </section>
-
-              {/* 4. Actions */}
-              {selectedRep.relatedIncidentId && onNavigateToIncident && (
-                <div className="pt-2 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenPreview(selectedRep.relatedIncidentId!)}
-                    className="px-4 py-2 bg-surface-container-high hover:bg-surface-bright text-primary border border-outline-variant font-mono-label text-[11px] font-bold rounded uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[15px]">description</span>
-                    Preview Official Dossier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onNavigateToIncident(selectedRep.relatedIncidentId!)}
-                    className="px-4 py-2 bg-primary text-on-primary font-mono-label text-[11px] font-bold rounded uppercase tracking-wider hover:bg-primary-container transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    Open Incident {selectedRep.relatedIncidentId.toUpperCase()} Dossier →
-                  </button>
-                </div>
+              {/* 3. Metrics Summary */}
+              {selectedReport.metrics && (
+                <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-2.5">
+                  <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2 pb-2 border-b border-outline-variant">
+                    <span className="material-symbols-outlined text-primary text-[18px]">analytics</span>
+                    Key Operational Metrics
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono-label text-[11px]">
+                    {Object.entries(selectedReport.metrics).map(([key, val]) => (
+                      <div key={key} className="p-2.5 bg-surface-container rounded border border-outline-variant/60">
+                        <span className="text-outline block uppercase text-[9px]">
+                          {key.replace(/([A-Z])/g, ' $1')}
+                        </span>
+                        <span className="text-primary font-bold text-[13px]">{String(val)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               )}
+
+              {/* Action Buttons */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewModalOpen(true)}
+                  className="px-5 py-2.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer shadow transition-colors flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px]">print</span>
+                  Print / Save Official PDF
+                </button>
+              </div>
             </>
           ) : (
             <div className="p-8 text-center text-on-surface-variant font-mono-label text-[12px]">
-              Select a report from the historical ledger to inspect details.
+              Select a report from the archive to inspect situational debrief metrics.
             </div>
           )}
         </div>
       </div>
 
-      {/* Incident Report Preview Modal */}
-      {previewIncident && (
+      {/* PDF Modal */}
+      {isPreviewModalOpen && (
         <IncidentReportPreviewModal
-          incident={previewIncident}
-          onClose={() => setPreviewIncident(null)}
+          incident={({
+            affectedPopulationEst: '12,500 civilians',
+            affectedAreaSqKm: '12.4 km²',
+            sourceCounts: { citizenReports: 1, newsReports: 0, governmentReports: 0, weatherReports: 0, fieldAssessments: 1 },
+            reports: [],
+            associatedOperations: [],
+            timeline: [],
+            
+            id: selectedReport?.incidentId || 'inc-a',
+            title: selectedReport?.title || 'Cyclone Alpha 4  Sector 7G Coastal Basin',
+            category: 'Cyclone' as any,
+            type: 'cyclone',
+            location: 'Sector 7G Coastal Basin',
+            sector: 'Sector 7G',
+            impact: selectedReport?.summary || 'Widespread coastal flooding',
+            severity: 'CRITICAL',
+            status: 'ACTIVE',
+            timeReported: '10:35 AM',
+            lastUpdated: 'Just now',
+            priorityLevel: 'Level 1',
+            resourceCoverage: '84%',
+            isFieldVerified: true,
+          }) as any}
+          onClose={() => setIsPreviewModalOpen(false)}
         />
       )}
     </div>

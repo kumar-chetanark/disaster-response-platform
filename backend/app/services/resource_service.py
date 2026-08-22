@@ -1,0 +1,150 @@
+import uuid
+import math
+from typing import Optional, List, Dict
+from sqlalchemy.orm import Session
+from app.models.resource import Resource
+from app.schemas.resource import ResourceCreate, ResourceUpdate, ResourceResponse, ResourceListResponse
+from app.services.matching_service import haversine_distance_km
+
+SECTOR_COORDINATES = {
+    "sector 7g": (29.7604, -95.3698),
+    "coastal basin": (29.7604, -95.3698),
+    "coastal causeway": (29.8100, -95.4200),
+    "highway 4": (29.8100, -95.4200),
+    "sector 1": (29.9000, -95.2000),
+    "highland ridge": (29.9000, -95.2000),
+    "sector 2": (29.7200, -95.3100),
+    "riverfront": (29.7200, -95.3100),
+    "civic arena": (29.7500, -95.3600),
+}
+
+def resolve_location_coords(location_name: str, lat: Optional[float], lon: Optional[float]):
+    if lat is not None and lon is not None:
+        return lat, lon
+    clean = location_name.lower()
+    for key, coords in SECTOR_COORDINATES.items():
+        if key in clean:
+            return coords
+    return 29.7604, -95.3698
+
+def to_resource_response(res: Resource, distance_km: Optional[float] = None) -> ResourceResponse:
+    return ResourceResponse(
+        id=res.id,
+        name=res.name,
+        category=res.category,
+        status=res.status,
+        base_location=res.base_location,
+        personnel_count=res.personnel_count or 0,
+        equipment_details=res.equipment_details,
+        distance_km=distance_km,
+        shelter_capacity=res.shelter_capacity,
+        shelter_occupied=res.shelter_occupied,
+        supplies_food_days=res.supplies_food_days,
+        supplies_food_people=res.supplies_food_people,
+        supplies_medicine_count=res.supplies_medicine_count,
+        supplies_clothing_count=res.supplies_clothing_count,
+    )
+
+def get_resources_list(
+    db: Session,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    location: Optional[str] = None,
+) -> ResourceListResponse:
+    query = db.query(Resource)
+    if category and category.lower() != "all":
+        query = query.filter(Resource.category == category.lower())
+    if status and status.upper() != "ALL":
+        query = query.filter(Resource.status == status.upper())
+    if location and location.strip():
+        query = query.filter(Resource.base_location.ilike(f"%{location.strip()}%"))
+
+    items = query.all()
+    
+    all_res = db.query(Resource).all()
+    breakdown: Dict[str, int] = {}
+    for r in all_res:
+        breakdown[r.category] = breakdown.get(r.category, 0) + 1
+
+    return ResourceListResponse(
+        items=[to_resource_response(r) for r in items],
+        total=len(items),
+        categories_breakdown=breakdown,
+    )
+
+def create_resource(db: Session, res_in: ResourceCreate) -> ResourceResponse:
+    res = Resource(
+        id=f"res-{res_in.category[:3]}-{str(uuid.uuid4())[:4]}",
+        name=res_in.name,
+        category=res_in.category.lower(),
+        status=res_in.status.upper(),
+        base_location=res_in.base_location,
+        personnel_count=res_in.personnel_count or 0,
+        equipment_details=res_in.equipment_details,
+        shelter_capacity=res_in.shelter_capacity,
+        shelter_occupied=res_in.shelter_occupied,
+        supplies_food_days=res_in.supplies_food_days,
+        supplies_food_people=res_in.supplies_food_people,
+        supplies_medicine_count=res_in.supplies_medicine_count,
+        supplies_clothing_count=res_in.supplies_clothing_count,
+    )
+    db.add(res)
+    db.commit()
+    db.refresh(res)
+    return to_resource_response(res)
+
+def update_resource(db: Session, resource_id: str, res_in: ResourceUpdate) -> Optional[ResourceResponse]:
+    res = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not res:
+        return None
+
+    if res_in.name is not None:
+        res.name = res_in.name
+    if res_in.status is not None:
+        res.status = res_in.status.upper()
+    if res_in.personnel_count is not None:
+        res.personnel_count = res_in.personnel_count
+    if res_in.equipment_details is not None:
+        res.equipment_details = res_in.equipment_details
+    if res_in.shelter_capacity is not None:
+        res.shelter_capacity = res_in.shelter_capacity
+    if res_in.shelter_occupied is not None:
+        res.shelter_occupied = res_in.shelter_occupied
+    if res_in.supplies_food_days is not None:
+        res.supplies_food_days = res_in.supplies_food_days
+    if res_in.supplies_food_people is not None:
+        res.supplies_food_people = res_in.supplies_food_people
+    if res_in.supplies_medicine_count is not None:
+        res.supplies_medicine_count = res_in.supplies_medicine_count
+    if res_in.supplies_clothing_count is not None:
+        res.supplies_clothing_count = res_in.supplies_clothing_count
+
+    db.commit()
+    db.refresh(res)
+    return to_resource_response(res)
+
+def get_nearby_resources(
+    db: Session,
+    location_name: str,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    category: Optional[str] = None,
+    max_distance_km: float = 50.0,
+) -> List[ResourceResponse]:
+    target_lat, target_lon = resolve_location_coords(location_name, latitude, longitude)
+    
+    query = db.query(Resource)
+    if category and category.lower() != "all":
+        query = query.filter(Resource.category == category.lower())
+    
+    all_resources = query.all()
+    results = []
+
+    for res in all_resources:
+        res_lat, res_lon = resolve_location_coords(res.base_location, None, None)
+        dist = round(haversine_distance_km(target_lat, target_lon, res_lat, res_lon), 1)
+        if dist <= max_distance_km:
+            results.append((dist, to_resource_response(res, distance_km=dist)))
+
+    results.sort(key=lambda x: x[0])
+    return [r[1] for r in results]

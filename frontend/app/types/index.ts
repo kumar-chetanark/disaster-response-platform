@@ -85,6 +85,7 @@ export type PriorityIncident = Incident
 
 // 2. CITIZEN SUBMISSION
 export interface CitizenReportSubmission {
+  citizenName?: string
   id: string
   whatHappened: string
   category: IncidentCategory
@@ -102,6 +103,11 @@ export type AlertCategory = 'METEO' | 'CIVIL' | 'INFRASTRUCTURE' | 'MEDICAL' | '
 export type AlertSeverity = 'critical' | 'warning' | 'info'
 
 export interface ActiveAlert {
+  timestamp?: string
+  alertTime?: string
+  incidentId?: string
+  isReviewed?: boolean
+  incidentTitle?: string
   id: string
   time: string
   category: AlertCategory
@@ -134,6 +140,8 @@ export type OperationState =
   | 'CANCELLED'
 
 export interface OperationRecord {
+  destinationLocation?: string
+  resourceCategory?: string
   id: string
   operationType: OperationType
   incidentId: string
@@ -153,9 +161,14 @@ export interface OperationRecord {
 export type ResourceCategory =
   | 'medical'
   | 'police_army'
+  | 'police'
+  | 'army'
   | 'rescue'
   | 'aerial'
+  | 'helicopter'
+  | 'drone'
   | 'water'
+  | 'boat'
   | 'land'
   | 'shelter'
   | 'supplies'
@@ -168,8 +181,18 @@ export type ResourceStatus =
   | 'IN OPERATION'
   | 'IN USE'
   | 'COMPLETED'
+  | 'MAINTENANCE'
+  | 'STANDBY'
+  | 'DEPLOYED'
 
 export interface ResourceUnit {
+  distanceKm?: number
+  shelterCapacity?: number
+  shelterOccupied?: number
+  suppliesFoodDays?: number
+  suppliesFoodPeople?: number
+  suppliesMedicineCount?: number
+  suppliesClothingCount?: number
   id: string
   name: string
   category: ResourceCategory
@@ -181,13 +204,7 @@ export interface ResourceUnit {
   assignedOperationId?: string
   etaMinutes?: number
   // For Shelters
-  shelterCapacity?: number
-  shelterOccupied?: number
   // For Supplies
-  suppliesFoodDays?: number
-  suppliesFoodPeople?: number
-  suppliesMedicineCount?: number
-  suppliesClothingCount?: number
 }
 
 // 6. ADVISORY ALLOCATION (9-Step Process)
@@ -268,6 +285,9 @@ export type ReportType =
   | 'Authority Decision Log'
 
 export interface PlatformReport {
+  generatedAt?: string
+  incidentId?: string
+  metrics?: Record<string, any>
   id: string
   reportType: ReportType
   title: string

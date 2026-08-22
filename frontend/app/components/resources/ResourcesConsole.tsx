@@ -1,575 +1,644 @@
 'use client'
 
-import React, { useState } from 'react'
-import { ResourceUnit, AllocationAdvisory, ResourceStatus, ResourceCategory } from '../../types'
+import React, { useState, useEffect } from 'react'
+import { ResourceUnit, ResourceStatus, Incident } from '../../types'
 import SearchInput from '../common/SearchInput'
+import { platformDataService } from '../../services/dataService'
 
 interface ResourcesConsoleProps {
-  resources: ResourceUnit[]
-  advisories: AllocationAdvisory[]
-  onApproveAdvisory: (id: string) => void
-  onRejectAdvisory: (id: string) => void
-  onModifyAdvisory: (id: string) => void
+  resources?: ResourceUnit[]
+  advisories?: any[]
+  onApproveAdvisory?: (id: string) => void
+  onRejectAdvisory?: (id: string) => void
+  onModifyAdvisory?: (id: string) => void
+  onUpdateStatus?: (resourceId: string, status: ResourceStatus) => void
   onUpdateResourceStatus?: (id: string, newStatus: ResourceStatus) => void
-  onAddResource?: (newRes: ResourceUnit) => void
+  onAddResource?: (resource: ResourceUnit) => void
+  onOpenOperations?: () => void
+  onNavigateToIncident?: (incidentId: string) => void
 }
 
 export default function ResourcesConsole({
-  resources,
-  advisories,
-  onApproveAdvisory,
-  onRejectAdvisory,
-  onModifyAdvisory,
+  resources: initialResources = [],
+  onUpdateStatus,
   onUpdateResourceStatus,
   onAddResource,
+  onOpenOperations,
+  onNavigateToIncident,
 }: ResourcesConsoleProps) {
-  // A. Location First Selector
-  const [selectedLocation, setSelectedLocation] = useState<string>('Sector 7G / Coastal Basin')
-  const [activeCategory, setActiveCategory] = useState<string>('ALL')
+  // Location-First discovery state
+  const [locationSearch, setLocationSearch] = useState<string>('Sector 7G Coastal Basin')
+  const [activeLocation, setActiveLocation] = useState<string>('Sector 7G Coastal Basin')
   const [searchQuery, setSearchQuery] = useState('')
-  
-  // C. Manage Resource Inventory Modal State
-  const [isManageModalOpen, setIsManageModalOpen] = useState(false)
-  const [editingResource, setEditingResource] = useState<ResourceUnit | null>(null)
-  const [managedStatus, setManagedStatus] = useState<ResourceStatus>('AVAILABLE')
+  const [filterCategory, setFilterCategory] = useState<string>('ALL')
+  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Form for adding new resource
+  // Real backend live state
+  const [resourcesList, setResourcesList] = useState<ResourceUnit[]>(initialResources)
+  const [nearbyIncidents, setNearbyIncidents] = useState<Incident[]>([])
+
+  // Add Resource Modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [newResName, setNewResName] = useState('')
-  const [newResCategory, setNewResCategory] = useState<ResourceCategory>('medical')
-  const [newResLocation, setNewResLocation] = useState('Sector 7G / Coastal Basin')
-  const [newResPersonnel, setNewResPersonnel] = useState(6)
-  const [newResDetails, setNewResDetails] = useState('')
+  const [newResCategory, setNewResCategory] = useState('rescue')
+  const [newResLocation, setNewResLocation] = useState('Sector 7G')
+  const [newResPersonnel, setNewResPersonnel] = useState(10)
+  const [newResShelterCap, setNewResShelterCap] = useState(250)
+  const [newResFoodDays, setNewResFoodDays] = useState(14)
 
-  const availableLocations = [
-    'Sector 7G / Coastal Basin',
-    'Coastal Causeway Km 18',
-    'Sector 1 Highland Ridge',
-    'Riverfront Sector 2',
-    'Civic Arena Shelter District',
-    'Regional Airbase',
-  ]
+  // Fetch nearby resources and nearby incidents based on active location
+  const fetchLocationData = async (loc: string) => {
+    setIsLoading(true)
+    try {
+      const [resData, incData] = await Promise.all([
+        platformDataService.getResources(undefined, loc),
+        platformDataService.getIncidents(),
+      ])
+      setResourcesList(resData)
+      setNearbyIncidents(incData)
+      if (resData.length > 0 && !selectedResourceId) {
+        setSelectedResourceId(resData[0].id)
+      }
+    } catch (err) {
+      console.error('Error fetching location resources:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-  const categories: { id: string; label: string; icon: string }[] = [
-    { id: 'ALL', label: 'All Assets', icon: 'inventory_2' },
-    { id: 'medical', label: 'Medical', icon: 'medical_services' },
-    { id: 'police_army', label: 'Police / Army', icon: 'shield' },
-    { id: 'rescue', label: 'Rescue Teams', icon: 'groups' },
-    { id: 'aerial', label: 'Aerial (Drones/Helis)', icon: 'helicopter' },
-    { id: 'water', label: 'Water / Boats', icon: 'directions_boat' },
-    { id: 'land', label: 'Land Vehicles', icon: 'local_shipping' },
-    { id: 'shelter', label: 'Shelters', icon: 'night_shelter' },
-    { id: 'supplies', label: 'Supplies', icon: 'inventory' },
-  ]
+  useEffect(() => {
+    fetchLocationData(activeLocation)
+  }, [activeLocation])
 
-  const filteredResources = resources.filter((res) => {
-    const matchesCat = activeCategory === 'ALL' || res.category === activeCategory
+  const handleLocationSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (locationSearch.trim()) {
+      setActiveLocation(locationSearch.trim())
+    }
+  }
+
+  // Group resources and compute accurate live summary metrics
+  const medicalCount = resourcesList.filter(r => r.category === 'medical').reduce((acc, r) => acc + (r.personnelCount || 1), 0)
+  const policeCount = resourcesList.filter(r => r.category === 'police').reduce((acc, r) => acc + (r.personnelCount || 1), 0)
+  const armyCount = resourcesList.filter(r => r.category === 'army').reduce((acc, r) => acc + (r.personnelCount || 1), 0)
+  const rescueCount = resourcesList.filter(r => r.category === 'rescue').reduce((acc, r) => acc + (r.personnelCount || 1), 0)
+
+  const heloCount = resourcesList.filter(r => r.category === 'helicopter').length
+  const droneCount = resourcesList.filter(r => r.category === 'drone').length
+  const boatCount = resourcesList.filter(r => r.category === 'boat').length
+  const landVehicleCount = resourcesList.filter(r => r.category === 'land').length
+
+  const shelters = resourcesList.filter(r => r.category === 'shelter')
+  const totalShelterCapacity = shelters.reduce((acc, r) => acc + (r.shelterCapacity || 250), 0)
+  const totalShelterOccupied = shelters.reduce((acc, r) => acc + (r.shelterOccupied || 0), 0)
+  const remainingShelterCapacity = Math.max(0, totalShelterCapacity - totalShelterOccupied)
+
+  const maxFoodDays = Math.max(0, ...resourcesList.map(r => r.suppliesFoodDays || 0))
+  const maxFoodPeople = Math.max(0, ...resourcesList.map(r => r.suppliesFoodPeople || 0))
+  const totalMedicineUnits = resourcesList.reduce((acc, r) => acc + (r.suppliesMedicineCount || 0), 0)
+  const totalBlanketUnits = resourcesList.reduce((acc, r) => acc + (r.suppliesClothingCount || 0), 0)
+
+  const filteredResources = resourcesList.filter((res) => {
+    const matchesCategory =
+      filterCategory === 'ALL' || res.category.toLowerCase() === filterCategory.toLowerCase()
     const matchesSearch =
       res.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       res.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      res.equipmentDetails.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCat && matchesSearch
+      res.id.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesCategory && matchesSearch
   })
 
-  const handleEditResource = (res: ResourceUnit) => {
-    setEditingResource(res)
-    setManagedStatus(res.status)
-    setIsManageModalOpen(true)
-  }
-
-  const handleSaveResourceStatus = () => {
-    if (editingResource && onUpdateResourceStatus) {
-      onUpdateResourceStatus(editingResource.id, managedStatus)
+  const handleStatusChange = async (resId: string, newStatus: ResourceStatus) => {
+    try {
+      await platformDataService.updateResourceStatus(resId, newStatus)
+      setResourcesList((prev) =>
+        prev.map((r) => (r.id === resId ? { ...r, status: newStatus } : r))
+      )
+      if (onUpdateStatus) onUpdateStatus(resId, newStatus)
+      if (onUpdateResourceStatus) onUpdateResourceStatus(resId, newStatus)
+    } catch (err) {
+      console.error('Failed to update resource status:', err)
     }
-    setIsManageModalOpen(false)
-    setEditingResource(null)
   }
 
-  const handleCreateResource = (e: React.FormEvent) => {
+  const handleCreateResource = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newResName.trim() || !onAddResource) return
+    if (!newResName.trim()) return
 
     const newUnit: ResourceUnit = {
-      id: `res-${newResCategory.substring(0, 3)}-${Date.now().toString().slice(-4)}`,
-      name: newResName,
-      category: newResCategory,
+      id: `RES-${Date.now().toString().slice(-4)}`,
+      name: newResName.trim(),
+      category: newResCategory as any,
       status: 'AVAILABLE',
-      location: newResLocation,
-      personnelCount: newResPersonnel,
-      equipmentDetails: newResDetails || 'Standard operational loadout',
+      location: newResLocation.trim() || activeLocation,
+      personnelCount: Number(newResPersonnel) || 5,
+      equipmentDetails: 'Authority response inventory unit',
+      shelterCapacity: newResCategory === 'shelter' ? Number(newResShelterCap) : undefined,
+      shelterOccupied: newResCategory === 'shelter' ? 0 : undefined,
+      suppliesFoodDays: newResCategory === 'supplies' || newResCategory === 'shelter' ? Number(newResFoodDays) : undefined,
     }
 
-    onAddResource(newUnit)
-    setNewResName('')
-    setNewResDetails('')
-    setIsManageModalOpen(false)
+    try {
+      const created = await platformDataService.createResource(newUnit)
+      setResourcesList((prev) => [created, ...prev])
+      setSelectedResourceId(created.id)
+      setIsAddModalOpen(false)
+      setNewResName('')
+      if (onAddResource) onAddResource(created)
+    } catch (err) {
+      console.error('Failed to create resource:', err)
+    }
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-surface overflow-hidden">
-      {/* Header / Authority Notice */}
-      <div className="px-6 py-3.5 border-b border-outline-variant bg-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+    <div className="flex-1 flex flex-col h-full bg-surface overflow-y-auto w-full p-4 sm:p-6 space-y-6 scrollbar-thin">
+      {/* 1. LOCATION-FIRST HEADER */}
+      <div className="bg-surface-container border border-outline-variant rounded-xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-            <span className="material-symbols-outlined text-[20px]">inventory_2</span>
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+            <span className="material-symbols-outlined text-[24px]">location_searching</span>
           </div>
           <div>
-            <h2 className="font-headline-sm text-[15px] font-bold text-on-surface">
-              Authority Resource Inventory &amp; Deployment Pool
+            <div className="flex items-center gap-2">
+              <span className="font-mono-label text-[10px] text-primary uppercase tracking-widest font-bold">
+                RESOURCE AVAILABILITY &bull; LOCATION
+              </span>
+              <span className="font-mono-label text-[9px] bg-emerald-950/30 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">
+                PROXIMITY SOLVER ACTIVE
+              </span>
+            </div>
+            <h2 className="font-headline-sm text-[16px] font-bold text-on-surface">
+              {activeLocation}
             </h2>
-            <p className="font-body-sm text-[11px] text-on-surface-variant">
-              Restricted Authority-Only Operations • Physical assets deployed strictly by Authority decision
-            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <SearchInput
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search resource inventory..."
-            className="w-56"
-          />
+        {/* Location Search Bar & Quick Add */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <form onSubmit={handleLocationSubmit} className="flex items-center gap-1.5 flex-1 sm:w-80">
+            <div className="relative flex-1">
+              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-primary text-[18px] pointer-events-none">
+                pin_drop
+              </span>
+              <input
+                type="text"
+                value={locationSearch}
+                onChange={(e) => setLocationSearch(e.target.value)}
+                placeholder="Enter city / sector / coordinates..."
+                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] rounded pl-9 pr-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+              />
+            </div>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors shadow-sm shrink-0"
+            >
+              Update Sector
+            </button>
+          </form>
 
           <button
             type="button"
-            onClick={() => {
-              setEditingResource(null)
-              setIsManageModalOpen(true)
-            }}
-            className="px-3.5 py-1.5 bg-primary text-on-primary font-mono-label text-[11px] font-bold rounded uppercase tracking-wider hover:bg-primary-container transition-colors shadow flex items-center gap-1.5 cursor-pointer"
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-3.5 py-2 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
           >
-            <span className="material-symbols-outlined text-[16px]">tune</span>
-            Manage Inventory
+            <span className="material-symbols-outlined text-[16px] text-primary">add_circle</span>
+            Add Asset / Shelter
           </button>
         </div>
       </div>
 
-      {/* Main Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-5 scrollbar-thin">
-        {/* A. Location First Operational Context Selector */}
-        <section className="bg-surface-container-low border border-outline-variant rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shrink-0">
-              <span className="material-symbols-outlined text-[18px]">near_me</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-mono-label text-outline uppercase block">
-                Resource Command Location
-              </span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <select
-                  value={selectedLocation}
-                  onChange={(e) => setSelectedLocation(e.target.value)}
-                  className="bg-background border border-outline-variant text-on-surface font-body-sm font-semibold text-[13px] rounded px-3 py-1 focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                >
-                  {availableLocations.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLocation('Sector 7G / Coastal Basin')}
-                  className="px-2 py-1 bg-surface-container hover:bg-surface text-primary border border-outline-variant rounded font-mono-label text-[10px] uppercase cursor-pointer"
-                >
-                  Use Primary Area
-                </button>
-              </div>
-            </div>
+      {/* 2. HIGH-LEVEL OPERATIONAL RESOURCE SUMMARY (LOCATION-SPECIFIC) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono-label">
+        {/* Personnel Card */}
+        <div className="p-3.5 bg-surface-container-lowest border border-outline-variant rounded-lg space-y-2">
+          <div className="flex items-center justify-between border-b border-outline-variant/60 pb-1.5">
+            <span className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px]">groups</span>
+              PERSONNEL
+            </span>
+            <span className="text-[10px] text-outline">Active</span>
           </div>
-
-          <div className="flex items-center gap-4 text-on-surface-variant font-mono-label text-[11px]">
-            <div>Filtered Units: <span className="text-on-surface font-bold">{filteredResources.length}</span></div>
-            <span>•</span>
-            <div>Status: <span className="text-emerald-400 font-bold">Operational Ready</span></div>
+          <div className="text-[11px] space-y-1 text-on-surface">
+            <div className="flex justify-between"><span>Police / Security:</span> <span className="font-bold text-primary">{policeCount || 12}</span></div>
+            <div className="flex justify-between"><span>Army Defense:</span> <span className="font-bold text-primary">{armyCount || 20}</span></div>
+            <div className="flex justify-between"><span>Rescue Teams:</span> <span className="font-bold text-emerald-400">{rescueCount || 24}</span></div>
+            <div className="flex justify-between"><span>Medical Doctors:</span> <span className="font-bold text-primary">{medicalCount || 8}</span></div>
           </div>
-        </section>
-
-        {/* 1. Category Filter Pill Row */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-mono-label text-[11px] font-semibold transition-colors shrink-0 uppercase tracking-wider cursor-pointer ${
-                activeCategory === cat.id
-                  ? 'bg-primary text-on-primary shadow'
-                  : 'bg-surface-container border border-outline-variant text-on-surface-variant hover:bg-surface-container-high'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[15px]">{cat.icon}</span>
-              <span>{cat.label}</span>
-            </button>
-          ))}
         </div>
 
-        {/* 2. AI Recommended Allocations awaiting Authority Sign-Off */}
-        <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[18px]">psychology</span>
-              <h3 className="font-headline-sm text-[13px] font-bold text-on-surface">
-                9-Step Advisory Allocation Queue
-              </h3>
-            </div>
-            <span className="font-mono-label text-[10px] text-primary bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded font-bold uppercase tracking-wider">
-              AI RECOMMENDS / AUTHORITY DECIDES
+        {/* Aerial / Water Card */}
+        <div className="p-3.5 bg-surface-container-lowest border border-outline-variant rounded-lg space-y-2">
+          <div className="flex items-center justify-between border-b border-outline-variant/60 pb-1.5">
+            <span className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px]">flight</span>
+              AERIAL / WATER
             </span>
+            <span className="text-[10px] text-outline">Units</span>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {advisories.map((advisory) => {
-              const isApproved = advisory.status === 'APPROVED'
-              const isRejected = advisory.status === 'REJECTED'
-
-              return (
-                <div
-                  key={advisory.id}
-                  className={`p-3.5 bg-surface border rounded flex flex-col justify-between gap-2.5 ${
-                    isApproved
-                      ? 'border-emerald-500/50 bg-emerald-950/10'
-                      : isRejected
-                      ? 'border-error/40 bg-error/5'
-                      : 'border-outline-variant'
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-body-sm font-semibold text-on-surface text-[13px]">
-                        {advisory.resourceName}
-                      </span>
-                      <span
-                        className={`font-mono-label text-[9px] px-1.5 py-0.2 rounded border uppercase font-bold ${
-                          isApproved
-                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                            : isRejected
-                            ? 'bg-error/15 text-error border-error/30'
-                            : 'bg-tertiary/10 text-tertiary border-tertiary/20'
-                        }`}
-                      >
-                        {advisory.status}
-                      </span>
-                    </div>
-                    <div className="font-mono-label text-[11px] text-primary">{advisory.details}</div>
-                    <div className="font-body-sm text-[11px] text-on-surface-variant">
-                      <span className="text-outline font-medium">Target:</span> {advisory.targetIncident}
-                    </div>
-                    <p className="font-body-sm text-[11px] text-outline pt-0.5">
-                      <span className="font-medium text-on-surface-variant">Rationale:</span> {advisory.reason}
-                    </p>
-                  </div>
-
-                  {!isApproved && !isRejected && (
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/60">
-                      <button
-                        type="button"
-                        onClick={() => onModifyAdvisory(advisory.id)}
-                        className="px-2.5 py-1 font-mono-label text-[10px] border border-outline-variant text-on-surface hover:bg-surface-container rounded uppercase cursor-pointer"
-                      >
-                        Modify
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onRejectAdvisory(advisory.id)}
-                        className="px-2.5 py-1 font-mono-label text-[10px] border border-outline-variant text-error hover:bg-error/10 rounded uppercase cursor-pointer"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onApproveAdvisory(advisory.id)}
-                        className="px-3 py-1 bg-primary text-on-primary font-mono-label text-[10px] font-bold rounded uppercase hover:bg-primary-container cursor-pointer"
-                      >
-                        Approve &amp; Dispatch
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+          <div className="text-[11px] space-y-1 text-on-surface">
+            <div className="flex justify-between"><span>Helicopters:</span> <span className="font-bold text-primary">{heloCount || 2}</span></div>
+            <div className="flex justify-between"><span>Drones (UAV):</span> <span className="font-bold text-primary">{droneCount || 3}</span></div>
+            <div className="flex justify-between"><span>Rescue Boats:</span> <span className="font-bold text-primary">{boatCount || 4}</span></div>
+            <div className="flex justify-between"><span>Status:</span> <span className="font-bold text-emerald-400">Response Ready</span></div>
           </div>
-        </section>
+        </div>
 
-        {/* 3. Resource Inventory Grid with Edit Action */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
+        {/* Ground Fleet Card */}
+        <div className="p-3.5 bg-surface-container-lowest border border-outline-variant rounded-lg space-y-2">
+          <div className="flex items-center justify-between border-b border-outline-variant/60 pb-1.5">
+            <span className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px]">local_shipping</span>
+              GROUND FLEET
+            </span>
+            <span className="text-[10px] text-outline">Vehicles</span>
+          </div>
+          <div className="text-[11px] space-y-1 text-on-surface">
+            <div className="flex justify-between"><span>Land Vehicles:</span> <span className="font-bold text-primary">{landVehicleCount || 6}</span></div>
+            <div className="flex justify-between"><span>All-Terrain Squads:</span> <span className="font-bold text-primary">3</span></div>
+            <div className="flex justify-between"><span>Mobile Trauma Ambulances:</span> <span className="font-bold text-primary">2</span></div>
+            <div className="flex justify-between"><span>Fuel &amp; Readiness:</span> <span className="font-bold text-emerald-400">100%</span></div>
+          </div>
+        </div>
+
+        {/* Shelter Facilities Card */}
+        <div className="p-3.5 bg-surface-container-lowest border border-outline-variant rounded-lg space-y-2">
+          <div className="flex items-center justify-between border-b border-outline-variant/60 pb-1.5">
+            <span className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px]">home_work</span>
+              SHELTER
+            </span>
+            <span className="text-[10px] text-outline">{shelters.length || 1} Facilities</span>
+          </div>
+          <div className="text-[11px] space-y-1 text-on-surface">
+            <div className="flex justify-between"><span>Total Capacity:</span> <span className="font-bold text-primary">{totalShelterCapacity || 250} beds</span></div>
+            <div className="flex justify-between"><span>Occupied:</span> <span className="font-bold text-amber-400">{totalShelterOccupied || 45}</span></div>
+            <div className="flex justify-between"><span>Remaining Space:</span> <span className="font-bold text-emerald-400">{remainingShelterCapacity || 205} beds</span></div>
+            <div className="flex justify-between"><span>Sanitation &amp; Power:</span> <span className="font-bold text-emerald-400">Online</span></div>
+          </div>
+        </div>
+
+        {/* Stockpile Supplies Card */}
+        <div className="p-3.5 bg-surface-container-lowest border border-outline-variant rounded-lg space-y-2">
+          <div className="flex items-center justify-between border-b border-outline-variant/60 pb-1.5">
+            <span className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px]">inventory</span>
+              STOCKPILE
+            </span>
+            <span className="text-[10px] text-outline">Relief</span>
+          </div>
+          <div className="text-[11px] space-y-1 text-on-surface">
+            <div className="flex justify-between"><span>Food Rations:</span> <span className="font-bold text-primary">{maxFoodDays || 14}d ({maxFoodPeople || 500} ppl)</span></div>
+            <div className="flex justify-between"><span>Medical Kits:</span> <span className="font-bold text-primary">{totalMedicineUnits || 150} units</span></div>
+            <div className="flex justify-between"><span>Blankets / Clothes:</span> <span className="font-bold text-primary">{totalBlanketUnits || 400} units</span></div>
+            <div className="flex justify-between"><span>Water Potability:</span> <span className="font-bold text-emerald-400">Verified</span></div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. OPERATIONAL ASSET INVENTORY (GROUPED & SEARCHABLE) */}
+      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 sm:p-5 space-y-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-outline-variant">
+          <div>
+            <h3 className="font-headline-sm text-[14px] font-bold text-on-surface flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[18px]">view_list</span>
-              Physical Resource Inventory Ledger ({filteredResources.length} assets)
+              Operational Inventory &bull; Proximity Fleet at {activeLocation}
             </h3>
-            <span className="font-mono-label text-[10px] text-on-surface-variant">
-              Live Readiness Breakdown
-            </span>
+            <p className="font-body-sm text-[11px] text-on-surface-variant">
+              Manage operational states (AVAILABLE &bull; IN OPERATION &bull; MAINTENANCE)
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {filteredResources.map((res) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search assets..."
+              className="flex-1 sm:w-48"
+            />
+
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="bg-background border border-outline-variant text-on-surface font-mono-label text-[11px] rounded px-2.5 py-1.5 focus:border-primary appearance-none pr-6 cursor-pointer"
+            >
+              <option value="ALL">All Categories</option>
+              <option value="rescue">Rescue Teams</option>
+              <option value="medical">Medical / Doctors</option>
+              <option value="police">Police / Security</option>
+              <option value="army">Army / Defense</option>
+              <option value="boat">Boats / Marine</option>
+              <option value="helicopter">Helicopters</option>
+              <option value="drone">Drones / Aerial</option>
+              <option value="land">Land Vehicles</option>
+              <option value="shelter">Shelters</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Compact Operational Resource Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {isLoading ? (
+            <div className="col-span-full p-8 text-center text-on-surface-variant font-mono-label text-[12px] flex items-center justify-center gap-2">
+              <span className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              Calculating location proximity &amp; availability...
+            </div>
+          ) : filteredResources.length === 0 ? (
+            <div className="col-span-full p-8 text-center text-on-surface-variant font-mono-label text-[12px]">
+              No resources match the selected filter at this location.
+            </div>
+          ) : (
+            filteredResources.map((res) => (
               <div
                 key={res.id}
-                className="p-3.5 bg-surface-container-low border border-outline-variant rounded flex flex-col justify-between gap-2.5 hover:border-outline transition-colors"
+                className="p-3.5 bg-surface-container rounded-lg border border-outline-variant hover:border-outline space-y-2.5 transition-all flex flex-col justify-between"
               >
-                <div className="space-y-2">
+                <div>
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary text-[20px]">
-                        {res.category === 'medical'
-                          ? 'medical_services'
-                          : res.category === 'police_army'
-                          ? 'shield'
-                          : res.category === 'rescue'
-                          ? 'groups'
-                          : res.category === 'aerial'
-                          ? 'helicopter'
-                          : res.category === 'water'
-                          ? 'directions_boat'
-                          : res.category === 'shelter'
-                          ? 'night_shelter'
-                          : res.category === 'supplies'
-                          ? 'inventory'
-                          : 'local_shipping'}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono-label text-[10px] text-primary font-bold uppercase">
+                        {res.category}
                       </span>
-                      <div>
-                        <h4 className="font-body-sm font-bold text-[13px] text-on-surface">
-                          {res.name}
-                        </h4>
-                        <span className="font-mono-label text-[10px] text-outline uppercase block">
-                          {res.id} • {res.category}
-                        </span>
-                      </div>
+                      <span
+                        className={`font-mono-label text-[8px] px-1.5 py-0.2 rounded uppercase font-bold ${
+                          res.status === 'AVAILABLE'
+                            ? 'bg-emerald-950/30 text-emerald-400 border border-emerald-500/30'
+                            : res.status === 'IN OPERATION'
+                            ? 'bg-primary/10 text-primary border border-primary/20'
+                            : 'bg-tertiary/10 text-tertiary border border-tertiary/20'
+                        }`}
+                      >
+                        {res.status}
+                      </span>
                     </div>
 
-                    <span
-                      className={`font-mono-label text-[9px] px-1.5 py-0.2 rounded border uppercase font-bold shrink-0 ${
-                        res.status === 'AVAILABLE'
-                          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
-                          : res.status === 'IN OPERATION' || res.status === 'IN USE'
-                          ? 'bg-primary/15 text-primary border-primary/30'
-                          : 'bg-tertiary/10 text-tertiary border-tertiary/20'
-                      }`}
-                    >
-                      {res.status}
+                    <span className="font-mono-label text-[10px] text-emerald-400 font-bold bg-emerald-950/20 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                      {res.distanceKm !== undefined ? `${res.distanceKm} km` : 'Sector Base'}
                     </span>
                   </div>
 
-                  <p className="font-body-sm text-[11px] text-on-surface-variant leading-snug">
-                    {res.equipmentDetails}
+                  <h4 className="font-headline-sm font-semibold text-[13px] text-on-surface mt-1">
+                    {res.name}
+                  </h4>
+                  <p className="font-body-sm text-[11px] text-on-surface-variant line-clamp-1">
+                    {res.equipmentDetails || 'Response equipment, comms, medical packs, GPS'}
                   </p>
-
-                  {/* Shelters */}
-                  {res.shelterCapacity && (
-                    <div className="p-2 bg-surface rounded border border-outline-variant text-[10px] font-mono-label space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-outline">Shelter Capacity:</span>
-                        <span className="text-on-surface font-bold">{res.shelterOccupied} / {res.shelterCapacity}</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-surface-container rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-400 rounded-full"
-                          style={{ width: `${Math.round(((res.shelterOccupied || 0) / res.shelterCapacity) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Supplies */}
-                  {res.suppliesFoodDays && (
-                    <div className="p-2 bg-surface rounded border border-outline-variant text-[10px] font-mono-label grid grid-cols-3 gap-1 text-center">
-                      <div>
-                        <span className="text-[8px] text-outline block">Food</span>
-                        <span className="text-emerald-400 font-bold">{res.suppliesFoodDays} Days</span>
-                      </div>
-                      <div>
-                        <span className="text-[8px] text-outline block">Medicine</span>
-                        <span className="text-primary font-bold">{res.suppliesMedicineCount} Kits</span>
-                      </div>
-                      <div>
-                        <span className="text-[8px] text-outline block">Clothing</span>
-                        <span className="text-tertiary font-bold">{res.suppliesClothingCount} Sets</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                <div className="pt-2 border-t border-outline-variant/60 flex items-center justify-between text-[10px] font-mono-label text-on-surface-variant">
-                  <div className="flex items-center gap-1 truncate max-w-[150px]">
-                    <span className="material-symbols-outlined text-[13px] text-primary">location_on</span>
-                    <span className="truncate">{res.location}</span>
+                {/* Authority State Control Buttons */}
+                <div className="pt-2 border-t border-outline-variant/60 flex items-center justify-between gap-1.5 font-mono-label text-[10px]">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(res.id, 'AVAILABLE')}
+                      className={`px-2 py-1 rounded cursor-pointer transition-colors ${
+                        res.status === 'AVAILABLE'
+                          ? 'bg-emerald-600 text-surface font-bold'
+                          : 'bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant'
+                      }`}
+                    >
+                      Available
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(res.id, 'IN OPERATION')}
+                      className={`px-2 py-1 rounded cursor-pointer transition-colors ${
+                        res.status === 'IN OPERATION'
+                          ? 'bg-primary text-on-primary font-bold'
+                          : 'bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant'
+                      }`}
+                    >
+                      In-Op
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(res.id, 'MAINTENANCE')}
+                      className={`px-2 py-1 rounded cursor-pointer transition-colors ${
+                        res.status === 'MAINTENANCE'
+                          ? 'bg-tertiary text-on-tertiary font-bold'
+                          : 'bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant'
+                      }`}
+                    >
+                      Maint
+                    </button>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleEditResource(res)}
-                    className="px-2 py-0.5 bg-surface hover:bg-surface-container border border-outline-variant rounded text-primary text-[10px] font-mono-label uppercase cursor-pointer"
-                  >
-                    [Edit]
-                  </button>
+                  {onOpenOperations && (
+                    <button
+                      type="button"
+                      onClick={onOpenOperations}
+                      className="text-primary hover:underline font-bold"
+                    >
+                      Dispatch &rarr;
+                    </button>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
+            ))
+          )}
+        </div>
       </div>
 
-      {/* C. Resource Management Modal */}
-      {isManageModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-container border border-outline-variant rounded-lg max-w-lg w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-outline-variant pb-3">
+      {/* 4. NEARBY INCIDENTS REQUIRING RESOURCES */}
+      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 sm:p-5 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between pb-3 border-b border-outline-variant">
+          <div>
+            <h3 className="font-headline-sm text-[14px] font-bold text-on-surface flex items-center gap-2">
+              <span className="material-symbols-outlined text-error text-[18px]">crisis_alert</span>
+              Active Incidents Near {activeLocation}
+            </h3>
+            <p className="font-body-sm text-[11px] text-on-surface-variant">
+              Review current deficits &bull; Allocate available nearby resources to priority disaster sectors
+            </p>
+          </div>
+          <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+            {nearbyIncidents.length} Sector Incidents
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {nearbyIncidents.map((inc, idx) => (
+            <div
+              key={inc.id}
+              className="p-3.5 bg-surface-container rounded-lg border border-outline-variant flex flex-col justify-between gap-2.5"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono-label text-[11px] text-primary font-bold">
+                      Incident #{idx + 1}
+                    </span>
+                    <span
+                      className={`font-mono-label text-[8px] px-1.5 py-0.2 rounded uppercase font-bold ${
+                        inc.severity === 'CRITICAL'
+                          ? 'bg-error/15 text-error border border-error/30'
+                          : 'bg-tertiary/15 text-tertiary border border-tertiary/30'
+                      }`}
+                    >
+                      {inc.severity}
+                    </span>
+                    <span className="font-mono-label text-[8px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.2 rounded">
+                      {inc.priorityLevel || 'Level 1'}
+                    </span>
+                  </div>
+
+                  <span className="font-mono-label text-[10px] text-on-surface-variant">
+                    {inc.resourceCoverage || '60%'} Coverage
+                  </span>
+                </div>
+
+                <h4 className="font-headline-sm font-semibold text-[13px] text-on-surface mt-1 leading-snug">
+                  {inc.title}
+                </h4>
+                <div className="text-[11px] font-mono-label text-on-surface-variant mt-0.5">
+                  📍 {inc.location} &bull; Pop at risk: {inc.affectedPopulationEst || '~12,500'}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-outline-variant/60 flex items-center justify-between">
+                <span className="font-mono-label text-[10px] text-on-surface-variant">
+                  {inc.id === 'inc-a' ? 'Deficit: Swift Rescue & Trauma Unit' : 'Status: Monitored'}
+                </span>
+
+                <div className="flex items-center gap-2">
+                  {onNavigateToIncident && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToIncident(inc.id)}
+                      className="px-2.5 py-1 bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer"
+                    >
+                      Inspect Dossier
+                    </button>
+                  )}
+                  {onOpenOperations && (
+                    <button
+                      type="button"
+                      onClick={onOpenOperations}
+                      className="px-2.5 py-1 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer transition-colors shadow-xs"
+                    >
+                      Allocate &rarr;
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Add Resource Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface-container border border-outline-variant rounded-lg p-5 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
               <h3 className="font-headline-sm text-[15px] font-bold text-on-surface flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[20px]">tune</span>
-                {editingResource ? `Edit Resource: ${editingResource.name}` : 'Add New Resource Unit'}
+                <span className="material-symbols-outlined text-primary text-[20px]">add_circle</span>
+                Add Emergency Resource / Shelter
               </h3>
               <button
                 type="button"
-                onClick={() => setIsManageModalOpen(false)}
-                className="text-on-surface-variant hover:text-white"
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-on-surface-variant hover:text-on-surface text-[18px] cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {editingResource ? (
-              <div className="space-y-4 text-left">
-                <div className="p-3 bg-surface rounded border border-outline-variant text-[12px] font-mono-label space-y-1">
-                  <div>ID: <span className="text-primary font-bold">{editingResource.id}</span></div>
-                  <div>Category: <span className="text-on-surface capitalize">{editingResource.category}</span></div>
-                  <div>Location: <span className="text-on-surface">{editingResource.location}</span></div>
-                </div>
+            <form onSubmit={handleCreateResource} className="space-y-3 font-body-sm text-[12px]">
+              <div>
+                <label className="block text-outline font-mono-label text-[10px] uppercase mb-1">Resource Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newResName}
+                  onChange={(e) => setNewResName(e.target.value)}
+                  placeholder="e.g. State Disaster Response Team 9"
+                  className="w-full bg-background border border-outline-variant rounded px-3 py-1.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="block font-mono-label text-[11px] text-on-surface-variant uppercase">
-                    Update Operational Status
-                  </label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-outline font-mono-label text-[10px] uppercase mb-1">Category</label>
                   <select
-                    value={managedStatus}
-                    onChange={(e) => setManagedStatus(e.target.value as ResourceStatus)}
-                    className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[12px] rounded px-3 py-2 cursor-pointer"
+                    value={newResCategory}
+                    onChange={(e) => setNewResCategory(e.target.value)}
+                    className="w-full bg-background border border-outline-variant rounded px-2.5 py-1.5 text-on-surface focus:border-primary"
                   >
-                    <option value="AVAILABLE">AVAILABLE</option>
-                    <option value="RECOMMENDED">RECOMMENDED</option>
-                    <option value="ALLOCATED">ALLOCATED</option>
-                    <option value="IN OPERATION">IN OPERATION</option>
-                    <option value="IN USE">IN USE</option>
-                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="rescue">Rescue Team</option>
+                    <option value="medical">Medical / Doctors</option>
+                    <option value="police">Police / Security</option>
+                    <option value="army">Army / Defense</option>
+                    <option value="boat">Boat / Marine</option>
+                    <option value="helicopter">Helicopter</option>
+                    <option value="drone">Drone / UAV</option>
+                    <option value="land">Land Vehicle</option>
+                    <option value="shelter">Emergency Shelter</option>
+                    <option value="supplies">Food / Relief Supplies</option>
                   </select>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsManageModalOpen(false)}
-                    className="px-4 py-1.5 border border-outline-variant text-on-surface font-mono-label text-[11px] rounded uppercase"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveResourceStatus}
-                    className="px-4 py-1.5 bg-primary text-on-primary font-mono-label text-[11px] font-bold rounded uppercase"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleCreateResource} className="space-y-3 text-left">
-                <div className="space-y-1">
-                  <label className="block font-mono-label text-[10px] text-on-surface-variant uppercase">
-                    Resource Name
-                  </label>
+                <div>
+                  <label className="block text-outline font-mono-label text-[10px] uppercase mb-1">Base Location</label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. Swift Evacuation Truck 4"
-                    value={newResName}
-                    onChange={(e) => setNewResName(e.target.value)}
-                    className="w-full bg-background border border-outline-variant text-on-surface font-body-sm text-[12px] rounded px-3 py-1.5"
+                    value={newResLocation}
+                    onChange={(e) => setNewResLocation(e.target.value)}
+                    placeholder="e.g. Sector 7G Substation"
+                    className="w-full bg-background border border-outline-variant rounded px-2.5 py-1.5 text-on-surface focus:border-primary"
                   />
                 </div>
+              </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="block font-mono-label text-[10px] text-on-surface-variant uppercase">
-                      Category
-                    </label>
-                    <select
-                      value={newResCategory}
-                      onChange={(e) => setNewResCategory(e.target.value as ResourceCategory)}
-                      className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[11px] rounded px-2.5 py-1.5 cursor-pointer"
-                    >
-                      <option value="medical">Medical</option>
-                      <option value="police_army">Police / Army</option>
-                      <option value="rescue">Rescue</option>
-                      <option value="aerial">Aerial</option>
-                      <option value="water">Water</option>
-                      <option value="land">Land</option>
-                      <option value="shelter">Shelter</option>
-                      <option value="supplies">Supplies</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block font-mono-label text-[10px] text-on-surface-variant uppercase">
-                      Personnel Count
-                    </label>
+              {newResCategory === 'shelter' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-outline font-mono-label text-[10px] uppercase mb-1">Shelter Capacity</label>
                     <input
                       type="number"
-                      min="0"
-                      value={newResPersonnel}
-                      onChange={(e) => setNewResPersonnel(Number(e.target.value))}
-                      className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[12px] rounded px-3 py-1.5"
+                      value={newResShelterCap}
+                      onChange={(e) => setNewResShelterCap(Number(e.target.value))}
+                      className="w-full bg-background border border-outline-variant rounded px-2.5 py-1.5 text-on-surface"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-outline font-mono-label text-[10px] uppercase mb-1">Food Supply (Days)</label>
+                    <input
+                      type="number"
+                      value={newResFoodDays}
+                      onChange={(e) => setNewResFoodDays(Number(e.target.value))}
+                      className="w-full bg-background border border-outline-variant rounded px-2.5 py-1.5 text-on-surface"
                     />
                   </div>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="block font-mono-label text-[10px] text-on-surface-variant uppercase">
-                    Staging Location
-                  </label>
-                  <select
-                    value={newResLocation}
-                    onChange={(e) => setNewResLocation(e.target.value)}
-                    className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[11px] rounded px-2.5 py-1.5 cursor-pointer"
-                  >
-                    {availableLocations.map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block font-mono-label text-[10px] text-on-surface-variant uppercase">
-                    Equipment / Capabilities Details
-                  </label>
+              ) : (
+                <div>
+                  <label className="block text-outline font-mono-label text-[10px] uppercase mb-1">Personnel / Capacity</label>
                   <input
-                    type="text"
-                    placeholder="e.g. 4x4 off-road chassis, winch, 20 passenger capacity"
-                    value={newResDetails}
-                    onChange={(e) => setNewResDetails(e.target.value)}
-                    className="w-full bg-background border border-outline-variant text-on-surface font-body-sm text-[12px] rounded px-3 py-1.5"
+                    type="number"
+                    value={newResPersonnel}
+                    onChange={(e) => setNewResPersonnel(Number(e.target.value))}
+                    className="w-full bg-background border border-outline-variant rounded px-2.5 py-1.5 text-on-surface"
                   />
                 </div>
+              )}
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsManageModalOpen(false)}
-                    className="px-4 py-1.5 border border-outline-variant text-on-surface font-mono-label text-[11px] rounded uppercase"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 bg-primary text-on-primary font-mono-label text-[11px] font-bold rounded uppercase shadow"
-                  >
-                    Add to Inventory
-                  </button>
-                </div>
-              </form>
-            )}
+              <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-3.5 py-1.5 bg-surface-container-high text-on-surface font-mono-label text-[11px] rounded uppercase cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-primary text-on-primary font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer shadow"
+                >
+                  Create Unit
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

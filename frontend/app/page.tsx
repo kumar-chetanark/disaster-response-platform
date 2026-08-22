@@ -39,6 +39,7 @@ export default function App() {
   const [session, setSession] = useState<UserSession>({ role: 'CITIZEN' })
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
   // Current Active View inside Authority Platform
   const [currentTab, setCurrentTab] = useState('dashboard')
@@ -217,7 +218,6 @@ export default function App() {
     }
     setAlerts((prev) => [newAlert, ...prev])
 
-    // Recalculate Advisories for Air Extraction
     const updatedAdvisories: AllocationAdvisory[] = [
       {
         id: 'adv-new-1',
@@ -360,12 +360,12 @@ export default function App() {
           <AlertsConsole
             alerts={alerts}
             selectedAlertId={selectedAlertId}
-            onSelectAlert={(id) => setSelectedAlertId(id)}
-            onNavigateToIncident={(incId) => {
+            onSelectAlert={(val: any) => setSelectedAlertId(typeof val === 'string' ? val : val?.id || null)}
+            onNavigateToIncident={(incId: string) => {
               setSelectedIncidentId(incId)
               setCurrentTab('incidents')
             }}
-            onMarkReviewed={(altId) => {
+            onMarkReviewed={(altId: string) => {
               setAlerts((prev) =>
                 prev.map((a) => (a.id === altId ? { ...a, isReviewedByAuthority: true } : a))
               )
@@ -381,7 +381,7 @@ export default function App() {
             incidents={incidents}
             selectedReportId={selectedReportId}
             onSelectReport={(id) => setSelectedReportId(id)}
-            onNavigateToIncident={(incId) => {
+            onNavigateToIncident={(incId: string) => {
               setSelectedIncidentId(incId)
               setCurrentTab('incidents')
             }}
@@ -390,7 +390,7 @@ export default function App() {
 
       case 'settings':
         return (
-          <div className="p-8 space-y-4">
+          <div className="p-6 md:p-8 space-y-4">
             <h2 className="font-headline-md text-[18px] font-bold text-on-surface">Platform Settings &amp; Node Telemetry</h2>
             <div className="p-4 bg-surface-container rounded border border-outline-variant text-[12px] font-mono-label space-y-2 max-w-xl">
               <div>Telemetry Mode: <span className="text-emerald-400">Mesh Sync Connected</span></div>
@@ -403,7 +403,7 @@ export default function App() {
 
       case 'support':
         return (
-          <div className="p-8 space-y-4">
+          <div className="p-6 md:p-8 space-y-4">
             <h2 className="font-headline-md text-[18px] font-bold text-on-surface">Operational Command Support</h2>
             <div className="p-4 bg-surface-container rounded border border-outline-variant text-[12px] font-mono-label space-y-2 max-w-xl">
               <div>Secure Radio Channel: <span className="text-primary font-bold">SEC-TAC-9</span></div>
@@ -535,30 +535,42 @@ export default function App() {
     }
   }
 
+  const handleToggleSidebar = () => {
+    // On small screens, toggle mobile drawer. On desktop, toggle collapse
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsMobileSidebarOpen((prev) => !prev)
+    } else {
+      setIsSidebarCollapsed((prev) => !prev)
+    }
+  }
+
   return (
     <div className="bg-background text-on-background font-body-base antialiased h-screen overflow-hidden flex w-full">
       {/* 1. Top Header with Hamburger Control */}
       <TopHeader
         isSidebarCollapsed={isSidebarCollapsed}
-        onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
+        onToggleSidebar={handleToggleSidebar}
       />
 
-      {/* 2. Collapsible Persistent Navigation Sidebar */}
+      {/* 2. Responsive Persistent Navigation Sidebar */}
       <Sidebar
         currentTab={currentTab}
         isCollapsed={isSidebarCollapsed}
+        isMobileOpen={isMobileSidebarOpen}
         onSelectTab={setCurrentTab}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
         onLogout={() => {
           setSession({ role: 'CITIZEN' })
           showNotification('Logged out of Authority Command Platform.', 'info')
         }}
       />
 
-      {/* 3. Main Content Area with Dynamic Offset */}
+      {/* 3. Main Content Area with Responsive Desktop Offset */}
       <div
         className={`flex-1 flex flex-col relative h-full pt-header-height bg-surface overflow-hidden transition-all duration-200 ${
-          isSidebarCollapsed ? 'ml-16' : 'ml-sidebar-width'
-        }`}
+          /* Desktop layout offset */
+          isSidebarCollapsed ? 'md:ml-16' : 'md:ml-sidebar-width'
+        } ml-0`}
       >
         {renderAuthorityContent()}
       </div>

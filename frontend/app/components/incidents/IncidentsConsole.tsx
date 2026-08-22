@@ -1,38 +1,98 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Incident, AllocationAdvisory, ResourceUnit } from '../../types'
+import React, { useState, useEffect, useRef } from 'react'
+import { Incident } from '../../types'
 import SearchInput from '../common/SearchInput'
 import DetailsHeader from '../common/DetailsHeader'
+import { platformDataService } from '../../services/dataService'
 
 interface IncidentsConsoleProps {
-  incidents: Incident[]
-  selectedIncidentId: string | null
-  advisories: AllocationAdvisory[]
-  resources?: ResourceUnit[]
-  onSelectIncident: (id: string) => void
-  onOpenAssessment: () => void
-  onNavigateToResources?: () => void
+  incidents?: Incident[]
+  selectedIncidentId?: string | null
+  advisories?: any[]
+  onSelectIncident?: (id: string) => void
+  onOpenAssessment?: () => void
+  onOpenOperations?: (opId?: string) => void
+  onOpenReportPreview?: (reportId?: string) => void
 }
 
 export default function IncidentsConsole({
-  incidents,
-  selectedIncidentId,
-  advisories,
+  incidents: initialIncidents = [],
+  selectedIncidentId: initialSelectedId = 'inc-a',
+  advisories = [],
   onSelectIncident,
   onOpenAssessment,
+  onOpenOperations,
+  onOpenReportPreview,
 }: IncidentsConsoleProps) {
   const [filterSeverity, setFilterSeverity] = useState<string>('ALL')
   const [filterStatus, setFilterStatus] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeReportTab, setActiveReportTab] = useState<'all' | 'citizen' | 'news' | 'gov' | 'field'>('all')
+  const [isMobileDetailView, setIsMobileDetailView] = useState(false)
 
-  const selectedIncident =
-    incidents.find((inc) => inc.id === selectedIncidentId) || incidents[0]
+  // Real backend live state & in-memory dossier cache to eliminate switching latency
+  const [incidentsList, setIncidentsList] = useState<Incident[]>(initialIncidents)
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(initialSelectedId || 'inc-a')
+  const [selectedIncidentDetail, setSelectedIncidentDetail] = useState<Incident | null>(null)
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+  const dossierCache = useRef<Record<string, Incident>>({})
 
-  const filteredIncidents = incidents.filter((inc) => {
-    const matchesSeverity = filterSeverity === 'ALL' || inc.severity === filterSeverity
-    const matchesStatus = filterStatus === 'ALL' || inc.status === filterStatus
+  // 1. Fetch live incidents list
+  useEffect(() => {
+    let isMounted = true
+    async function loadLiveIncidents() {
+      try {
+        const data = await platformDataService.getIncidents(searchQuery, filterSeverity, filterStatus)
+        if (isMounted) {
+          setIncidentsList(data)
+          if (data.length > 0 && !selectedIncidentId) {
+            setSelectedIncidentId(data[0].id)
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching live incidents list:', err)
+      }
+    }
+    loadLiveIncidents()
+    return () => { isMounted = false }
+  }, [searchQuery, filterSeverity, filterStatus])
+
+  // 2. Fetch or retrieve from cache the full 16-dimension canonical dossier with zero-lag UI response
+  useEffect(() => {
+    if (!selectedIncidentId) return
+
+    // If already in memory cache, display immediately without network latency
+    if (dossierCache.current[selectedIncidentId]) {
+      setSelectedIncidentDetail(dossierCache.current[selectedIncidentId])
+      setIsLoadingDetail(false)
+      return
+    }
+
+    let isMounted = true
+    setIsLoadingDetail(true)
+    
+    async function loadIncidentDossier() {
+      try {
+        const detail = await platformDataService.getIncidentById(selectedIncidentId!)
+        if (isMounted && detail) {
+          dossierCache.current[selectedIncidentId!] = detail
+          setSelectedIncidentDetail(detail)
+        }
+      } catch (err) {
+        console.error('Error fetching incident detail:', err)
+      } finally {
+        if (isMounted) setIsLoadingDetail(false)
+      }
+    }
+    loadIncidentDossier()
+    return () => { isMounted = false }
+  }, [selectedIncidentId])
+
+  const filteredIncidents = incidentsList.filter((inc) => {
+    const matchesSeverity =
+      filterSeverity === 'ALL' || inc.severity.toLowerCase() === filterSeverity.toLowerCase()
+    const matchesStatus =
+      filterStatus === 'ALL' || inc.status.toLowerCase() === filterStatus.toLowerCase()
     const matchesSearch =
       inc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       inc.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -40,521 +100,414 @@ export default function IncidentsConsole({
     return matchesSeverity && matchesStatus && matchesSearch
   })
 
-  const incidentReports = selectedIncident?.reports || []
-  const filteredReports = incidentReports.filter((rep) => {
-    if (activeReportTab === 'all') return true
-    if (activeReportTab === 'citizen') return rep.sourceType === 'CITIZEN' || rep.sourceType === 'SMS' || rep.sourceType === 'IVR'
-    if (activeReportTab === 'news') return rep.sourceType === 'NEWS'
-    if (activeReportTab === 'gov') return rep.sourceType === 'GOVERNMENT' || rep.sourceType === 'WEATHER'
-    if (activeReportTab === 'field') return rep.sourceType === 'FIELD_ASSESSMENT'
-    return true
-  })
+  // Get index for stable simple naming: Incident #1, Incident #2, etc.
+  const getIncidentNumber = (incId: string): number => {
+    const idx = incidentsList.findIndex((i) => i.id === incId)
+    return idx >= 0 ? idx + 1 : 1
+  }
 
-  // Match advisories specifically tied to the selected incident
-  const relevantAdvisories = advisories.filter(
-    (adv) =>
-      adv.targetIncidentId === selectedIncident?.id ||
-      (selectedIncident?.id === 'inc-a' && (adv.targetIncident.includes('Incident A') || adv.targetIncident.includes('Sector 7G'))) ||
-      (selectedIncident?.id === 'inc-b' && adv.targetIncident.includes('Incident B'))
-  )
+  const selectedIncident =
+    selectedIncidentDetail || incidentsList.find((i) => i.id === selectedIncidentId) || filteredIncidents[0] || null
 
-  const totalReportsCount =
-    (selectedIncident?.sourceCounts?.citizenReports || 0) +
-    (selectedIncident?.sourceCounts?.newsReports || 0) +
-    (selectedIncident?.sourceCounts?.governmentReports || 0) +
-    (selectedIncident?.sourceCounts?.weatherReports || 0) +
-    (selectedIncident?.sourceCounts?.fieldAssessments || 0)
+  const handleSelectIncident = (inc: Incident) => {
+    setSelectedIncidentId(inc.id)
+    if (onSelectIncident) {
+      onSelectIncident(inc.id)
+    }
+    setIsMobileDetailView(true)
+  }
+
+  const handleBackToList = () => {
+    setIsMobileDetailView(false)
+  }
+
+  // Corroboration counts derived from live backend sources
+  const totalSourcesCount = selectedIncident?.reports?.length || 1
+  const citizenCount = selectedIncident?.sourceCounts?.citizenReports || (selectedIncident?.reports?.filter(r => r.sourceType === 'CITIZEN').length) || 1
+  const newsCount = selectedIncident?.sourceCounts?.newsReports || (selectedIncident?.reports?.filter(r => r.sourceType === 'NEWS').length) || 0
+  const govCount = selectedIncident?.sourceCounts?.governmentReports || (selectedIncident?.reports?.filter(r => r.sourceType === 'GOVERNMENT').length) || 0
+  const weatherCount = selectedIncident?.sourceCounts?.weatherReports || (selectedIncident?.reports?.filter(r => r.sourceType === 'WEATHER').length) || 0
+  const reconCount = selectedIncident?.sourceCounts?.fieldAssessments || (selectedIncident?.reports?.filter(r => r.sourceType === 'FIELD_ASSESSMENT').length) || (selectedIncident?.isFieldVerified ? 1 : 0)
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-surface overflow-hidden">
-      {/* Header / Filter Toolbar */}
-      <div className="px-6 py-3.5 border-b border-outline-variant bg-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+    <div className="flex-1 flex flex-col h-full bg-surface overflow-hidden w-full">
+      {/* Header Toolbar */}
+      <div className="px-4 sm:px-6 py-3.5 border-b border-outline-variant bg-surface-container flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-            <span className="material-symbols-outlined text-[20px]">warning</span>
+          <div className="w-8 h-8 rounded bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+            <span className="material-symbols-outlined text-[20px]">crisis_alert</span>
           </div>
           <div>
             <h2 className="font-headline-sm text-[15px] font-bold text-on-surface">
-              Incident Registry &amp; Multi-Source Corroboration
+              Canonical Incident Registry
             </h2>
-            <p className="font-body-sm text-[11px] text-on-surface-variant">
-              Master Registry • Multi-channel streams correlated to singular disaster records
+            <p className="font-body-sm text-[11px] text-on-surface-variant hidden sm:block">
+              Multi-source deduplicated incident records • Real-time field intelligence
             </p>
           </div>
         </div>
 
-        {/* Reusable Search & Clean Filters */}
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* Search and Filters */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <SearchInput
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Search incidents, sectors..."
-            className="w-56"
+            placeholder="Search canonical registry..."
+            className="flex-1 sm:w-60"
           />
 
-          <div className="flex items-center gap-2">
-            <select
-              value={filterSeverity}
-              onChange={(e) => setFilterSeverity(e.target.value)}
-              className="bg-background border border-outline-variant text-on-surface font-mono-label text-[11px] rounded px-2.5 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary appearance-none pr-7 cursor-pointer"
-            >
-              <option value="ALL">Severity: ALL</option>
-              <option value="CRITICAL">SEV: CRITICAL</option>
-              <option value="HIGH">SEV: HIGH</option>
-              <option value="MEDIUM">SEV: MEDIUM</option>
-              <option value="LOW">SEV: LOW</option>
-            </select>
+          <select
+            value={filterSeverity}
+            onChange={(e) => setFilterSeverity(e.target.value)}
+            className="bg-background border border-outline-variant text-on-surface font-mono-label text-[11px] rounded px-2.5 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary appearance-none pr-7 cursor-pointer"
+          >
+            <option value="ALL">Severity: ALL</option>
+            <option value="critical">CRITICAL</option>
+            <option value="high">HIGH</option>
+            <option value="medium">MEDIUM</option>
+            <option value="low">LOW</option>
+          </select>
 
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-background border border-outline-variant text-on-surface font-mono-label text-[11px] rounded px-2.5 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary appearance-none pr-7 cursor-pointer"
-            >
-              <option value="ALL">Status: ALL</option>
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="UNRESOLVED">UNRESOLVED</option>
-              <option value="MONITORING">MONITORING</option>
-              <option value="RESOLVED">RESOLVED</option>
-            </select>
-          </div>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="bg-background border border-outline-variant text-on-surface font-mono-label text-[11px] rounded px-2.5 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary appearance-none pr-7 cursor-pointer"
+          >
+            <option value="ALL">Status: ALL</option>
+            <option value="active">ACTIVE</option>
+            <option value="contained">CONTAINED</option>
+            <option value="monitoring">MONITORING</option>
+            <option value="resolved">RESOLVED</option>
+          </select>
         </div>
       </div>
 
-      {/* Master-Detail Split Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* LEFT PANE: Scrollable Master List */}
-        <div className="w-full md:w-5/12 lg:w-4/12 border-r border-outline-variant flex flex-col h-full bg-surface-container-lowest">
+      {/* Main Split Layout: Desktop 2-column | Mobile conditional 1-column */}
+      <div className="flex-1 flex overflow-hidden w-full relative">
+        {/* LEFT PANE: Incident Master List */}
+        <div
+          className={`w-full md:w-5/12 lg:w-4/12 border-r border-outline-variant flex flex-col h-full bg-surface-container-lowest transition-all ${
+            isMobileDetailView ? 'hidden md:flex' : 'flex'
+          }`}
+        >
           <div className="px-4 py-2.5 bg-surface-container-low border-b border-outline-variant flex items-center justify-between shrink-0">
             <span className="font-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider">
-              {filteredIncidents.length} Registered Incidents
+              {filteredIncidents.length} Canonical Events
             </span>
             <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-              Authority View
+              Live Database
             </span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin">
-            {filteredIncidents.map((incident) => {
-              const isSelected = selectedIncident?.id === incident.id
-              const totalSources =
-                (incident.sourceCounts?.citizenReports || 0) +
-                (incident.sourceCounts?.newsReports || 0) +
-                (incident.sourceCounts?.governmentReports || 0) +
-                (incident.sourceCounts?.weatherReports || 0) +
-                (incident.sourceCounts?.fieldAssessments || 0)
-
-              return (
-                <div
-                  key={incident.id}
-                  onClick={() => onSelectIncident(incident.id)}
-                  className={`p-3.5 rounded border transition-all cursor-pointer flex flex-col gap-2 relative ${
-                    isSelected
-                      ? 'bg-surface-container-highest border-primary shadow-sm ring-1 ring-primary/40'
-                      : 'bg-surface-container-low border-outline-variant hover:border-outline hover:bg-surface-container'
-                  }`}
-                >
+            {filteredIncidents.length === 0 ? (
+              <div className="p-8 text-center text-on-surface-variant font-mono-label text-[12px]">
+                No incidents match the active search/filters.
+              </div>
+            ) : (
+              filteredIncidents.map((inc, index) => {
+                const isSelected = selectedIncident?.id === inc.id
+                const incidentNumber = index + 1
+                return (
                   <div
-                    className={`absolute left-0 top-0 bottom-0 w-1 rounded-l ${
-                      incident.severity === 'CRITICAL'
-                        ? 'bg-error'
-                        : incident.severity === 'HIGH'
-                        ? 'bg-tertiary'
-                        : 'bg-yellow-400'
+                    key={inc.id}
+                    onClick={() => handleSelectIncident(inc)}
+                    className={`p-3.5 rounded border transition-all cursor-pointer flex flex-col gap-1.5 relative ${
+                      isSelected
+                        ? 'bg-surface-container-highest border-primary shadow-sm ring-1 ring-primary/40'
+                        : 'bg-surface-container-low border-outline-variant hover:border-outline hover:bg-surface-container'
                     }`}
-                  />
+                  >
+                    <div
+                      className={`absolute left-0 top-0 bottom-0 w-1 rounded-l ${
+                        inc.severity === 'CRITICAL'
+                          ? 'bg-error'
+                          : inc.severity === 'HIGH'
+                          ? 'bg-tertiary'
+                          : 'bg-primary'
+                      }`}
+                    />
 
-                  <div className="flex items-start justify-between gap-2 pl-1">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono-label text-[10px] text-primary font-bold">
-                          {incident.id.toUpperCase()}
+                    <div className="flex items-start justify-between gap-2 pl-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono-label text-[12px] font-bold text-primary">
+                          Incident #{incidentNumber}
                         </span>
-                        <span className="text-outline-variant text-[10px]">•</span>
                         <span
-                          className={`font-status-badge text-[9px] px-1.5 py-0.2 rounded border uppercase font-bold ${
-                            incident.severity === 'CRITICAL'
-                              ? 'bg-error/15 text-error border-error/30'
-                              : incident.severity === 'HIGH'
-                              ? 'bg-tertiary/15 text-tertiary border-tertiary/30'
-                              : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
+                          className={`font-mono-label text-[9px] px-1.5 py-0.2 rounded uppercase font-bold ${
+                            inc.severity === 'CRITICAL'
+                              ? 'bg-error/15 text-error border border-error/30'
+                              : inc.severity === 'HIGH'
+                              ? 'bg-tertiary/15 text-tertiary border border-tertiary/30'
+                              : 'bg-primary/10 text-primary border border-primary/20'
                           }`}
                         >
-                          {incident.severity}
+                          {inc.severity}
                         </span>
-                        {incident.isFieldVerified ? (
-                          <span className="bg-emerald-950/40 text-emerald-400 border border-emerald-500/30 font-mono-label text-[9px] px-1 py-0.2 rounded font-bold">
-                            FIELD VERIFIED
-                          </span>
-                        ) : (
-                          <span className="bg-surface text-on-surface-variant border border-outline-variant font-mono-label text-[9px] px-1 py-0.2 rounded">
-                            UNASSESSED
+                        {inc.isFieldVerified && (
+                          <span className="font-mono-label text-[8px] bg-emerald-950/30 text-emerald-400 border border-emerald-500/30 px-1 py-0.2 rounded font-bold">
+                            ✓ VERIFIED
                           </span>
                         )}
                       </div>
-                      <h4 className="font-body-sm font-semibold text-[13px] text-on-surface mt-0.5 leading-snug">
-                        {incident.title}
-                      </h4>
+
+                      <span className="font-mono-label text-[10px] text-on-surface-variant">
+                        {inc.lastUpdated || inc.timeReported}
+                      </span>
                     </div>
 
-                    <span className="font-mono-label text-[9px] text-on-surface-variant shrink-0">
-                      {incident.timeReported}
-                    </span>
-                  </div>
-
-                  <div className="pl-1 text-on-surface-variant font-body-sm text-[12px] leading-tight">
-                    <div className="flex items-center gap-1 text-[11px] font-mono-label text-on-surface-variant">
-                      <span className="material-symbols-outlined text-[13px] text-primary">location_on</span>
-                      <span className="truncate">{incident.location}</span>
-                    </div>
-                    <p className="line-clamp-2 mt-1 text-[11px] text-outline">
-                      {incident.impact}
+                    <p className="pl-1 font-body-sm font-semibold text-[13px] text-on-surface leading-snug line-clamp-1">
+                      {inc.title}
                     </p>
-                  </div>
 
-                  <div className="pl-1 pt-2 border-t border-outline-variant/60 flex items-center justify-between text-[10px] font-mono-label text-on-surface-variant">
-                    <div className="flex items-center gap-1 text-primary">
-                      <span className="material-symbols-outlined text-[14px]">hub</span>
-                      <span>{totalSources} Sources Corroborating</span>
+                    <div className="pl-1 flex items-center justify-between text-[11px] text-on-surface-variant font-mono-label">
+                      <span className="truncate max-w-[180px]">📍 {inc.location}</span>
+                      <span className="text-[10px] bg-surface-container px-1.5 py-0.5 rounded border border-outline-variant/60">
+                        {inc.resourceCoverage || '60%'} Cov
+                      </span>
                     </div>
-
-                    <span className="uppercase text-[9px] bg-surface px-1.5 py-0.5 rounded border border-outline-variant">
-                      {incident.status}
-                    </span>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </div>
         </div>
 
-        {/* RIGHT PANE: Selected Incident Master Dossier & Source Stream */}
-        <div className="flex-1 flex flex-col h-full bg-surface overflow-y-auto p-5 space-y-5 scrollbar-thin">
+        {/* RIGHT PANE: Selected Incident Master Dossier */}
+        <div
+          className={`flex-1 flex flex-col h-full bg-surface overflow-y-auto p-4 sm:p-5 space-y-4 scrollbar-thin transition-all min-w-0 ${
+            isMobileDetailView ? 'flex w-full' : 'hidden md:flex'
+          }`}
+        >
           {selectedIncident ? (
             <>
-              {/* 1. Compact Consistent Details Header */}
+              {/* Mobile Back to List Button */}
+              <div className="md:hidden pb-1">
+                <button
+                  type="button"
+                  onClick={handleBackToList}
+                  className="flex items-center gap-1.5 text-primary hover:text-on-surface font-mono-label text-[12px] font-bold py-1.5 px-2.5 rounded bg-surface-container border border-outline-variant cursor-pointer w-fit"
+                >
+                  <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                  ← Back to Incident List
+                </button>
+              </div>
+
+              {/* 1. Header with Simple Identifier & Complete Sub-Title */}
               <DetailsHeader
-                badgeId={`INCIDENT DOSSIER: ${selectedIncident.id.toUpperCase()}`}
+                badgeId={`INCIDENT #${getIncidentNumber(selectedIncident.id)} • [${selectedIncident.id.toUpperCase()}]`}
                 title={selectedIncident.title}
                 severityBadge={selectedIncident.severity}
-                statusText={`STATUS: ${selectedIncident.status}`}
-                statusColor={selectedIncident.status === 'ACTIVE' ? 'error' : 'outline'}
-                accentColor={selectedIncident.severity === 'CRITICAL' ? 'error' : 'tertiary'}
+                statusText={selectedIncident.status}
+                statusColor={selectedIncident.status === 'ACTIVE' ? 'error' : 'primary'}
+                accentColor={selectedIncident.severity === 'CRITICAL' ? 'error' : 'primary'}
                 subItems={[
-                  { label: 'Location', value: `${selectedIncident.location} (${selectedIncident.sector})`, icon: 'location_on' },
-                  { label: 'Reported', value: selectedIncident.timeReported },
-                  { label: 'Sync', value: selectedIncident.lastUpdated },
-                  {
-                    label: 'Recon',
-                    value: selectedIncident.isFieldVerified ? 'Verified' : 'Not yet assessed',
-                    highlight: selectedIncident.isFieldVerified,
-                  },
+                  { label: 'Location', value: selectedIncident.location, icon: 'location_on' },
+                  { label: 'Disaster Type', value: (selectedIncident.type || 'Disaster').toUpperCase() },
+                  { label: 'Priority Level', value: selectedIncident.priorityLevel || 'Level 1', highlight: true },
+                  { label: 'Affected Population', value: selectedIncident.affectedPopulationEst || 'Estimated ~12,500' },
                 ]}
-                extraAction={
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-surface px-3 py-2 rounded border border-outline-variant">
-                    <div className="flex flex-col text-center sm:text-left">
-                      <span className="text-[8px] font-mono-label text-on-surface-variant uppercase">Pop.</span>
-                      <span className="font-headline-sm text-[13px] text-error font-bold leading-tight">
-                        {selectedIncident.affectedPopulationEst}
-                      </span>
-                    </div>
-                    <div className="flex flex-col text-center sm:text-left">
-                      <span className="text-[8px] font-mono-label text-on-surface-variant uppercase">Area</span>
-                      <span className="font-headline-sm text-[13px] text-on-surface font-bold leading-tight">
-                        {selectedIncident.affectedAreaSqKm}k㎡
-                      </span>
-                    </div>
-                    <div className="flex flex-col text-center sm:text-left">
-                      <span className="text-[8px] font-mono-label text-on-surface-variant uppercase">Priority</span>
-                      <span className="font-headline-sm text-[13px] text-error font-bold leading-tight">
-                        {selectedIncident.priorityLevel}
-                      </span>
-                    </div>
-                    <div className="flex flex-col text-center sm:text-left">
-                      <span className="text-[8px] font-mono-label text-on-surface-variant uppercase">Coverage</span>
-                      <span className="font-headline-sm text-[13px] text-emerald-400 font-bold leading-tight">
-                        {selectedIncident.resourceCoverage}
-                      </span>
-                    </div>
-                  </div>
-                }
               />
 
-              {/* 2. Source Correlation Summary Box */}
-              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-col gap-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary text-[18px]">hub</span>
-                    <h4 className="font-headline-sm text-[13px] font-bold text-on-surface">
-                      Source Correlation Engine (Corroborating Feeds for {selectedIncident.id.toUpperCase()})
-                    </h4>
-                  </div>
-                  <div className="font-mono-label text-[10px] text-emerald-400 bg-emerald-950/20 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    {totalReportsCount} Inputs Corroborated to 1 Unified Incident
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                  <div className="p-2 bg-surface-container-low border border-outline-variant rounded flex flex-col items-center text-center">
-                    <span className="material-symbols-outlined text-tertiary text-[16px] mb-0.5">forum</span>
-                    <span className="font-headline-sm text-[15px] font-bold text-on-surface">
-                      {selectedIncident.sourceCounts?.citizenReports || 0}
+              {/* 2. Situational Impact & Ground Verification */}
+              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
+                  <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
+                    Situational Impact &amp; Field Verification
+                  </h4>
+                  {selectedIncident.isFieldVerified ? (
+                    <span className="font-mono-label text-[10px] text-emerald-400 bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-500/30">
+                      ✓ Field Recon Verified
                     </span>
-                    <span className="font-mono-label text-[9px] text-on-surface-variant uppercase">Citizen Reports</span>
-                  </div>
-
-                  <div className="p-2 bg-surface-container-low border border-outline-variant rounded flex flex-col items-center text-center">
-                    <span className="material-symbols-outlined text-primary text-[16px] mb-0.5">newspaper</span>
-                    <span className="font-headline-sm text-[15px] font-bold text-on-surface">
-                      {selectedIncident.sourceCounts?.newsReports || 0}
-                    </span>
-                    <span className="font-mono-label text-[9px] text-on-surface-variant uppercase">News &amp; Media</span>
-                  </div>
-
-                  <div className="p-2 bg-surface-container-low border border-outline-variant rounded flex flex-col items-center text-center">
-                    <span className="material-symbols-outlined text-purple-400 text-[16px] mb-0.5">account_balance</span>
-                    <span className="font-headline-sm text-[15px] font-bold text-on-surface">
-                      {selectedIncident.sourceCounts?.governmentReports || 0}
-                    </span>
-                    <span className="font-mono-label text-[9px] text-on-surface-variant uppercase">Gov Alerts</span>
-                  </div>
-
-                  <div className="p-2 bg-surface-container-low border border-outline-variant rounded flex flex-col items-center text-center">
-                    <span className="material-symbols-outlined text-cyan-400 text-[16px] mb-0.5">thunderstorm</span>
-                    <span className="font-headline-sm text-[15px] font-bold text-on-surface">
-                      {selectedIncident.sourceCounts?.weatherReports || 0}
-                    </span>
-                    <span className="font-mono-label text-[9px] text-on-surface-variant uppercase">IMD / Radar</span>
-                  </div>
-
-                  <div className="p-2 bg-surface-container-low border border-outline-variant rounded flex flex-col items-center text-center">
-                    <span className="material-symbols-outlined text-emerald-400 text-[16px] mb-0.5">satellite_alt</span>
-                    <span className="font-headline-sm text-[15px] font-bold text-emerald-400">
-                      {selectedIncident.sourceCounts?.fieldAssessments || 0}
-                    </span>
-                    <span className="font-mono-label text-[9px] text-on-surface-variant uppercase">Field Recon</span>
-                  </div>
-                </div>
-              </section>
-
-              {/* 3. Multi-Channel Ingestion Feed */}
-              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-col gap-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary text-[18px]">feed</span>
-                    <h4 className="font-headline-sm text-[13px] font-bold text-on-surface">
-                      Corroborating Intelligence Ingestion Stream ({filteredReports.length})
-                    </h4>
-                  </div>
-
-                  <div className="flex items-center gap-1 bg-surface-container p-1 rounded border border-outline-variant text-[11px] font-mono-label">
-                    <button
-                      type="button"
-                      onClick={() => setActiveReportTab('all')}
-                      className={`px-2 py-1 rounded transition-colors cursor-pointer ${
-                        activeReportTab === 'all' ? 'bg-primary text-on-primary font-bold' : 'text-on-surface-variant hover:text-white'
-                      }`}
-                    >
-                      All ({incidentReports.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveReportTab('citizen')}
-                      className={`px-2 py-1 rounded transition-colors cursor-pointer ${
-                        activeReportTab === 'citizen' ? 'bg-primary text-on-primary font-bold' : 'text-on-surface-variant hover:text-white'
-                      }`}
-                    >
-                      Citizen
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveReportTab('news')}
-                      className={`px-2 py-1 rounded transition-colors cursor-pointer ${
-                        activeReportTab === 'news' ? 'bg-primary text-on-primary font-bold' : 'text-on-surface-variant hover:text-white'
-                      }`}
-                    >
-                      News
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveReportTab('gov')}
-                      className={`px-2 py-1 rounded transition-colors cursor-pointer ${
-                        activeReportTab === 'gov' ? 'bg-primary text-on-primary font-bold' : 'text-on-surface-variant hover:text-white'
-                      }`}
-                    >
-                      Gov/IMD
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveReportTab('field')}
-                      className={`px-2 py-1 rounded transition-colors cursor-pointer ${
-                        activeReportTab === 'field' ? 'bg-primary text-on-primary font-bold' : 'text-on-surface-variant hover:text-white'
-                      }`}
-                    >
-                      Field Recon
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin">
-                  {filteredReports.map((report) => (
-                    <div
-                      key={report.id}
-                      className="p-3 bg-surface-container-low border border-outline-variant rounded flex flex-col gap-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`font-mono-label text-[9px] px-1.5 py-0.5 rounded uppercase font-bold border ${
-                              report.sourceType === 'CITIZEN' || report.sourceType === 'SMS' || report.sourceType === 'IVR'
-                                ? 'bg-tertiary/10 text-tertiary border-tertiary/30'
-                                : report.sourceType === 'GOVERNMENT' || report.sourceType === 'WEATHER'
-                                ? 'bg-cyan-950/20 text-cyan-400 border-cyan-500/30'
-                                : report.sourceType === 'FIELD_ASSESSMENT'
-                                ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/30'
-                                : 'bg-primary/10 text-primary border-primary/30'
-                            }`}
-                          >
-                            {report.channelBadge || report.sourceType}
-                          </span>
-                          <span className="font-body-sm font-semibold text-[12px] text-on-surface">
-                            {report.sourceLabel}
-                          </span>
-                          {report.confidence && (
-                            <span className="font-mono-label text-[9px] text-emerald-400 bg-surface px-1 py-0.2 rounded border border-outline-variant">
-                              Confidence: {report.confidence}%
-                            </span>
-                          )}
-                        </div>
-
-                        <span className="font-mono-label text-[10px] text-on-surface-variant">
-                          {report.timestamp}
-                        </span>
-                      </div>
-
-                      <p className="font-body-sm text-[12px] text-on-surface leading-snug">
-                        {report.summary}
-                      </p>
-
-                      {report.rawContent && (
-                        <div className="p-2 bg-surface-container-lowest rounded border border-outline-variant/60 font-mono-label text-[10px] text-on-surface-variant">
-                          <span className="text-outline block mb-0.5 uppercase text-[8px]">Raw Telemetry:</span>
-                          {report.rawContent}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* 4. Bottom Split: Type-Aware Resource Advisories vs Timeline */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pb-4">
-                <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-col gap-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
-                    <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary text-[18px]">inventory_2</span>
-                      Incident Capability Requirements &amp; Advisories
-                    </h4>
-                    <span className="font-mono-label text-[10px] text-primary">
-                      {relevantAdvisories.length} Active Advisories
-                    </span>
-                  </div>
-
-                  {relevantAdvisories.length > 0 ? (
-                    <div className="space-y-2">
-                      {relevantAdvisories.map((adv) => (
-                        <div
-                          key={adv.id}
-                          className="p-2.5 bg-surface-container-low border border-outline-variant rounded flex items-center justify-between"
-                        >
-                          <div>
-                            <div className="font-body-sm font-semibold text-on-surface text-[12px]">
-                              {adv.resourceName}
-                            </div>
-                            <div className="font-mono-label text-[10px] text-primary">{adv.details}</div>
-                            <div className="font-body-sm text-[10px] text-outline mt-0.5">{adv.reason}</div>
-                          </div>
-                          <span
-                            className={`font-mono-label text-[9px] px-1.5 py-0.5 rounded border uppercase shrink-0 ${
-                              adv.status === 'APPROVED'
-                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                                : 'bg-tertiary/10 text-tertiary border-tertiary/20'
-                            }`}
-                          >
-                            {adv.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
                   ) : (
-                    <div className="p-3 bg-surface-container-low rounded border border-outline-variant text-[11px] text-on-surface-variant font-mono-label">
-                      No automated resource recommendation required at this stage. Operational needs satisfied by active ground teams.
+                    <span className="font-mono-label text-[10px] text-tertiary bg-tertiary/10 px-2 py-0.5 rounded border border-tertiary/20">
+                      Unverified Sensor Model
+                    </span>
+                  )}
+                </div>
+
+                <p className="font-body-base text-[13px] text-on-surface bg-surface-container p-3 rounded border border-outline-variant leading-relaxed">
+                  {selectedIncident.impact || 'Ground impact model synchronized with central command intelligence.'}
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono-label text-[11px]">
+                  <div className="p-2 bg-surface-container rounded border border-outline-variant/60">
+                    <span className="text-outline block text-[10px]">Resource Coverage</span>
+                    <span className="text-primary font-bold text-[12px]">{selectedIncident.resourceCoverage || '60%'}</span>
+                  </div>
+                  <div className="p-2 bg-surface-container rounded border border-outline-variant/60">
+                    <span className="text-outline block text-[10px]">Estimated Area</span>
+                    <span className="text-on-surface font-bold text-[12px]">{selectedIncident.affectedAreaSqKm || '12.4 km²'}</span>
+                  </div>
+                  <div className="p-2 bg-surface-container rounded border border-outline-variant/60">
+                    <span className="text-outline block text-[10px]">First Reported</span>
+                    <span className="text-on-surface font-bold text-[12px]">{selectedIncident.timeReported || '10:35 AM'}</span>
+                  </div>
+                  <div className="p-2 bg-surface-container rounded border border-outline-variant/60">
+                    <span className="text-outline block text-[10px]">Last Signal</span>
+                    <span className="text-on-surface font-bold text-[12px]">{selectedIncident.lastUpdated || 'Just now'}</span>
+                  </div>
+                </div>
+              </section>
+
+              {/* 3. Multi-Channel Corroborating Feed (Exact source counts restored) */}
+              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
+                  <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[18px]">hub</span>
+                    Multi-Channel Corroboration ({totalSourcesCount} Total Signals)
+                  </h4>
+                  <div className="flex items-center gap-1.5 font-mono-label text-[10px] flex-wrap">
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded border border-primary/20 font-bold">
+                      {citizenCount} Citizen {citizenCount === 1 ? 'Report' : 'Reports'}
+                    </span>
+                    {newsCount > 0 && (
+                      <span className="px-2 py-0.5 bg-surface-container-high text-on-surface rounded border border-outline-variant">
+                        {newsCount} News
+                      </span>
+                    )}
+                    {govCount > 0 && (
+                      <span className="px-2 py-0.5 bg-emerald-950/20 text-emerald-400 rounded border border-emerald-500/30">
+                        {govCount} Government
+                      </span>
+                    )}
+                    {weatherCount > 0 && (
+                      <span className="px-2 py-0.5 bg-sky-950/20 text-sky-400 rounded border border-sky-500/30">
+                        {weatherCount} Weather/IMD
+                      </span>
+                    )}
+                    {reconCount > 0 && (
+                      <span className="px-2 py-0.5 bg-tertiary/10 text-tertiary rounded border border-tertiary/20">
+                        {reconCount} Field Recon
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
+                  {selectedIncident.reports && selectedIncident.reports.length > 0 ? (
+                    selectedIncident.reports.map((rep) => (
+                      <div
+                        key={rep.id}
+                        className="p-3 bg-surface-container rounded border border-outline-variant/80 space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono-label text-[10px] text-primary font-bold">
+                              {rep.sourceLabel || rep.sourceType}
+                            </span>
+                            <span className="font-mono-label text-[9px] bg-surface-container-high px-1.5 py-0.2 rounded border border-outline-variant">
+                              {rep.channelBadge || 'SOURCE'}
+                            </span>
+                          </div>
+                          <span className="font-mono-label text-[10px] text-on-surface-variant">
+                            {rep.timestamp}
+                          </span>
+                        </div>
+                        <p className="font-body-sm text-[12px] text-on-surface leading-relaxed">
+                          {rep.summary}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 bg-surface-container rounded border border-outline-variant text-center font-mono-label text-[11px] text-on-surface-variant">
+                      Single corroborating source attached.
                     </div>
                   )}
+                </div>
+              </section>
 
-                  <div className="pt-2 border-t border-outline-variant">
-                    <span className="font-mono-label text-[10px] text-outline uppercase block mb-1.5">
-                      Active Operational Tracks:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(selectedIncident.associatedOperations || []).map((op, idx) => (
-                        <span
-                          key={idx}
-                          className="bg-surface-container px-2 py-1 rounded text-[10px] font-mono-label text-on-surface border border-outline-variant"
+              {/* 4. Incident-Specific AI Operational Recommendations */}
+              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
+                  <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[18px]">psychology</span>
+                    AI Operational Recommendations &amp; Advisories
+                  </h4>
+                  <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                    Incident Specific
+                  </span>
+                </div>
+
+                {selectedIncident.id === 'inc-a' ? (
+                  <div className="space-y-2.5">
+                    <div className="p-3 bg-surface-container rounded border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono-label text-[11px] text-primary font-bold">NDRF Swift Rescue Squad 4</span>
+                          <span className="font-mono-label text-[9px] bg-emerald-950/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">98% MATCH</span>
+                        </div>
+                        <p className="font-body-sm text-[12px] text-on-surface-variant mt-0.5">
+                          Priority extraction for civilians stranded in flood zone • ETA: 12 min
+                        </p>
+                      </div>
+                      {onOpenOperations && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenOperations()}
+                          className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer transition-colors shrink-0"
                         >
-                          {op}
-                        </span>
-                      ))}
+                          Dispatch Squad →
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-surface-container rounded border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono-label text-[11px] text-primary font-bold">Mobile Trauma Care Unit 1</span>
+                          <span className="font-mono-label text-[9px] bg-emerald-950/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">95% MATCH</span>
+                        </div>
+                        <p className="font-body-sm text-[12px] text-on-surface-variant mt-0.5">
+                          Emergency triage setup for field sector • ETA: 15 min
+                        </p>
+                      </div>
+                      {onOpenOperations && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenOperations()}
+                          className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer transition-colors shrink-0"
+                        >
+                          Dispatch Unit →
+                        </button>
+                      )}
                     </div>
                   </div>
-
-                  <div className="mt-auto pt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={onOpenAssessment}
-                      className="w-full py-2 bg-surface-container-high hover:bg-surface-bright border border-outline-variant text-primary font-mono-label text-[11px] font-semibold rounded uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">satellite_alt</span>
-                      Initiate Field Reconnaissance Assessment
-                    </button>
+                ) : (
+                  <div className="p-4 bg-surface-container rounded border border-outline-variant/60 text-center font-mono-label text-[12px] text-on-surface-variant">
+                    No active resource recommendations for this incident.
                   </div>
-                </div>
+                )}
+              </section>
 
-                <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-col gap-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
-                    <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary text-[18px]">history</span>
-                      Incident Progression Timeline
-                    </h4>
-                    <span className="font-mono-label text-[10px] text-on-surface-variant">Audit Trail</span>
-                  </div>
-
-                  <div className="space-y-3 overflow-y-auto max-h-[220px] pr-1 scrollbar-thin">
-                    {(selectedIncident.timeline || []).map((event) => (
-                      <div key={event.id} className="flex items-start gap-2.5 text-[11px]">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className="font-body-sm font-semibold text-on-surface text-[11px]">
-                              {event.title}
-                            </span>
-                            <span className="font-mono-label text-[9px] text-on-surface-variant">
-                              {event.timestamp}
-                            </span>
-                          </div>
-                          <p className="font-body-sm text-[11px] text-on-surface-variant leading-snug">
-                            {event.description}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {/* 5. Actions */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                {onOpenAssessment && (
+                  <button
+                    type="button"
+                    onClick={onOpenAssessment}
+                    className="flex-1 py-2.5 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-mono-label text-[11px] font-bold rounded uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-primary">sensors</span>
+                    Launch Field Assessment →
+                  </button>
+                )}
+                {onOpenReportPreview && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenReportPreview(selectedIncident.id)}
+                    className="flex-1 py-2.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary font-mono-label text-[11px] font-bold rounded uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                    Generate Incident Dossier PDF
+                  </button>
+                )}
               </div>
             </>
           ) : (
             <div className="p-8 text-center text-on-surface-variant font-mono-label text-[12px]">
-              Select an incident from the registry to view master dossier and multi-channel telemetry.
+              Select an incident from the registry to view detailed intelligence dossier.
             </div>
           )}
         </div>

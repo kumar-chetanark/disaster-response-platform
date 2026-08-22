@@ -16,7 +16,6 @@ export default function AssessmentForm({
   onSubmit,
   onBackToDashboard,
 }: AssessmentFormProps) {
-  // Assessment Mode State (Generalized: Drone, Helicopter, Land, Water)
   const [assessmentMode, setAssessmentMode] = useState<AssessmentMode>('Aerial — Drone')
   const [missionId] = useState('SCAN-44A')
   const [missionType, setMissionType] = useState<MissionType>('Area Scan / Survey')
@@ -34,7 +33,6 @@ export default function AssessmentForm({
   const [roadAccessibility, setRoadAccessibility] = useState('3 roads blocked')
   const [peopleObserved, setPeopleObserved] = useState('~15 in isolated pockets')
   
-  // Mission-Specific Dynamic Fields
   const [deliveryStatus, setDeliveryStatus] = useState('In Transit - Drop Zone 4')
   const [commsStatus, setCommsStatus] = useState('Repeater Tower Delta Offline (30% coverage drop)')
   const [evacRouteRisk, setEvacRouteRisk] = useState('High - Route 9 Bridge cracked')
@@ -98,70 +96,75 @@ export default function AssessmentForm({
   }
 
   return (
-    <div className="flex-1 bg-background h-full overflow-y-auto flex flex-col scrollbar-thin">
-      {/* Top Header - Sticky */}
-      <header className="h-header-height sticky top-0 bg-surface/95 backdrop-blur-md border-b border-outline-variant flex items-center justify-between px-6 z-30 shrink-0">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={onBackToDashboard}
-            className="text-on-surface-variant hover:text-on-surface transition-colors p-2 -ml-2 rounded-lg hover:bg-surface-container-high flex items-center cursor-pointer"
-            title="Return to Command Dashboard"
-          >
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <div>
-            <h2 className="font-headline-md text-headline-md font-semibold text-on-surface">
-              Field Assessment Ingestion Console
-            </h2>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="font-mono-label text-[11px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-                MISSION ID: {missionId}
-              </span>
-              <span className="text-outline-variant text-[11px]">|</span>
-              <span className="font-body-sm text-[12px] text-on-surface-variant">
-                Resource: <span className="text-primary font-medium">{initialAsset?.name || 'Drone Alpha'}</span>
-              </span>
-              <span className="text-outline-variant text-[11px]">|</span>
-              <span className="font-body-sm text-[12px] text-on-surface-variant">
-                Target: <span className="text-on-surface font-medium">{initialIncidentTitle}</span>
-              </span>
+    <div className="flex-1 bg-background h-full overflow-y-auto flex flex-col scrollbar-thin w-full">
+      {/* Top Header - Responsive Reflow (Stacked on mobile, row on desktop) */}
+      <header className="sticky top-0 bg-surface/95 backdrop-blur-md border-b border-outline-variant px-4 sm:px-6 py-3 z-30 shrink-0 w-full">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 max-w-5xl mx-auto w-full">
+          {/* Left: Back button & Title */}
+          <div className="flex items-start gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={onBackToDashboard}
+              className="text-on-surface-variant hover:text-on-surface transition-colors p-1.5 -ml-1 rounded-lg hover:bg-surface-container-high flex items-center cursor-pointer shrink-0 mt-0.5"
+              title="Return to Command Dashboard"
+            >
+              <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            </button>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-headline-md text-[16px] sm:text-headline-md font-semibold text-on-surface leading-tight">
+                Field Assessment Ingestion Console
+              </h2>
+              {/* Responsive Metadata: wraps cleanly on mobile/tablet */}
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1.5">
+                <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 shrink-0">
+                  ID: {missionId}
+                </span>
+                <span className="text-outline-variant text-[10px] hidden sm:inline">•</span>
+                <span className="font-body-sm text-[11px] text-on-surface-variant shrink-0">
+                  Resource: <span className="text-primary font-medium">{initialAsset?.name || 'Drone Alpha'}</span>
+                </span>
+                <span className="text-outline-variant text-[10px] hidden sm:inline">•</span>
+                <span className="font-body-sm text-[11px] text-on-surface-variant truncate max-w-[200px] sm:max-w-none">
+                  Target: <span className="text-on-surface font-medium">{initialIncidentTitle}</span>
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-on-surface-variant font-body-sm bg-surface-container px-3 py-1.5 rounded-lg border border-outline-variant text-[12px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Field Telemetry Link Active
+          {/* Right: Telemetry pill & Save Draft */}
+          <div className="flex items-center justify-between md:justify-end gap-2 pt-1 md:pt-0 border-t md:border-t-0 border-outline-variant/60 shrink-0">
+            <div className="flex items-center gap-1.5 text-on-surface-variant font-body-sm bg-surface-container px-2.5 py-1 rounded border border-outline-variant text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-mono-label">Telemetry Live</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-body-sm text-[11px] font-medium rounded transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[15px]">save</span>
+              {draftSaved ? 'Draft Saved!' : 'Save Draft'}
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            className="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-body-sm text-[12px] font-medium rounded transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px]">save</span>
-            {draftSaved ? 'Draft Saved!' : 'Save Draft'}
-          </button>
         </div>
       </header>
 
-      {/* Fully Scrollable Form Body Container */}
-      <div className="max-w-4xl w-full mx-auto p-6 space-y-6 pb-28">
-        <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Form Body Container */}
+      <div className="max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6 pb-28 min-w-0">
+        <form onSubmit={handleSubmit} className="space-y-6 w-full min-w-0">
           {/* Section 1: Mission Metadata & Mode */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
-            <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-[20px]">info</span>
-              <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm w-full min-w-0">
+            <div className="bg-surface-container-high px-4 sm:px-6 py-3 border-b border-outline-variant flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-primary text-[18px]">info</span>
+              <h3 className="font-headline-sm text-[14px] sm:text-[15px] font-semibold text-on-surface">
                 1. Mission Metadata &amp; Assessment Mode
               </h3>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+            <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-1.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                   Assessment Mode
                 </label>
                 <select
@@ -176,8 +179,8 @@ export default function AssessmentForm({
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+              <div className="space-y-1.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                   Mission Objective Type
                 </label>
                 <select
@@ -194,8 +197,8 @@ export default function AssessmentForm({
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+              <div className="space-y-1.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                   Assessment Time (ZULU)
                 </label>
                 <input
@@ -206,8 +209,8 @@ export default function AssessmentForm({
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+              <div className="space-y-1.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                   Weather Conditions
                 </label>
                 <input
@@ -222,17 +225,17 @@ export default function AssessmentForm({
           </section>
 
           {/* Section 2: Spatial Data & Hazards */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
-            <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-[20px]">my_location</span>
-              <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm w-full min-w-0">
+            <div className="bg-surface-container-high px-4 sm:px-6 py-3 border-b border-outline-variant flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-primary text-[18px]">my_location</span>
+              <h3 className="font-headline-sm text-[14px] sm:text-[15px] font-semibold text-on-surface">
                 2. Spatial Data &amp; Hazards Detected
               </h3>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-1.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                   Area Surveyed
                 </label>
                 <input
@@ -243,8 +246,8 @@ export default function AssessmentForm({
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+              <div className="space-y-1.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                   Hazards Detected
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -260,7 +263,7 @@ export default function AssessmentForm({
                         key={hazard.name}
                         type="button"
                         onClick={() => toggleHazard(hazard.name)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded border transition-colors text-[12px] font-body-sm cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border transition-colors text-[11px] font-body-sm cursor-pointer ${
                           isChecked
                             ? hazard.color === 'error'
                               ? 'border-error/60 bg-error/15 text-error font-medium'
@@ -280,28 +283,28 @@ export default function AssessmentForm({
             </div>
           </section>
 
-          {/* Section 3: Impact Analysis (Mission-Specific Ingestion) */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
-            <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary text-[20px]">analytics</span>
-                <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
+          {/* Section 3: Impact Analysis */}
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm w-full min-w-0">
+            <div className="bg-surface-container-high px-4 sm:px-6 py-3 border-b border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-primary text-[18px]">analytics</span>
+                <h3 className="font-headline-sm text-[14px] sm:text-[15px] font-semibold text-on-surface">
                   3. Impact Analysis ({missionType})
                 </h3>
               </div>
-              <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 uppercase">
+              <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 uppercase w-fit">
                 Mode: {assessmentMode}
               </span>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+            <div className="p-4 sm:p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                     Structures Damaged
                   </label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant material-symbols-outlined text-[18px]">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant material-symbols-outlined text-[16px]">
                       home_work
                     </span>
                     <input
@@ -314,8 +317,8 @@ export default function AssessmentForm({
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+                <div className="space-y-1.5">
+                  <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                     Roads / Accessibility
                   </label>
                   <div className="relative">
@@ -330,17 +333,17 @@ export default function AssessmentForm({
                       <option value="Impassable">Impassable (Air/Boat Access Only)</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-on-surface-variant">
-                      <span className="material-symbols-outlined text-[18px]">expand_more</span>
+                      <span className="material-symbols-outlined text-[16px]">expand_more</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
-                    People Observed (Trapped/Isolated)
+                <div className="space-y-1.5">
+                  <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
+                    People Observed
                   </label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant material-symbols-outlined text-[18px]">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant material-symbols-outlined text-[16px]">
                       group
                     </span>
                     <input
@@ -391,7 +394,7 @@ export default function AssessmentForm({
               )}
 
               {/* Impact Visualization / Spatial Canvas */}
-              <div className="w-full h-44 bg-surface-container-lowest rounded border border-outline-variant overflow-hidden relative map-grid flex items-center justify-center">
+              <div className="w-full h-40 sm:h-44 bg-surface-container-lowest rounded border border-outline-variant overflow-hidden relative map-grid flex items-center justify-center">
                 <svg
                   viewBox="0 0 600 180"
                   className="w-full h-full object-cover opacity-50 text-outline"
@@ -409,35 +412,35 @@ export default function AssessmentForm({
                   <circle cx="320" cy="90" r="4" fill="#adc6ff" />
                 </svg>
 
-                <div className="absolute top-[45%] left-[22%] flex items-center gap-1 bg-error/90 border border-error px-2 py-0.5 rounded text-[10px] font-mono-label text-white shadow-md">
+                <div className="absolute top-[45%] left-[10%] sm:left-[22%] flex items-center gap-1 bg-error/90 border border-error px-2 py-0.5 rounded text-[10px] font-mono-label text-white shadow-md">
                   <span className="material-symbols-outlined text-[12px]">block</span>
                   Route 9 Blocked
                 </div>
 
-                <div className="absolute top-[60%] left-[55%] flex items-center gap-1 bg-tertiary-container/90 border border-tertiary px-2 py-0.5 rounded text-[10px] font-mono-label text-white shadow-md">
+                <div className="absolute top-[60%] left-[45%] sm:left-[55%] flex items-center gap-1 bg-tertiary-container/90 border border-tertiary px-2 py-0.5 rounded text-[10px] font-mono-label text-white shadow-md">
                   <span className="material-symbols-outlined text-[12px]">group</span>
-                  ~15 Trapped (Sector 7G)
+                  ~15 Trapped
                 </div>
 
-                <div className="absolute top-2 right-2 bg-background/90 backdrop-blur px-2.5 py-1 rounded text-[10px] font-mono-label text-on-surface-variant border border-outline-variant">
-                  LAT 29.7604° N / LON 95.3698° W • ALT 120m
+                <div className="absolute top-2 right-2 bg-background/90 backdrop-blur px-2 py-0.5 rounded text-[9px] font-mono-label text-on-surface-variant border border-outline-variant">
+                  LAT 29.76°N / LON 95.36°W
                 </div>
               </div>
             </div>
           </section>
 
           {/* Section 4: Resource Needs & Evacuation */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
-            <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-[20px]">local_shipping</span>
-              <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm w-full min-w-0">
+            <div className="bg-surface-container-high px-4 sm:px-6 py-3 border-b border-outline-variant flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-primary text-[18px]">local_shipping</span>
+              <h3 className="font-headline-sm text-[14px] sm:text-[15px] font-semibold text-on-surface">
                 4. Field Resource Requirements &amp; Route Status
               </h3>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-1.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                   Recommended Field Resources
                 </label>
                 <textarea
@@ -449,15 +452,15 @@ export default function AssessmentForm({
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+              <div className="space-y-1.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                   Evacuation Route Status
                 </label>
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   <button
                     type="button"
                     onClick={() => setEvacuationStatus('Routes Clear')}
-                    className={`w-full text-left flex items-center gap-3 p-3 rounded border transition-colors cursor-pointer ${
+                    className={`w-full text-left flex items-center gap-3 p-2.5 rounded border transition-colors cursor-pointer ${
                       evacuationStatus === 'Routes Clear'
                         ? 'border-emerald-500/60 bg-emerald-950/20'
                         : 'border-outline-variant bg-background hover:bg-surface-container'
@@ -473,15 +476,15 @@ export default function AssessmentForm({
                       {evacuationStatus === 'Routes Clear' && <span className="w-1.5 h-1.5 rounded-full bg-black" />}
                     </span>
                     <div>
-                      <div className="font-body-base text-[13px] text-on-surface font-medium">Routes Clear</div>
-                      <div className="font-body-sm text-[11px] text-on-surface-variant">Primary and secondary paths accessible.</div>
+                      <div className="font-body-base text-[12px] sm:text-[13px] text-on-surface font-medium">Routes Clear</div>
+                      <div className="font-body-sm text-[10px] text-on-surface-variant">Primary and secondary paths accessible.</div>
                     </div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setEvacuationStatus('Compromised')}
-                    className={`w-full text-left flex items-center gap-3 p-3 rounded border transition-colors cursor-pointer ${
+                    className={`w-full text-left flex items-center gap-3 p-2.5 rounded border transition-colors cursor-pointer ${
                       evacuationStatus === 'Compromised'
                         ? 'border-error/60 bg-error/15'
                         : 'border-outline-variant bg-background hover:bg-surface-container'
@@ -497,8 +500,8 @@ export default function AssessmentForm({
                       {evacuationStatus === 'Compromised' && <span className="w-1.5 h-1.5 rounded-full bg-black" />}
                     </span>
                     <div>
-                      <div className="font-body-base text-[13px] text-error font-semibold">Compromised (Road Blocked)</div>
-                      <div className="font-body-sm text-[11px] text-error/80">Air or specialized water extraction required.</div>
+                      <div className="font-body-base text-[12px] sm:text-[13px] text-error font-semibold">Compromised (Road Blocked)</div>
+                      <div className="font-body-sm text-[10px] text-error/80">Air or specialized water extraction required.</div>
                     </div>
                   </button>
                 </div>
@@ -507,25 +510,22 @@ export default function AssessmentForm({
           </section>
 
           {/* Section 5: Media & Notes */}
-          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm">
-            <div className="bg-surface-container-high px-6 py-3.5 border-b border-outline-variant flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-[20px]">perm_media</span>
-              <h3 className="font-headline-sm text-[15px] font-semibold text-on-surface">
+          <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-sm w-full min-w-0">
+            <div className="bg-surface-container-high px-4 sm:px-6 py-3 border-b border-outline-variant flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-primary text-[18px]">perm_media</span>
+              <h3 className="font-headline-sm text-[14px] sm:text-[15px] font-semibold text-on-surface">
                 5. Media &amp; Operator Observations
               </h3>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
-                  Attached Field Telemetry / Imagery
+            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-2.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
+                  Attached Field Telemetry
                 </label>
-                <div className="w-full h-24 border-2 border-dashed border-outline-variant rounded bg-background flex flex-col items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors cursor-pointer group">
-                  <span className="material-symbols-outlined text-[24px] mb-1 group-hover:-translate-y-0.5 transition-transform">
-                    cloud_upload
-                  </span>
-                  <span className="font-body-sm text-[12px]">Click to attach field reconnaissance files</span>
-                  <span className="text-[10px] text-outline-variant">GeoTIFF, JPG, PNG up to 50MB</span>
+                <div className="w-full h-20 border-2 border-dashed border-outline-variant rounded bg-background flex flex-col items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors cursor-pointer group">
+                  <span className="material-symbols-outlined text-[20px] mb-0.5">cloud_upload</span>
+                  <span className="font-body-sm text-[11px]">Attach field reconnaissance files</span>
                 </div>
 
                 <div className="space-y-1.5">
@@ -534,28 +534,28 @@ export default function AssessmentForm({
                       key={file}
                       className="flex items-center justify-between p-2 rounded bg-surface-container border border-outline-variant"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[16px] text-primary">image</span>
-                        <span className="font-body-sm text-[12px] text-on-surface truncate">{file}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="material-symbols-outlined text-[15px] text-primary shrink-0">image</span>
+                        <span className="font-body-sm text-[11px] text-on-surface truncate">{file}</span>
                       </div>
                       <button
                         type="button"
                         onClick={() => removeMediaFile(file)}
-                        className="text-on-surface-variant hover:text-error transition-colors cursor-pointer"
+                        className="text-on-surface-variant hover:text-error transition-colors shrink-0 p-0.5"
                       >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
+                        <span className="material-symbols-outlined text-[15px]">close</span>
                       </button>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="block font-body-sm text-[12px] text-on-surface-variant font-medium uppercase tracking-wider">
+              <div className="space-y-1.5">
+                <label className="block font-body-sm text-[11px] text-on-surface-variant font-medium uppercase tracking-wider">
                   Operator Field Observations
                 </label>
                 <textarea
-                  rows={5}
+                  rows={4}
                   value={operatorObservations}
                   onChange={(e) => setOperatorObservations(e.target.value)}
                   className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-outline resize-none"
@@ -566,14 +566,14 @@ export default function AssessmentForm({
           </section>
 
           {/* Form Action Submit / Confidence Slider Bar */}
-          <div className="pt-2">
-            <div className="bg-surface-container-low border border-outline-variant p-4 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
-              <div className="flex-1 w-full max-w-sm space-y-1">
+          <div className="pt-2 w-full">
+            <div className="bg-surface-container-low border border-outline-variant p-4 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg w-full">
+              <div className="w-full sm:w-64 space-y-1">
                 <div className="flex justify-between items-center">
-                  <label className="font-body-sm text-[12px] text-on-surface-variant font-medium">
-                    Assessment Confidence Score
+                  <label className="font-body-sm text-[11px] text-on-surface-variant font-medium">
+                    Confidence Score
                   </label>
-                  <span className="font-mono-label text-[13px] text-emerald-400 font-bold">
+                  <span className="font-mono-label text-[12px] text-emerald-400 font-bold">
                     {confidenceScore}%
                   </span>
                 </div>
@@ -593,20 +593,20 @@ export default function AssessmentForm({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                 <button
                   type="button"
                   onClick={onBackToDashboard}
-                  className="px-5 py-2 text-on-surface-variant font-body-sm font-medium hover:text-on-surface transition-colors rounded border border-outline-variant cursor-pointer"
+                  className="flex-1 sm:flex-none px-4 py-2 text-on-surface-variant font-body-sm text-[12px] font-medium hover:text-on-surface transition-colors rounded border border-outline-variant cursor-pointer text-center"
                 >
-                  Discard &amp; Return
+                  Discard
                 </button>
 
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[12px] font-bold rounded shadow transition-all flex items-center gap-2 uppercase tracking-wider cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded shadow transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px]">send</span>
+                  <span className="material-symbols-outlined text-[15px]">send</span>
                   SUBMIT TO COMMAND
                 </button>
               </div>
