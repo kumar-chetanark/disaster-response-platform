@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { PlatformReport, Incident } from '../../types'
 import SearchInput from '../common/SearchInput'
 import DetailsHeader from '../common/DetailsHeader'
@@ -23,6 +23,7 @@ export default function ReportsConsole({
   onSelectReport,
   onGenerateReport,
   onDownloadPDF,
+  onNavigateToIncident,
 }: ReportsConsoleProps) {
   const [filterType, setFilterType] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
@@ -31,7 +32,9 @@ export default function ReportsConsole({
   // Real backend live state
   const [reportsList, setReportsList] = useState<PlatformReport[]>(initialReports)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(initialSelectedId || null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isLoading, setIsLoading] = useState<boolean>(initialReports.length === 0)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const isFetchingRef = useRef(false)
 
   // PDF Preview & Generation Modal states
   const [previewModalOpen, setPreviewModalOpen] = useState<boolean>(false)
@@ -42,33 +45,43 @@ export default function ReportsConsole({
   const [newRepIncidentId, setNewRepIncidentId] = useState<string>('inc-a')
   const [newRepSummary, setNewRepSummary] = useState<string>('')
 
-  const fetchLiveReports = async () => {
+  const fetchLiveReports = useCallback(async () => {
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
     setIsLoading(true)
+    setErrorMessage(null)
+
     try {
       const data = await platformDataService.getReports(undefined, filterType)
       setReportsList(data)
-      if (data.length > 0 && !selectedReportId) {
-        setSelectedReportId(data[0].id)
+      if (data.length > 0) {
+        setSelectedReportId((prev) => (prev && data.some((r) => r.id === prev) ? prev : data[0].id))
       }
-    } catch (err) {
-      console.error('Error loading live backend reports:', err)
+    } catch (err: any) {
+      console.error('[ReportsConsole] Error fetching live reports:', err)
+      setErrorMessage('Unable to connect to backend reports database service.')
     } finally {
       setIsLoading(false)
+      isFetchingRef.current = false
     }
-  }
+  }, [filterType])
 
   useEffect(() => {
     fetchLiveReports()
-  }, [filterType])
+  }, [fetchLiveReports])
 
   const filteredReports = reportsList.filter((rep) => {
-    const matchesType =
-      filterType === 'ALL' || (rep.type || rep.reportType || '').toLowerCase() === filterType.toLowerCase()
+    const repTypeStr = String(rep.type || rep.reportType || '').toUpperCase()
+    const activeFilter = filterType.toUpperCase()
+    const matchesType = activeFilter === 'ALL' || repTypeStr === activeFilter
+
+    const q = searchQuery.toLowerCase()
     const matchesSearch =
-      rep.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      rep.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      rep.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (rep.incidentTitle && rep.incidentTitle.toLowerCase().includes(searchQuery.toLowerCase()))
+      rep.title.toLowerCase().includes(q) ||
+      rep.id.toLowerCase().includes(q) ||
+      rep.author.toLowerCase().includes(q) ||
+      (rep.incidentTitle && rep.incidentTitle.toLowerCase().includes(q))
+
     return matchesType && matchesSearch
   })
 
@@ -91,7 +104,8 @@ export default function ReportsConsole({
     if (onDownloadPDF) {
       onDownloadPDF(repId)
     } else {
-      window.open(`http://localhost:8000/api/reports/${repId}/pdf`, '_blank')
+      const targetUrl = `http://localhost:8000/api/reports/${encodeURIComponent(repId)}/pdf`
+      window.open(targetUrl, '_blank')
     }
   }
 
@@ -115,7 +129,7 @@ export default function ReportsConsole({
         setNewRepSummary('')
       }
     } catch (err) {
-      console.error('Failed to create report on backend:', err)
+      console.error('[ReportsConsole] Failed to create report on backend:', err)
     }
   }
 
@@ -166,8 +180,36 @@ export default function ReportsConsole({
             <span className="material-symbols-outlined text-[16px]">add_circle</span>
             Generate Report
           </button>
+
+          <button
+            type="button"
+            onClick={() => fetchLiveReports()}
+            className="p-1.5 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant rounded text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            title="Refresh reports from backend"
+          >
+            <span className={`material-symbols-outlined text-[16px] ${isLoading ? 'animate-spin' : ''}`}>
+              refresh
+            </span>
+          </button>
         </div>
       </div>
+
+      {/* Error Banner if Backend is Unavailable */}
+      {errorMessage && (
+        <div className="px-6 py-2.5 bg-error/15 border-b border-error/30 flex items-center justify-between text-error font-body-sm text-[12px]">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]">cloud_off</span>
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => fetchLiveReports()}
+            className="font-mono-label text-[11px] font-bold underline uppercase cursor-pointer hover:text-white"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Main Split Layout: Desktop 2-column | Mobile conditional 1-column */}
       <div className="flex-1 flex overflow-hidden w-full relative">
@@ -190,7 +232,7 @@ export default function ReportsConsole({
             {isLoading && reportsList.length === 0 ? (
               <div className="flex items-center justify-center p-12 text-on-surface-variant font-mono-label text-[12px] gap-2">
                 <span className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                Loading reports from backend...
+                Loading reports from database...
               </div>
             ) : filteredReports.length === 0 ? (
               <div className="p-8 text-center text-on-surface-variant font-mono-label text-[12px] space-y-2">
@@ -215,7 +257,7 @@ export default function ReportsConsole({
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className="font-mono-label text-[10px] text-primary font-bold uppercase bg-primary/10 px-1.5 py-0.2 rounded border border-primary/20">
-                          {rep.type}
+                          {rep.type || rep.reportType}
                         </span>
                         <span className="font-mono-label text-[10px] text-on-surface-variant">
                           {rep.id}
@@ -223,7 +265,7 @@ export default function ReportsConsole({
                       </div>
 
                       <span className="font-mono-label text-[10px] text-on-surface-variant">
-                        {rep.date}
+                        {rep.date || rep.timestamp}
                       </span>
                     </div>
 
@@ -376,8 +418,8 @@ export default function ReportsConsole({
             <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-sm text-[12px] text-on-surface scrollbar-thin">
               <div className="flex justify-between border-b border-outline-variant/60 pb-2 font-mono-label text-[10px]">
                 <span>REPORT ID: <b className="text-primary">{selectedReport.id}</b></span>
-                <span>TYPE: <b>{selectedReport.type}</b></span>
-                <span>DATE: <b>{selectedReport.date}</b></span>
+                <span>TYPE: <b>{selectedReport.type || selectedReport.reportType}</b></span>
+                <span>DATE: <b>{selectedReport.date || selectedReport.timestamp}</b></span>
               </div>
 
               <div>

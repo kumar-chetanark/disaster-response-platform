@@ -1,7 +1,16 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.database import Base, engine
+import app.models  # Ensures all models and tables are registered in Base.metadata
 from app.routers import health, citizen_reports, incidents, resources, operations, assessments, alerts, reports
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Deterministically ensure database tables exist on server startup
+    Base.metadata.create_all(bind=engine)
+    yield
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -9,6 +18,7 @@ app = FastAPI(
     version="0.8.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS middleware for Next.js frontend

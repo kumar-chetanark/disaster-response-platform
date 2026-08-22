@@ -411,31 +411,60 @@ class PlatformDataService {
 
   // Reports -> GET /api/reports, POST /api/reports, GET /api/reports/{id}/pdf
   async getReports(incidentId?: string, reportType?: string): Promise<PlatformReport[]> {
+    const params = new URLSearchParams()
+    if (incidentId && incidentId.trim() !== '') params.append('incident_id', incidentId.trim())
+    if (reportType && reportType !== 'ALL' && reportType.trim() !== '') {
+      params.append('report_type', reportType.trim())
+    }
+    const query = params.toString() ? `?${params.toString()}` : ''
+    const url = `${API_BASE_URL}/api/reports${query}`
+
     try {
-      const params = new URLSearchParams()
-      if (incidentId) params.append('incident_id', incidentId)
-      if (reportType && reportType !== 'ALL') params.append('report_type', reportType)
-      const res = await fetch(`${API_BASE_URL}/api/reports?${params.toString()}`)
-      if (res.ok) {
-        const data = await res.json()
-        return (data.items || []).map((r: any) => ({
-          id: r.id,
-          title: r.title,
-          type: r.report_type || 'INCIDENT_SUMMARY',
+      const res = await fetch(url, { cache: 'no-store' })
+      if (!res.ok) {
+        console.error(`[DataService] HTTP error fetching /api/reports: status ${res.status} ${res.statusText}`)
+        return []
+      }
+
+      const data = await res.json()
+      if (!data || !Array.isArray(data.items)) {
+        console.error('[DataService] Malformed JSON response from /api/reports. Expected data.items array:', data)
+        return []
+      }
+
+      return data.items.map((r: any) => {
+        let parsedTags: string[] = []
+        if (Array.isArray(r.tags)) {
+          parsedTags = r.tags.map(String)
+        } else if (typeof r.tags === 'string' && r.tags.trim() !== '') {
+          parsedTags = r.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        }
+
+        return {
+          id: String(r.id || ''),
+          title: String(r.title || 'Untitled Report'),
+          reportType: r.report_type || 'SITREP',
+          type: r.report_type || 'SITREP',
           date: r.created_at || 'Just now',
-          author: r.author || 'Command Desk',
-          incidentId: r.incident_id,
-          incidentTitle: r.incident_title,
-          summary: r.summary,
-          tags: r.tags ? r.tags.split(',') : [],
+          timestamp: r.created_at || 'Just now',
+          author: String(r.author || 'Command Desk'),
+          incidentId: r.incident_id || undefined,
+          incidentTitle: r.incident_title || (r.incident_id ? `Incident #${r.incident_id}` : 'Central Command Network'),
+          summary: String(r.summary || ''),
+          metricsSummary: r.metrics_summary || '',
+          tags: parsedTags,
           format: 'PDF',
           downloadUrl: `${API_BASE_URL}/api/reports/${r.id}/pdf`,
-        }))
+        }
+      })
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+        console.error(`[DataService] Network connection failure to backend at ${url}. Verify backend server is running on ${API_BASE_URL}.`, err)
+      } else {
+        console.error(`[DataService] Unexpected error processing /api/reports:`, err)
       }
-    } catch (err) {
-      console.warn('Backend /api/reports unavailable:', err)
+      return []
     }
-    return []
   }
 
   async createReport(report: {

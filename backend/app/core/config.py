@@ -1,6 +1,10 @@
-import os
+from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Base backend directory (anchors SQLite db path to backend directory regardless of invocation CWD)
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+DEFAULT_DB_PATH = BACKEND_DIR / "disaster_response_dev.db"
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Disaster Response Platform API"
@@ -8,8 +12,8 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api"
 
-    # Database connection URL (PostgreSQL / Supabase PostgreSQL / SQLite dev)
-    DATABASE_URL: str = "sqlite:///./disaster_response_dev.db"
+    # Database connection URL - default to absolute SQLite path in backend directory
+    DATABASE_URL: str = f"sqlite:///{DEFAULT_DB_PATH.as_posix()}"
 
     # Supabase credentials (for future auth/realtime services)
     SUPABASE_URL: str = "https://your-supabase-project.supabase.co"
