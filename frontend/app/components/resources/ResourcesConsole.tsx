@@ -142,11 +142,13 @@ export default function ResourcesConsole({
 
     try {
       const created = await platformDataService.createResource(newUnit)
-      setResourcesList((prev) => [created, ...prev])
-      setSelectedResourceId(created.id)
-      setIsAddModalOpen(false)
-      setNewResName('')
-      if (onAddResource) onAddResource(created)
+      if (created) {
+        setResourcesList((prev) => [created, ...prev])
+        setSelectedResourceId(created.id)
+        setIsAddModalOpen(false)
+        setNewResName('')
+        if (onAddResource) onAddResource(created)
+      }
     } catch (err) {
       console.error('Failed to create resource:', err)
     }

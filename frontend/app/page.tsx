@@ -43,8 +43,8 @@ export default function App() {
 
   // Current Active View inside Authority Platform
   const [currentTab, setCurrentTab] = useState('dashboard')
-  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>('inc-a')
-  const [selectedOperationId, setSelectedOperationId] = useState<string | null>('OP-8821')
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
+  const [selectedOperationId, setSelectedOperationId] = useState<string | null>(null)
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>('alt-1')
   const [selectedReportId, setSelectedReportId] = useState<string | null>('REP-901')
 
@@ -117,11 +117,11 @@ export default function App() {
     const newOp: OperationRecord = {
       id: `OP-${Math.floor(1000 + Math.random() * 9000)}`,
       operationType: adv.resourceCategory === 'medical' ? 'Medical Emergency Response' : 'Rescue Team Mission',
-      incidentId: adv.targetIncidentId || 'inc-a',
+      incidentId: adv.targetIncidentId || (incidents[0]?.id || ''),
       incidentTitle: adv.targetIncident,
       resourceId: adv.resourceId || 'res-alloc',
       resourceName: adv.resourceName,
-      location: 'Sector 7G Coastal Basin',
+      location: incidents[0]?.location || 'Operational Area',
       state: 'DISPATCHED',
       dispatchedTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       estimatedCompletion: '~20 min',
@@ -175,11 +175,11 @@ export default function App() {
     const newOp: OperationRecord = {
       id: `OP-RECON-${Math.floor(1000 + Math.random() * 9000)}`,
       operationType: asset.type === 'drone' ? 'Drone Reconnaissance' : 'Helicopter Air Evacuation',
-      incidentId: 'inc-a',
-      incidentTitle: 'Cyclone Alpha 4 (Sector 7G)',
+      incidentId: incidents[0]?.id || '',
+      incidentTitle: incidents[0]?.title || 'Active Incident',
       resourceId: asset.id,
       resourceName: asset.name,
-      location: 'Sector 7G Coastal Basin',
+      location: incidents[0]?.location || 'Operational Area',
       state: 'DISPATCHED',
       dispatchedTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       estimatedCompletion: '~30 min',
@@ -212,8 +212,8 @@ export default function App() {
       location: submission.areaSurveyed,
       message: `[FIELD REPORT] Recon confirms ${submission.roadAccessibility} in ${submission.areaSurveyed}. Specialized extraction required.`,
       severity: 'critical',
-      relatedIncidentId: 'inc-a',
-      relatedIncidentTitle: 'Cyclone Alpha 4 (Sector 7G)',
+      relatedIncidentId: incidents[0]?.id || '',
+      relatedIncidentTitle: incidents[0]?.title || 'Active Incident',
       isReviewedByAuthority: false,
     }
     setAlerts((prev) => [newAlert, ...prev])
@@ -221,10 +221,10 @@ export default function App() {
     const updatedAdvisories: AllocationAdvisory[] = [
       {
         id: 'adv-new-1',
-        targetIncidentId: 'inc-a',
+        targetIncidentId: incidents[0]?.id || '',
         resourceName: 'Air Evacuation Chopper 1',
         resourceCategory: 'aviation',
-        targetIncident: 'Incident A (Sector 7G)',
+        targetIncident: incidents[0]?.title || 'Active Incident',
         details: '1 helicopter • 4 crew • Specialized hoist • ~8 min',
         reason: `Recon verified Route 9 impassable + ~15 civilians isolated. Air extraction capability matched (Confidence ${submission.confidenceScore}%).`,
         status: 'RECOMMENDED',
@@ -238,7 +238,7 @@ export default function App() {
       },
       {
         id: 'adv-new-2',
-        targetIncidentId: 'inc-a',
+        targetIncidentId: incidents[0]?.id || '',
         resourceName: 'Heavy Engineering Unit B',
         resourceCategory: 'engineering',
         targetIncident: 'Incident A (Bridge)',
@@ -266,7 +266,7 @@ export default function App() {
       reportType: 'Assessment Mission Report',
       title: `Field Recon Mission ${submission.id} Post-Action Telemetry`,
       timestamp: submission.submittedAt,
-      relatedIncidentId: 'inc-a',
+      relatedIncidentId: incidents[0]?.id || '',
       author: `${submission.assetName} (${submission.assessmentMode})`,
       summary: `Verified ${submission.structuresAffected} damaged structures and ${submission.roadAccessibility}. Recommendations generated for air extraction.`,
       metricsSummary: `Confidence: ${submission.confidenceScore}% • ${submission.evacuationStatus}`,
@@ -348,7 +348,7 @@ export default function App() {
         return (
           <AssessmentForm
               incidents={incidents}
-            initialIncidentTitle="Cyclone Alpha 4 — Sector 7G Coastal Basin"
+            initialIncidentTitle={incidents[0]?.title || ''}
             initialAsset={dispatchedAsset}
             onSubmit={handleAssessmentSubmit}
             onBackToDashboard={() => setCurrentTab('dashboard')}

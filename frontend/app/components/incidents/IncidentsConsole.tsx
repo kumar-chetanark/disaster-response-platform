@@ -18,7 +18,7 @@ interface IncidentsConsoleProps {
 
 export default function IncidentsConsole({
   incidents: initialIncidents = [],
-  selectedIncidentId: initialSelectedId = 'inc-a',
+  selectedIncidentId: initialSelectedId = null,
   advisories = [],
   onSelectIncident,
   onOpenAssessment,
@@ -32,7 +32,7 @@ export default function IncidentsConsole({
 
   // Real backend live state & in-memory dossier cache to eliminate switching latency
   const [incidentsList, setIncidentsList] = useState<Incident[]>(initialIncidents)
-  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(initialSelectedId || 'inc-a')
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(initialSelectedId || null)
   const [selectedIncidentDetail, setSelectedIncidentDetail] = useState<Incident | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
   const dossierCache = useRef<Record<string, Incident>>({})

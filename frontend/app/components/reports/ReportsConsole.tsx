@@ -519,7 +519,7 @@ export default function ReportsConsole({
                     className="w-full bg-background border border-outline-variant rounded px-2.5 py-1.5 text-on-surface focus:border-primary"
                   >
                     <option value="inc-a">Incident #1 (inc-a)</option>
-                    <option value="inc-b">Incident #2 (inc-b)</option>
+                    
                     <option value="inc-c">Incident #3 (inc-c)</option>
                     <option value="">None (Platform General)</option>
                   </select>
