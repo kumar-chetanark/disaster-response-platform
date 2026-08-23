@@ -187,3 +187,116 @@ def get_incident_operations(
             detail=f"Incident with ID '{incident_id}' not found.",
         )
     return list_operations(db=db, incident_id=incident_id)
+
+@router.get("/{incident_id}/operations/telemetry")
+def get_incident_operations_telemetry(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Live Operational Command Center Telemetry Endpoint:
+    Returns structured real-time operational response status, mission breakdowns,
+    and resource states derived exclusively from real database records.
+    """
+    from app.models.operation import Operation
+    from app.models.resource import Resource
+    from datetime import datetime, timezone
+
+    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not inc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found.",
+        )
+
+    ops = db.query(Operation).filter(Operation.incident_id == incident_id).all()
+    all_resources = db.query(Resource).all()
+
+    active_states = {"ASSIGNED", "DISPATCHED", "EN_ROUTE", "ON_SCENE", "IN_PROGRESS", "IN OPERATION", "IN TRANSIT"}
+    active_ops = [op for op in ops if op.state in active_states]
+    completed_ops = [op for op in ops if op.state == "COMPLETED"]
+
+    # State breakdown
+    breakdown = {}
+    for op in ops:
+        breakdown[op.state] = breakdown.get(op.state, 0) + 1
+
+    # Resource categorization
+    # A resource takes the state of its latest active operation on this incident
+    assigned_res_ids = set()
+    en_route_res_ids = set()
+    on_scene_res_ids = set()
+
+    for op in ops:
+        if op.state == "ASSIGNED":
+            assigned_res_ids.add(op.resource_id)
+        elif op.state in {"DISPATCHED", "EN_ROUTE", "IN TRANSIT"}:
+            en_route_res_ids.add(op.resource_id)
+            assigned_res_ids.discard(op.resource_id)
+        elif op.state in {"ON_SCENE", "IN_PROGRESS", "IN OPERATION"}:
+            on_scene_res_ids.add(op.resource_id)
+            assigned_res_ids.discard(op.resource_id)
+            en_route_res_ids.discard(op.resource_id)
+        elif op.state in {"COMPLETED", "RECALLED", "CANCELLED"}:
+            assigned_res_ids.discard(op.resource_id)
+            en_route_res_ids.discard(op.resource_id)
+            on_scene_res_ids.discard(op.resource_id)
+
+    avail_count = sum(1 for r in all_resources if r.status == "AVAILABLE")
+    assigned_count = len(assigned_res_ids)
+    en_route_count = len(en_route_res_ids)
+    on_scene_count = len(on_scene_res_ids)
+
+    # Latest operation representations
+    latest_operations = []
+    for op in sorted(ops, key=lambda x: x.created_at or datetime.min, reverse=True)[:10]:
+        latest_operations.append({
+            "operation_id": op.id,
+            "resource_id": op.resource_id,
+            "resource_name": op.resource.name if op.resource else "Resource Squad",
+            "resource_category": op.resource.category if op.resource else "rescue",
+            "status": op.state,
+            "destination_location": op.destination_location,
+            "authorized_by": op.authorized_by,
+            "mission_objective": op.mission_objective,
+            "dispatched_time": op.dispatched_time,
+            "estimated_completion": op.estimated_completion,
+            "field_updates": [u for u in (op.field_updates_log or "").split("\n") if u.strip()],
+            "created_at": op.created_at.isoformat() if op.created_at else None,
+            "updated_at": op.updated_at.isoformat() if op.updated_at else None,
+        })
+
+    # Latest resource states linked or available
+    latest_resource_states = []
+    linked_res_ids = {op.resource_id for op in ops}
+    relevant_resources = [r for r in all_resources if r.id in linked_res_ids or r.status == "AVAILABLE"]
+    for r in relevant_resources[:15]:
+        latest_resource_states.append({
+            "resource_id": r.id,
+            "name": r.name,
+            "category": r.category,
+            "status": r.status,
+            "latitude": r.latitude,
+            "longitude": r.longitude,
+            "current_operation_id": r.assigned_operation_id,
+            "last_updated": r.updated_at.strftime("%I:%M %p") if r.updated_at else "Earlier",
+        })
+
+    now = datetime.now(timezone.utc)
+
+    return {
+        "incident_id": inc.id,
+        "incident_title": inc.title,
+        "incident_status": inc.status,
+        "generated_at": now.isoformat(),
+        "active_operation_count": len(active_ops),
+        "completed_operation_count": len(completed_ops),
+        "resource_count": len(all_resources),
+        "resources_available": avail_count,
+        "resources_assigned": assigned_count,
+        "resources_en_route": en_route_count,
+        "resources_on_scene": on_scene_count,
+        "operation_state_breakdown": breakdown,
+        "latest_operations": latest_operations,
+        "latest_resource_states": latest_resource_states,
+    }

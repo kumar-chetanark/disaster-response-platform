@@ -13,6 +13,11 @@ class Resource(Base):
     status = Column(String(50), nullable=False, default="AVAILABLE", index=True) # AVAILABLE, IN OPERATION, DISPATCHED, MAINTENANCE, UNAVAILABLE
     
     base_location = Column(String(255), nullable=False, index=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    assigned_incident_id = Column(String(36), nullable=True)
+    assigned_operation_id = Column(String(36), nullable=True)
+    
     personnel_count = Column(Integer, default=0)
     equipment_details = Column(Text, nullable=True)
     

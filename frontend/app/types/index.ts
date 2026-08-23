@@ -391,3 +391,47 @@ export interface IncidentRequirementsResponse {
   status: string
   requirements: IncidentCapabilityRequirement[]
 }
+
+export interface ResourceTelemetryState {
+  resource_id: string
+  name: string
+  category: string
+  status: string
+  latitude?: number | null
+  longitude?: number | null
+  current_operation_id?: string | null
+  last_updated: string
+}
+
+export interface OperationTelemetryItem {
+  operation_id: string
+  resource_id: string
+  resource_name: string
+  resource_category: string
+  status: string
+  destination_location: string
+  authorized_by: string
+  mission_objective: string
+  dispatched_time: string
+  estimated_completion?: string | null
+  field_updates: string[]
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface LiveOperationalTelemetry {
+  incident_id: string
+  incident_title: string
+  incident_status: string
+  generated_at: string
+  active_operation_count: number
+  completed_operation_count: number
+  resource_count: number
+  resources_available: number
+  resources_assigned: number
+  resources_en_route: number
+  resources_on_scene: number
+  operation_state_breakdown: Record<string, number>
+  latest_operations: OperationTelemetryItem[]
+  latest_resource_states: ResourceTelemetryState[]
+}

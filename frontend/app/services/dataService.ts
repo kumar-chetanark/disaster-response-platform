@@ -12,6 +12,7 @@ import {
   AssessmentSubmission,
   ResourceStatus,
   IncidentConfidenceTelemetry,
+  LiveOperationalTelemetry,
 } from '../types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -699,6 +700,19 @@ class PlatformDataService {
     return await res.json()
   }
 
+
+
+  async getIncidentTelemetry(incidentId: string): Promise<LiveOperationalTelemetry | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/operations/telemetry`, { cache: 'no-store' })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to fetch telemetry for incident ${incidentId}:`, err)
+    }
+    return null
+  }
 
   async getIncidentRequirements(incidentId: string): Promise<IncidentRequirementsResponse | null> {
     try {

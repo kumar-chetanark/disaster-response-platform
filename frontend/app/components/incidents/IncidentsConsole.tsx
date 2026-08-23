@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem, IncidentRequirementsResponse, IncidentCapabilityRequirement, OperationRecord } from '../../types'
+import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem, IncidentRequirementsResponse, IncidentCapabilityRequirement, OperationRecord, LiveOperationalTelemetry, ResourceTelemetryState } from '../../types'
 import SearchInput from '../common/SearchInput'
 import DetailsHeader from '../common/DetailsHeader'
 import { platformDataService } from '../../services/dataService'
@@ -43,6 +43,9 @@ export default function IncidentsConsole({
   const [incidentOperations, setIncidentOperations] = useState<OperationRecord[]>([])
   const [isDeployingResource, setIsDeployingResource] = useState<string | null>(null)
   const [deployError, setDeployError] = useState<string | null>(null)
+  const [telemetryData, setTelemetryData] = useState<LiveOperationalTelemetry | null>(null)
+  const [lastRefreshedSec, setLastRefreshedSec] = useState<number>(0)
+
 
 
   const dossierCache = useRef<Record<string, Incident>>({})
@@ -115,6 +118,37 @@ export default function IncidentsConsole({
     loadLiveIncidents()
     return () => { isMounted = false }
   }, [searchQuery, filterSeverity, filterStatus])
+
+
+  // Live Operational Telemetry Polling (Every 4 seconds with cleanup)
+  useEffect(() => {
+    if (!selectedIncidentId) return
+    let isMounted = true
+
+    const fetchTelemetry = async () => {
+      try {
+        const data = await platformDataService.getIncidentTelemetry(selectedIncidentId)
+        if (isMounted && data) {
+          setTelemetryData(data)
+          setLastRefreshedSec(0)
+        }
+      } catch (err) {
+        console.error('Error fetching live telemetry:', err)
+      }
+    }
+
+    fetchTelemetry()
+    const interval = setInterval(fetchTelemetry, 4000)
+    const tickInterval = setInterval(() => {
+      if (isMounted) setLastRefreshedSec((prev) => prev + 1)
+    }, 1000)
+
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+      clearInterval(tickInterval)
+    }
+  }, [selectedIncidentId])
 
   // 2. Fetch or retrieve from cache the full 16-dimension canonical dossier with zero-lag UI response
   useEffect(() => {
@@ -550,7 +584,95 @@ export default function IncidentsConsole({
                 </div>
               </section>
 
-              {/* 4. Incident-Specific AI Operational Recommendations & Requirements */}
+              {/* 4. Live Command Center Operational Telemetry (Phase 7 Real-Time Synchronization) */}
+              <section className="bg-surface-container-lowest border border-cyan-500/30 rounded-lg p-4 space-y-3.5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
+                  <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                    </span>
+                    Live Operational Command Telemetry
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono-label text-[10px] px-2 py-0.5 rounded bg-cyan-950/40 text-cyan-300 border border-cyan-500/40 font-bold uppercase flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px]">sync</span>
+                      LIVE • Updated {lastRefreshedSec}s ago
+                    </span>
+                  </div>
+                </div>
+
+                {/* Telemetry Metric Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-center font-mono-label">
+                  <div className="p-2.5 bg-surface-container rounded border border-outline-variant">
+                    <div className="text-[18px] font-bold text-cyan-400">
+                      {telemetryData ? telemetryData.active_operation_count : 0}
+                    </div>
+                    <div className="text-[9px] text-on-surface-variant uppercase font-bold mt-0.5">Active Missions</div>
+                  </div>
+                  <div className="p-2.5 bg-surface-container rounded border border-outline-variant">
+                    <div className="text-[18px] font-bold text-amber-400">
+                      {telemetryData ? telemetryData.resources_assigned : 0}
+                    </div>
+                    <div className="text-[9px] text-on-surface-variant uppercase font-bold mt-0.5">Assigned</div>
+                  </div>
+                  <div className="p-2.5 bg-surface-container rounded border border-outline-variant">
+                    <div className="text-[18px] font-bold text-blue-400">
+                      {telemetryData ? telemetryData.resources_en_route : 0}
+                    </div>
+                    <div className="text-[9px] text-on-surface-variant uppercase font-bold mt-0.5">En Route</div>
+                  </div>
+                  <div className="p-2.5 bg-surface-container rounded border border-outline-variant">
+                    <div className="text-[18px] font-bold text-purple-400">
+                      {telemetryData ? telemetryData.resources_on_scene : 0}
+                    </div>
+                    <div className="text-[9px] text-on-surface-variant uppercase font-bold mt-0.5">On Scene</div>
+                  </div>
+                  <div className="p-2.5 bg-surface-container rounded border border-outline-variant">
+                    <div className="text-[18px] font-bold text-emerald-400">
+                      {telemetryData ? telemetryData.resources_available : 0}
+                    </div>
+                    <div className="text-[9px] text-on-surface-variant uppercase font-bold mt-0.5">Available</div>
+                  </div>
+                  <div className="p-2.5 bg-surface-container rounded border border-outline-variant">
+                    <div className="text-[18px] font-bold text-emerald-300">
+                      {telemetryData ? telemetryData.completed_operation_count : 0}
+                    </div>
+                    <div className="text-[9px] text-on-surface-variant uppercase font-bold mt-0.5">Completed</div>
+                  </div>
+                </div>
+
+                {/* Resource State Grid */}
+                {telemetryData && telemetryData.latest_resource_states && telemetryData.latest_resource_states.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="text-[11px] font-mono-label text-on-surface-variant font-bold uppercase flex items-center justify-between">
+                      <span>Live Squad Readiness &amp; Deployment:</span>
+                      <span className="text-[10px] text-outline font-normal">
+                        {telemetryData.latest_resource_states.length} Active Tracked Units
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      {telemetryData.latest_resource_states.slice(0, 6).map((res: ResourceTelemetryState) => (
+                        <div key={res.resource_id} className="p-2 bg-surface-container rounded border border-outline-variant/70 text-[11px] flex items-center justify-between font-mono-label">
+                          <div className="truncate mr-2">
+                            <div className="font-bold text-on-surface truncate">{res.name}</div>
+                            <div className="text-[9px] text-on-surface-variant capitalize">{res.category} • {res.last_updated}</div>
+                          </div>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase shrink-0 border ${
+                            res.status === 'AVAILABLE'
+                              ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/30'
+                              : 'bg-cyan-950/30 text-cyan-400 border-cyan-500/30'
+                          }`}>
+                            {res.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {/* 5. Incident-Specific AI Operational Recommendations & Requirements */}
               <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
                   <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">

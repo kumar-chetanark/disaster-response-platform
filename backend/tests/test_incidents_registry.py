@@ -213,3 +213,98 @@ def test_multi_source_corroboration_and_confidence_scoring():
     # 7. Test Nonexistent incident confidence -> 404
     nf_conf = client.get("/api/incidents/inc-nonexistent-404/confidence")
     assert nf_conf.status_code == 404
+
+
+def test_phase7_live_command_center_telemetry():
+    # 1. Nonexistent incident telemetry -> 404
+    nf_tel = client.get("/api/incidents/inc-nonexistent-777/operations/telemetry")
+    assert nf_tel.status_code == 404
+
+    # 2. Create fresh incident
+    cit_payload = {
+        "disaster_type": "flood",
+        "location": "Central Telemetry Sector",
+        "description": "Rising floodwaters reported, 2 families isolated on terrace.",
+        "is_people_trapped": True,
+        "is_immediate_danger": True
+    }
+    cit_res = client.post("/api/citizen-reports", json=cit_payload)
+    assert cit_res.status_code == 201
+    inc_id = cit_res.json()["incident_id"]
+
+    # 3. Telemetry with 0 operations -> Check empty baseline counts
+    tel0 = client.get(f"/api/incidents/{inc_id}/operations/telemetry")
+    assert tel0.status_code == 200
+    t0_data = tel0.json()
+    assert t0_data["incident_id"] == inc_id
+    assert t0_data["active_operation_count"] == 0
+    assert t0_data["completed_operation_count"] == 0
+    assert t0_data["resources_assigned"] == 0
+    assert t0_data["resources_en_route"] == 0
+    assert t0_data["resources_on_scene"] == 0
+
+    # 4. Create an available resource with coordinates
+    res_payload = {
+        "name": "Rapid Recon Drone Unit 4",
+        "category": "aerial",
+        "personnel_count": 3,
+        "equipment_details": "4K Thermal Sensors, FLIR",
+        "base_location": "Central Drone Hub",
+        "status": "AVAILABLE"
+    }
+    res_res = client.post("/api/resources", json=res_payload)
+    assert res_res.status_code == 201
+    res_id = res_res.json()["id"]
+
+    # 5. Authority approve deployment -> Operation ASSIGNED
+    login_res = client.post("/api/auth/login", json={"username": "authority_admin", "password": "Commander@2026!"})
+    token = login_res.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    app_res = client.post(
+        f"/api/allocations/rec-p7/approve?incident_id={inc_id}&resource_id={res_id}&notes=Launch+aerial+recon+survey",
+        headers=headers
+    )
+    assert app_res.status_code == 200
+    op_id = app_res.json()["operation_id"]
+
+    # 6. Verify Telemetry reflects ASSIGNED state
+    tel1 = client.get(f"/api/incidents/{inc_id}/operations/telemetry").json()
+    assert tel1["active_operation_count"] == 1
+    assert tel1["resources_assigned"] == 1
+    assert tel1["resources_en_route"] == 0
+    assert tel1["resources_on_scene"] == 0
+    assert tel1["operation_state_breakdown"].get("ASSIGNED") == 1
+
+    # 7. Transition: ASSIGNED -> DISPATCHED -> EN_ROUTE -> Verify telemetry bucket
+    disp_res = client.patch(f"/api/operations/{op_id}/status", json={"status": "DISPATCHED"}, headers=headers)
+    assert disp_res.status_code == 200
+    enr_res = client.patch(f"/api/operations/{op_id}/status", json={"status": "EN_ROUTE"}, headers=headers)
+    assert enr_res.status_code == 200
+    tel2 = client.get(f"/api/incidents/{inc_id}/operations/telemetry").json()
+    assert tel2["active_operation_count"] == 1
+    assert tel2["resources_assigned"] == 0
+    assert tel2["resources_en_route"] == 1
+    assert tel2["resources_on_scene"] == 0
+
+    # 8. Transition to ON_SCENE -> Verify telemetry bucket
+    client.patch(f"/api/operations/{op_id}/status", json={"status": "ON_SCENE"}, headers=headers)
+    tel3 = client.get(f"/api/incidents/{inc_id}/operations/telemetry").json()
+    assert tel3["active_operation_count"] == 1
+    assert tel3["resources_assigned"] == 0
+    assert tel3["resources_en_route"] == 0
+    assert tel3["resources_on_scene"] == 1
+
+    # 9. Transition to COMPLETED -> Verify completed count and resource release
+    client.patch(f"/api/operations/{op_id}/status", json={"status": "COMPLETED"}, headers=headers)
+    tel4 = client.get(f"/api/incidents/{inc_id}/operations/telemetry").json()
+    assert tel4["active_operation_count"] == 0
+    assert tel4["completed_operation_count"] == 1
+    assert tel4["resources_assigned"] == 0
+    assert tel4["resources_en_route"] == 0
+    assert tel4["resources_on_scene"] == 0
+
+    # 10. Check resource returned to AVAILABLE in latest_resource_states
+    matched_res = [r for r in tel4["latest_resource_states"] if r["resource_id"] == res_id]
+    assert len(matched_res) == 1
+    assert matched_res[0]["status"] == "AVAILABLE"
