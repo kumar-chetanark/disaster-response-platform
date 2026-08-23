@@ -1,185 +1,31 @@
+import os
 import sys
-from pathlib import Path
 from datetime import datetime, timezone
-
-# Anchor to backend directory
-BACKEND_DIR = Path(__file__).resolve().parent
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from app.core.database import SessionLocal, Base, engine
-from app.models.incident import Incident
-from app.models.incident_source import IncidentSource
+from sqlalchemy.orm import Session
+from app.core.database import SessionLocal, engine, Base
+from app.models.incident import Incident, IncidentSource
 from app.models.citizen_report import CitizenReport
 from app.models.resource import Resource
-from app.models.resource_allocation import ResourceAllocation
 from app.models.alert import Alert
 from app.models.report import Report
+from app.models.shelter import Shelter
 from app.models.operation import Operation
+from app.models.assessment import Assessment
 
 def seed_database(reset: bool = False):
     """
-    Idempotently seeds canonical incidents, resources, alerts, operations,
-    and official situational reports into the authoritative database.
+    Seed operational resources, shelters, baseline reports, and clean active incident state.
+    Incidents are created dynamically via real citizen/SMS/external submissions.
     """
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-
     if reset:
         print("Resetting database tables...")
         Base.metadata.drop_all(bind=engine)
-        Base.metadata.create_all(bind=engine)
-
+    
+    Base.metadata.create_all(bind=engine)
+    db: Session = SessionLocal()
     now = datetime.now(timezone.utc)
 
-    # 1. Incidents
-    incidents_data = [
-        {
-            "id": "inc-a",
-            "title": "Cyclone Alpha 4 — Central Grid Failure & Coastal Basin Surge",
-            "description": "Severe surge — 15 civilians isolated in pocket — Route 9 Bridge damaged",
-            "disaster_type": "cyclone",
-            "severity": "CRITICAL",
-            "priority_level": "Level 1",
-            "status": "ACTIVE",
-            "latitude": 29.7604,
-            "longitude": -95.3698,
-            "location_name": "Sector 7G / Coastal Basin",
-            "sector": "Sector 7G",
-            "affected_population": "2.4M",
-            "affected_area_sq_km": 1420.0,
-            "resource_coverage_pct": 84,
-            "is_field_verified": True,
-        },
-        {
-            "id": "inc-b",
-            "title": "Incident B — Highway 4 Flooding & Causeway Blockage",
-            "description": "Submerged underpass — 3 vehicles stranded — Water depth 4.2ft",
-            "disaster_type": "flood",
-            "severity": "HIGH",
-            "priority_level": "Level 2",
-            "status": "ACTIVE",
-            "latitude": 29.8100,
-            "longitude": -95.4200,
-            "location_name": "Coastal Causeway Km 18",
-            "sector": "Sector 4B",
-            "affected_population": "450",
-            "affected_area_sq_km": 120.0,
-            "resource_coverage_pct": 70,
-            "is_field_verified": False,
-        },
-        {
-            "id": "inc-c",
-            "title": "Incident C — Comms Tower Delta Offline",
-            "description": "Cell coverage degraded 30% — Radio fallback active",
-            "disaster_type": "infrastructure",
-            "severity": "MEDIUM",
-            "priority_level": "Level 3",
-            "status": "ACTIVE",
-            "latitude": 29.9000,
-            "longitude": -95.2000,
-            "location_name": "Highland Ridge Sector 1",
-            "sector": "Sector 1",
-            "affected_population": "12,000",
-            "affected_area_sq_km": 340.0,
-            "resource_coverage_pct": 90,
-            "is_field_verified": False,
-        },
-        {
-            "id": "inc-d",
-            "title": "Incident D — East Levee Seepage Warning",
-            "description": "Pre-breach seepage — 400 households alerted",
-            "disaster_type": "flood",
-            "severity": "HIGH",
-            "priority_level": "Level 2",
-            "status": "MONITORING",
-            "latitude": 29.7200,
-            "longitude": -95.3100,
-            "location_name": "Riverfront Sector 2",
-            "sector": "Sector 2",
-            "affected_population": "1,600",
-            "affected_area_sq_km": 85.0,
-            "resource_coverage_pct": 75,
-            "is_field_verified": False,
-        },
-    ]
-
-    for item in incidents_data:
-        existing = db.query(Incident).filter(Incident.id == item["id"]).first()
-        if not existing:
-            db.add(Incident(**item, created_at=now, updated_at=now))
-
-    # 2. Corroborating Sources for Incident A
-    sources_data = [
-        {
-            "id": "src-101",
-            "incident_id": "inc-a",
-            "source_type": "WEATHER",
-            "source_label": "IMD Early Warning Radar",
-            "channel_badge": "IMD_METEO",
-            "confidence_score": 96.0,
-            "summary": "Cyclone Alpha 4 landfall confirmed. Sustained winds 120km/h with heavy coastal surge.",
-            "raw_content": "RADAR_LOC: 29.76N/95.36W | WIND_MAX: 124km/h | SURGE_EST: 2.8m",
-        },
-        {
-            "id": "src-102",
-            "incident_id": "inc-a",
-            "source_type": "CITIZEN",
-            "source_label": "Citizen SMS Broadcast Gateway",
-            "channel_badge": "CELL_SMS",
-            "confidence_score": 90.0,
-            "summary": "Water rising rapidly near Sector 7G school. 15 people trapped on building rooftop.",
-            "raw_content": "SMS_ID: 98124 | SENDER: +919876543210 | MSG: Water 6ft deep at Sector 7 rooftop.",
-        },
-        {
-            "id": "src-103",
-            "incident_id": "inc-a",
-            "source_type": "NEWS",
-            "source_label": "National Broadcast Network",
-            "channel_badge": "MEDIA_INTEL",
-            "confidence_score": 94.0,
-            "summary": "Coastal substation tripping causes blackout across Sector 7G metro. Hospital C on backup power.",
-            "raw_content": "MEDIA_FEED: Live report from metro substation.",
-        },
-        {
-            "id": "src-104",
-            "incident_id": "inc-a",
-            "source_type": "GOVERNMENT",
-            "source_label": "State Disaster Management Authority (SDMA)",
-            "channel_badge": "GOV_BULLETIN",
-            "confidence_score": 99.0,
-            "summary": "Mandatory evacuation order active for Coastal Basin. Deploying swift-water response units.",
-            "raw_content": "SDMA_ORDER_#4491",
-        },
-    ]
-
-    for s in sources_data:
-        existing = db.query(IncidentSource).filter(IncidentSource.id == s["id"]).first()
-        if not existing:
-            db.add(IncidentSource(**s, created_at=now))
-
-    # 3. Citizen Reports
-    citizen_reports_data = [
-        {
-            "id": "cr-101",
-            "incident_id": "inc-a",
-            "location_text": "Sector 7G school building rooftop",
-            "disaster_type": "Cyclone",
-            "description": "Water is 6ft deep on the ground floor. 15 people waiting on rooftop.",
-            "is_people_trapped": True,
-            "is_immediate_danger": True,
-            "affected_people_estimate": "15 people",
-            "citizen_contact": "Citizen SMS Gateway (+919876543210)",
-            "status": "CORROBORATED",
-        }
-    ]
-
-    for cr in citizen_reports_data:
-        existing = db.query(CitizenReport).filter(CitizenReport.id == cr["id"]).first()
-        if not existing:
-            db.add(CitizenReport(**cr, created_at=now))
-
-    # 4. Resources
+    # 1. Operational Inventory: Resources (NDRF, Medical, UAV Drone, Land Excavation)
     resources_data = [
         {
             "id": "res-1",
@@ -224,35 +70,68 @@ def seed_database(reset: bool = False):
         if not existing:
             db.add(Resource(**res, created_at=now))
 
-    # 5. Alerts
+    # 2. Emergency Relief Shelters
+    shelters_data = [
+        {
+            "id": "shl-101",
+            "name": "Sector 7 Community Center & Relief Camp",
+            "location": "Sector 7G Basin North",
+            "total_capacity": 850,
+            "current_occupancy": 320,
+            "contact_phone": "+91 98765 11223",
+        },
+        {
+            "id": "shl-102",
+            "name": "State Model High School Disaster Shelter",
+            "location": "Coastal Causeway Km 14",
+            "total_capacity": 600,
+            "current_occupancy": 540,
+            "contact_phone": "+91 98765 44556",
+        },
+        {
+            "id": "shl-103",
+            "name": "Highland Sports Complex Emergency Evacuation Hub",
+            "location": "Sector 1 Ridge Highway",
+            "total_capacity": 1200,
+            "current_occupancy": 150,
+            "contact_phone": "+91 98765 77889",
+        },
+    ]
+
+    for shl in shelters_data:
+        existing = db.query(Shelter).filter(Shelter.id == shl["id"]).first()
+        if not existing:
+            db.add(Shelter(**shl, created_at=now))
+
+    # 3. Global Disaster Telemetry & Early Warning Feeds (Alerts)
     alerts_data = [
         {
             "id": "alt-101",
-            "incident_id": "inc-a",
+            "incident_id": None,
             "category": "METEO",
-            "source": "IMD Doppler Radar",
-            "location": "Coastal Sector 7G",
-            "message": "Storm surge height peaked at 2.8m. Immediate levee monitoring advised.",
+            "source": "IMD Doppler Radar Early Warning Feed",
+            "location": "Coastal Basin Sector 7G",
+            "message": "Heavy monsoon depression advancing north-northwest. Regional storm surge warning active.",
             "severity": "critical",
-            "is_reviewed_by_authority": True,
+            "is_reviewed_by_authority": False,
         },
         {
             "id": "alt-102",
-            "incident_id": "inc-a",
+            "incident_id": None,
             "category": "CIVIL",
-            "source": "Grid Telemetry",
+            "source": "State Electrical Grid Telemetry",
             "location": "Sector 7G Substation",
-            "message": "Primary transformer breaker trip. Emergency generators active at Base Hospital.",
+            "message": "High voltage transformer tripped on over-current protection. Emergency grid backup initiated.",
             "severity": "high",
             "is_reviewed_by_authority": False,
         },
         {
             "id": "alt-103",
-            "incident_id": "inc-b",
+            "incident_id": None,
             "category": "TRAFFIC",
-            "source": "Traffic Police Camera 18",
+            "source": "Highway Patrol Sensor 18",
             "location": "Coastal Causeway Km 18",
-            "message": "Causeway submerged. Route 4 traffic diverted to Northern Expressway.",
+            "message": "Causeway access road reported partially water-logged. Traffic diverted to expressway.",
             "severity": "medium",
             "is_reviewed_by_authority": True,
         },
@@ -263,37 +142,18 @@ def seed_database(reset: bool = False):
         if not existing:
             db.add(Alert(**alt, created_at=now))
 
-    # 6. Reports (Phase 8 Official Reports)
+    # 4. Standard Operational Template Reports (Audit & SITREP templates)
     reports_data = [
-        {
-            "id": "rep-sitrep-101",
-            "incident_id": "inc-a",
-            "report_type": "SITREP",
-            "title": "Cyclone Alpha 4 — Executive Command SITREP & Impact Debrief",
-            "author": "Commander J. Sterling (SDMA Crisis Desk)",
-            "summary": "Landfall recorded at 09:30 UTC. High-resolution telemetry and aerial UAV reconnaissance confirm severe storm surge across Coastal Basin Sector 7G. 15 civilians extracted from critical water-logging zones. Mobile trauma units active.",
-            "metrics_summary": "Affected: 12,500 | Evacuated: 1,420 | Casualties: 0 | Resource Coverage: 85%",
-            "tags": "cyclone,evacuation,drone_recon,sitrep",
-        },
-        {
-            "id": "rep-afteraction-202",
-            "incident_id": "inc-b",
-            "report_type": "AFTER_ACTION",
-            "title": "Industrial Chemical Storage Spill — Incident Mitigation Debrief",
-            "author": "Chief Hazmat Inspector V. Vance",
-            "summary": "Atmospheric dispersion sensors logged rapid dissipation of toxic vapor clouds following emergency perimeter foaming. Zero residential sector breach.",
-            "metrics_summary": "Air Quality Index: Normalized (42 AQI) | Containment: 100%",
-            "tags": "chemical_spill,hazmat,after_action",
-        },
         {
             "id": "rep-audit-303",
             "incident_id": None,
             "report_type": "RESOURCE_AUDIT",
-            "title": "Central Regional Disaster Depot — Fleet Readiness & Stockpile Audit",
+            "title": "Central Regional Disaster Depot  Fleet Readiness & Stockpile Audit",
             "author": "Logistics Controller K. Adams",
             "summary": "Complete audit of all disaster response vehicles, aerial drones, and relief stockpiles. All emergency generators and medical units verified operational.",
             "metrics_summary": "Fleet Readiness: 98% | Food Rations: 14 Days | Medical Kits: 150",
             "tags": "logistics,inventory,audit",
+            "status": "COMPLETED",
         },
     ]
 

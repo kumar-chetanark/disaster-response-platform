@@ -234,7 +234,7 @@ class PlatformDataService {
           return data.items.map((op: any) => ({
             id: op.id,
             incidentId: op.incident_id,
-            incidentTitle: op.incident_title || 'Cyclone Alpha 4',
+            incidentTitle: op.incident_title || 'Incident #1',
             resourceId: op.resource_id,
             resourceName: op.resource_name,
             resourceCategory: op.resource_category,
@@ -309,7 +309,7 @@ class PlatformDataService {
     const fallbackOp: OperationRecord = {
       id: `op-${Date.now().toString().slice(-4)}`,
       incidentId: payload.incidentId,
-      incidentTitle: 'Target Incident',
+      incidentTitle: 'Incident #1',
       resourceId: payload.resourceId,
       resourceName: 'Dispatched Response Squad',
       resourceCategory: 'rescue',
@@ -400,12 +400,116 @@ class PlatformDataService {
   }
 
   // Advisories
-  async getAdvisories(): Promise<AllocationAdvisory[]> {
+  async getAdvisories(incidentId?: string): Promise<AllocationAdvisory[]> {
+    try {
+      const q = incidentId ? `?incident_id=${encodeURIComponent(incidentId)}` : ''
+      const res = await fetch(`${API_BASE_URL}/api/allocations/recommendations${q}`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+          return data.map((d: any) => {
+            const cat = d.resource_category === 'rescue' ? 'rescue' : d.resource_category === 'medical' ? 'medical' : d.resource_category === 'aerial' ? 'aviation' : d.resource_category === 'water' ? 'boat' : 'engineering'
+            return {
+              id: d.id,
+              resourceId: d.resource_id || undefined,
+              resourceName: d.resource_name,
+              resourceCategory: cat as any,
+              targetIncidentId: d.incident_id,
+              targetIncident: d.incident_title,
+              details: `${d.personnel_count || 0} active personnel · ${d.travel_time_est} travel`,
+              reason: d.reason,
+              status: d.unmet_demand ? 'REJECTED' : 'RECOMMENDED',
+              metrics: {
+                capabilityMatch: d.match_score || 90,
+                proximity: 92,
+                travelTime: d.travel_time_est || '10 mins',
+                scarcity: d.scarcity_warning ? 'HIGH' : 'LOW',
+                competingIncidents: d.scarcity_warning ? 2 : 1,
+              },
+            }
+          })
+        }
+      }
+    } catch (err) {
+      console.warn('[DataService] /api/allocations/recommendations offline, falling back:', err)
+    }
     return this.inMemoryAdvisories
+  }
+
+  async getShelters(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/shelters`, { cache: 'no-store' })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (err) {
+      console.warn('[DataService] /api/shelters offline:', err)
+    }
+    return [
+      {
+        id: 'shl-101',
+        name: 'Sector 7 Community Center & Relief Camp',
+        location: 'Sector 7G Basin North',
+        total_capacity: 850,
+        current_occupancy: 320,
+        available_capacity: 530,
+        occupancy_pct: 37.6,
+        status: 'AVAILABLE',
+      },
+      {
+        id: 'shl-102',
+        name: 'State Model High School Disaster Shelter',
+        location: 'Coastal Causeway Km 14',
+        total_capacity: 600,
+        current_occupancy: 540,
+        available_capacity: 60,
+        occupancy_pct: 90.0,
+        status: 'NEAR_CAPACITY',
+      }
+    ]
+  }
+
+  async sendDegradedSMS(senderPhone: string, messageText: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sms/inbound`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender_phone: senderPhone, message_text: messageText }),
+      })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (err) {
+      console.error('[DataService] /api/sms/inbound error:', err)
+    }
+    return null
   }
 
   // Assets
   async getAerialAssets(): Promise<AerialAsset[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/resources?category=aerial`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        const items = data.items || []
+        if (items.length > 0) {
+          return items.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            type: 'VTOL_DRONE',
+            status: r.status === 'AVAILABLE' ? 'STANDBY' : 'AIRBORNE',
+            batteryPct: 85,
+            currentLocation: r.base_location || 'Regional Airfield',
+            coverageRadiusKm: 25,
+            sensorSuite: ['4K Optical', 'Thermal Infrared', 'LiDAR Terrain'],
+            payloadCapacityKg: 5.0,
+            streamingUrl: 'rtsp://uav.local/stream',
+          }))
+        }
+      }
+    } catch (err) {
+      console.warn('[DataService] /api/resources?category=aerial offline, falling back:', err)
+    }
     return this.inMemoryAerialAssets
   }
 

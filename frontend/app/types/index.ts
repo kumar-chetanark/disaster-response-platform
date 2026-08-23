@@ -53,6 +53,9 @@ export interface Incident {
   category: IncidentCategory
   type: 'flood' | 'cyclone' | 'earthquake' | 'wildfire' | 'infrastructure'
   location: string
+  latitude?: number
+  longitude?: number
+  disasterType?: string
   sector: string
   impact: string
   severity: IncidentSeverity
@@ -60,8 +63,10 @@ export interface Incident {
   timeReported: string
   lastUpdated: string
   affectedPopulationEst: string
+  affectedPopulation?: string
   affectedAreaSqKm: number
   resourceCoverage: string
+  resourceCoveragePct?: number
   priorityLevel: string
   isFieldVerified?: boolean
   structuresAffectedCount?: number
@@ -302,4 +307,37 @@ export interface PlatformReport {
   tags?: string[]
   format?: string
   downloadUrl?: string
+}
+
+
+export interface EmergencyShelter {
+  id: string
+  name: string
+  location: string
+  total_capacity: number
+  current_occupancy: number
+  available_capacity: number
+  occupancy_pct: number
+  status: 'AVAILABLE' | 'NEAR_CAPACITY' | 'FULL'
+  contact_phone?: string
+  created_at?: string
+}
+
+export interface BackendAllocationAdvisory {
+  id: string
+  incident_id: string
+  incident_title: string
+  incident_priority: number
+  required_capability: string
+  resource_id?: string | null
+  resource_name: string
+  resource_category: string
+  personnel_count: number
+  match_score: number
+  travel_time_est: string
+  reason: string
+  explanation_breakdown: Record<string, number>
+  alternatives: string[]
+  scarcity_warning: boolean
+  unmet_demand: boolean
 }

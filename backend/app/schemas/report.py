@@ -1,31 +1,46 @@
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
 
-class ReportCreate(BaseModel):
-    incident_id: Optional[str] = Field(None, description="Optional canonical incident ID linked to this report")
-    report_type: str = Field(..., description="Report type: SITREP, AFTER_ACTION, DAMAGE_ASSESSMENT, RESOURCE_AUDIT")
-    title: str = Field(..., description="Official report title")
-    author: str = Field(..., description="Reporting officer or command authority")
-    summary: str = Field(..., description="Narrative summary and executive overview")
-    metrics_summary: Optional[str] = Field(None, description="Key metrics or JSON-encoded metrics summary")
-    tags: Optional[str] = Field(None, description="Comma-separated category tags")
+ReportType = Literal[
+    "SITREP",
+    "AFTER_ACTION",
+    "RESOURCE_AUDIT",
+    "CASUALTY_REPORT",
+    "ASSESSMENT_SUMMARY",
+]
 
-class ReportResponse(BaseModel):
-    id: str
+ReportStatus = Literal["PENDING", "ONGOING", "COMPLETED"]
+
+class ReportBase(BaseModel):
     incident_id: Optional[str] = None
-    incident_title: Optional[str] = None
-    report_type: str
-    title: str
-    author: str
+    report_type: ReportType = "SITREP"
+    title: str = Field(..., max_length=255)
+    author: str = Field(..., max_length=255)
     summary: str
     metrics_summary: Optional[str] = None
     tags: Optional[str] = None
-    created_at: str
+    status: Optional[ReportStatus] = "PENDING"
+
+class ReportCreate(ReportBase):
+    pass
+
+class ReportUpdate(BaseModel):
+    status: Optional[ReportStatus] = None
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    metrics_summary: Optional[str] = None
+
+class ReportResponse(ReportBase):
+    id: str
+    status: str = "PENDING"
+    created_at: datetime
+    incident_title: Optional[str] = None
+    incident_location: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class ReportListResponse(BaseModel):
-    items: List[ReportResponse]
     total: int
-    page: int
-    page_size: int
-    total_pages: int
+    items: List[ReportResponse]

@@ -347,6 +347,7 @@ export default function App() {
         const dispatchedAsset = aerialAssets.find((a) => a.status === 'DISPATCHED') || aerialAssets[0]
         return (
           <AssessmentForm
+              incidents={incidents}
             initialIncidentTitle="Cyclone Alpha 4 — Sector 7G Coastal Basin"
             initialAsset={dispatchedAsset}
             onSubmit={handleAssessmentSubmit}
@@ -484,15 +485,16 @@ export default function App() {
 
             {/* 1. Active Incident Banner */}
             <ActiveIncidentBanner
+              incident={incidents.length > 0 ? incidents[0] : null}
               onViewIncident={() => {
-                setSelectedIncidentId('inc-a')
+                if (incidents.length > 0) {
+                  setSelectedIncidentId(incidents[0].id)
+                }
                 setCurrentTab('incidents')
               }}
               onViewRecommendations={() => {
                 setCurrentTab('resources')
               }}
-              resourceCoverage={resourceCoverage}
-              isReassessed={isReassessed}
             />
 
             {/* 2. Priority Incidents & Active Alerts Grid */}
@@ -519,7 +521,7 @@ export default function App() {
 
             {/* 4. Bottom Grid: Contextual Map & Aerial Dispatch Panel */}
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
-              <ContextualMapPreview />
+              <ContextualMapPreview incidents={incidents} resources={resources} selectedIncidentId={selectedIncidentId} onSelectIncident={(id) => setSelectedIncidentId(id)} />
 
               <AerialDispatchPanel
                 assets={aerialAssets}

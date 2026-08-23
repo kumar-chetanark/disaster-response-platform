@@ -83,3 +83,28 @@ def test_download_report_pdf():
 def test_download_report_pdf_not_found():
     res = client.get("/api/reports/REP-NONEXISTENT/pdf")
     assert res.status_code == 404
+
+
+def test_report_status_lifecycle():
+    # 1. Create PENDING report
+    payload = {
+        "title": "Operation Alpha Status Report",
+        "author": "Officer R. Vance",
+        "summary": "Initial briefing pending verification.",
+        "report_type": "SITREP",
+        "status": "PENDING"
+    }
+    create_res = client.post("/api/reports", json=payload)
+    assert create_res.status_code == 201
+    rep_id = create_res.json()["id"]
+    assert create_res.json()["status"] == "PENDING"
+
+    # 2. Patch to ONGOING
+    patch1 = client.patch(f"/api/reports/{rep_id}", json={"status": "ONGOING"})
+    assert patch1.status_code == 200
+    assert patch1.json()["status"] == "ONGOING"
+
+    # 3. Patch to COMPLETED
+    patch2 = client.patch(f"/api/reports/{rep_id}", json={"status": "COMPLETED"})
+    assert patch2.status_code == 200
+    assert patch2.json()["status"] == "COMPLETED"

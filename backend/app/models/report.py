@@ -16,6 +16,7 @@ class Report(Base):
     summary = Column(Text, nullable=False)
     metrics_summary = Column(String(255), nullable=True)
     tags = Column(String(255), nullable=True) # comma separated
+    status = Column(String(50), default="PENDING", nullable=False) # PENDING, ONGOING, COMPLETED
     
     created_at = Column(DateTime, default=datetime.utcnow)
 

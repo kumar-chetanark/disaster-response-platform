@@ -16,7 +16,7 @@ def process_citizen_report(db: Session, report_in: CitizenReportCreate) -> Citiz
     Processes citizen report intake:
     1. Runs deterministic matching against active canonical incidents.
     2. If match found: corroborates to existing incident by attaching an incident_source.
-    3. If no match found: initializes a new canonical incident record.
+    3. If no match found: initializes a new canonical incident record with deterministic 'Incident #N' naming.
     4. Creates the citizen_report and proactive alert records.
     """
     now = get_utc_now()
@@ -46,11 +46,12 @@ def process_citizen_report(db: Session, report_in: CitizenReportCreate) -> Citiz
         
         canonical_incident.updated_at = now
     else:
-        # No matching incident -> Create new Canonical Incident
+        # No matching incident -> Create new Canonical Incident with Incident #N deterministic title
         is_new = True
+        inc_count = db.query(Incident).count() + 1
         canonical_incident = Incident(
             id=f"inc-{str(uuid.uuid4())[:6]}",
-            title=f"{report_in.disaster_type} — {report_in.location}",
+            title=f"Incident #{inc_count}",
             description=report_in.description,
             disaster_type=report_in.disaster_type.lower(),
             severity="CRITICAL" if (report_in.is_people_trapped or report_in.is_immediate_danger) else "HIGH",
@@ -106,7 +107,7 @@ def process_citizen_report(db: Session, report_in: CitizenReportCreate) -> Citiz
         category="CIVIL",
         source="Citizen Emergency Intake",
         location=report_in.location,
-        message=f"[CITIZEN REPORT #{report_id}] {report_in.disaster_type} at {report_in.location}: {report_in.description[:120]}...",
+        message=f"[CITIZEN REPORT #{report_id}] {canonical_incident.title} ({report_in.disaster_type}) at {report_in.location}: {report_in.description[:120]}...",
         severity="critical" if report_in.is_immediate_danger else "warning",
         alert_time=submitted_time_str,
         is_reviewed_by_authority=False,

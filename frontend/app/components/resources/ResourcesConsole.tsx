@@ -32,6 +32,7 @@ export default function ResourcesConsole({
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('ALL')
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null)
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   // Real backend live state
@@ -174,26 +175,111 @@ export default function ResourcesConsole({
           </div>
         </div>
 
-        {/* Location Search Bar & Quick Add */}
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <form onSubmit={handleLocationSubmit} className="flex items-center gap-1.5 flex-1 sm:w-80">
+        {/* Swiggy/Zomato-Style Live Address Autocomplete & Proximity Sector Scanner */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap flex-1 sm:justify-end">
+          <form onSubmit={handleLocationSubmit} className="flex items-center gap-1.5 flex-1 max-w-lg relative">
             <div className="relative flex-1">
               <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-primary text-[18px] pointer-events-none">
-                pin_drop
+                search
               </span>
               <input
                 type="text"
                 value={locationSearch}
-                onChange={(e) => setLocationSearch(e.target.value)}
-                placeholder="Enter city / sector / coordinates..."
-                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] rounded pl-9 pr-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                onFocus={() => setIsSuggestionsOpen(true)}
+                onChange={(e) => {
+                  setLocationSearch(e.target.value)
+                  setIsSuggestionsOpen(true)
+                }}
+                placeholder="Search address, landmark or sector e.g. Sector 7G, MG Road, Coastal Basin..."
+                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] rounded pl-9 pr-24 py-2 focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
               />
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const locStr = `Lat ${pos.coords.latitude.toFixed(4)}, Lon ${pos.coords.longitude.toFixed(4)}`
+                        setLocationSearch(locStr)
+                        setActiveLocation(locStr)
+                        setIsSuggestionsOpen(false)
+                      },
+                      (err) => {
+                        console.warn('Geolocation access fallback to manual search:', err)
+                      },
+                      { timeout: 8000 }
+                    )
+                  }
+                }}
+                title="Use Current Location (Yes, allow this time)"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-[10px] font-mono-label rounded text-primary hover:text-on-surface transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[14px]">my_location</span>
+                <span>Near Me</span>
+              </button>
+
+              {/* Swiggy/Google Maps Style Auto-suggestions Dropdown */}
+              {isSuggestionsOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-outline-variant rounded-lg shadow-xl z-50 overflow-hidden font-body-base">
+                  <div className="p-2 border-b border-outline-variant/60 text-[10px] font-mono-label text-on-surface-variant uppercase font-bold flex justify-between items-center bg-surface-container-high">
+                    <span>Recommended Sectors &amp; Hubs</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsSuggestionsOpen(false)}
+                      className="text-on-surface-variant hover:text-on-surface cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    {[
+                      { name: 'Sector 7G Coastal Basin', desc: 'Coastal Flood Relief Zone & Marine Substation', type: 'COASTAL' },
+                      { name: 'Sector 4 Ridge Highway', desc: 'Highway Landslide Corridor & Mountain Access', type: 'HIGHWAY' },
+                      { name: 'MG Road Central Depot', desc: 'Central Urban Transit & Trauma Staging Area', type: 'URBAN' },
+                      { name: 'District Emergency Operations Center', desc: 'Armed Forces & NGO Coordination Hub', type: 'COMMAND' },
+                      { name: 'Highland Sports Evacuation Hub', desc: 'Mass Civilian Shelter & NGO Logistics Center', type: 'SHELTER' },
+                    ]
+                      .filter(
+                        (item) =>
+                          !locationSearch ||
+                          item.name.toLowerCase().includes(locationSearch.toLowerCase()) ||
+                          item.desc.toLowerCase().includes(locationSearch.toLowerCase())
+                      )
+                      .map((item) => (
+                        <div
+                          key={item.name}
+                          onClick={() => {
+                            setLocationSearch(item.name)
+                            setActiveLocation(item.name)
+                            setIsSuggestionsOpen(false)
+                          }}
+                          className="px-3 py-2.5 hover:bg-surface-container cursor-pointer border-b border-outline-variant/30 flex items-center justify-between gap-2 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="material-symbols-outlined text-[16px] text-primary">
+                              {item.type === 'COASTAL' ? 'water' : item.type === 'HIGHWAY' ? 'terrain' : 'location_city'}
+                            </span>
+                            <div>
+                              <div className="text-[12px] font-bold text-on-surface">{item.name}</div>
+                              <div className="text-[10px] text-on-surface-variant">{item.desc}</div>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-mono-label bg-surface-container-highest px-1.5 py-0.5 rounded text-primary uppercase">
+                            {item.type}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
+
             <button
               type="submit"
               className="px-4 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors shadow-sm shrink-0"
             >
-              Update Sector
+              Scan Area
             </button>
           </form>
 
@@ -203,7 +289,7 @@ export default function ResourcesConsole({
             className="px-3.5 py-2 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
           >
             <span className="material-symbols-outlined text-[16px] text-primary">add_circle</span>
-            Add Asset / Shelter
+            Add Resource
           </button>
         </div>
       </div>
