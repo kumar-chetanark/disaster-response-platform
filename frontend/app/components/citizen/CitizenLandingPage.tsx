@@ -39,13 +39,16 @@ export default function CitizenLandingPage({
     if (isSubmitting) return
     setErrorMessage(null)
 
-    // Validation
-    if (!location.trim()) {
-      setErrorMessage('Please enter your current location or landmark.')
+    // Front-end Pre-Validation
+    const cleanLocation = location.trim()
+    const cleanDescription = description.trim()
+
+    if (!cleanLocation || cleanLocation.length < 2) {
+      setErrorMessage('Please enter a valid location or landmark (at least 2 characters).')
       return
     }
-    if (!description.trim() || description.trim().length < 5) {
-      setErrorMessage('Please describe what you are seeing (at least 5 characters).')
+    if (!cleanDescription || cleanDescription.length < 10) {
+      setErrorMessage('Please provide a meaningful description of the situation (at least 10 characters).')
       return
     }
 
@@ -59,8 +62,8 @@ export default function CitizenLandingPage({
       id: reportRef,
       category: whatHappened as any,
       whatHappened,
-      location: location.trim(),
-      description: description.trim(),
+      location: cleanLocation,
+      description: cleanDescription,
       citizenName: citizenName.trim() || undefined,
       citizenContact: contactInfo.trim() || undefined,
       isPeopleTrapped,
@@ -70,19 +73,20 @@ export default function CitizenLandingPage({
     }
 
     try {
-      // Call parent handler which calls real backend /api/citizen-reports
       const result = await onReportSubmitted(submission)
 
-      setSubmittedData({
-        reportId: (result && result.reportId) ? result.reportId : reportRef,
-        incidentId: (result && result.incidentId) ? result.incidentId : 'INC-A',
-        incidentTitle: 'Target Disaster Sector',
-        status: 'TRANSMITTED TO RESPONDERS',
-        time: timeStr,
-      })
+      if (result) {
+        setSubmittedData({
+          reportId: result.reportId || reportRef,
+          incidentId: result.incidentId || 'PENDING',
+          incidentTitle: result.incidentTitle || 'Emergency Incident Registered',
+          status: result.status === 'CORROBORATED' ? 'CORROBORATED WITH ACTIVE INCIDENT' : 'REGISTERED (PENDING REVIEW)',
+          time: result.submittedAt || timeStr,
+        })
+      }
     } catch (err: any) {
       console.error('Error submitting citizen report:', err)
-      setErrorMessage('Unable to transmit report to Command Center. Please verify connection and retry.')
+      setErrorMessage(err.message || 'Validation error: Please ensure your location and description provide genuine disaster details.')
     } finally {
       setIsSubmitting(false)
     }

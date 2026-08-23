@@ -54,7 +54,7 @@ def find_matching_incident(
     # Query active/monitoring incidents
     active_incidents: List[Incident] = (
         db.query(Incident)
-        .filter(Incident.status.in_(["ACTIVE", "MONITORING"]))
+        .filter(Incident.status.in_(["PENDING", "ACTIVE", "MONITORING"]))
         .all()
     )
 

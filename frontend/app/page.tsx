@@ -96,13 +96,16 @@ export default function App() {
 
   // 1. Citizen Report Ingestion
   const handleCitizenReport = async (sub: CitizenReportSubmission) => {
-    await platformDataService.submitCitizenReport(sub)
-    const [updatedIncidents, updatedAlerts] = await Promise.all([
+    const result = await platformDataService.submitCitizenReport(sub)
+    const [updatedIncidents, updatedAlerts, updatedAdvisories] = await Promise.all([
       platformDataService.getIncidents(),
       platformDataService.getAlerts(),
+      platformDataService.getAdvisories(),
     ])
     setIncidents(updatedIncidents)
     setAlerts(updatedAlerts)
+    setAdvisories(updatedAdvisories)
+    return result
   }
 
   // 2. Authority Decision on Advisories -> Create Operation Record

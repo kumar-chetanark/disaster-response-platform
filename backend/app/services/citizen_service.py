@@ -16,8 +16,8 @@ def process_citizen_report(db: Session, report_in: CitizenReportCreate) -> Citiz
     Processes citizen report intake:
     1. Runs deterministic matching against active canonical incidents.
     2. If match found: corroborates to existing incident by attaching an incident_source.
-    3. If no match found: initializes a new canonical incident record with deterministic 'Incident #N' naming.
-    4. Creates the citizen_report and proactive alert records.
+    3. If no match found: initializes a new canonical incident record with status = PENDING and deterministic 'Incident #N' naming.
+    4. Creates the citizen_report and proactive alert records linking directly to the incident.
     """
     now = get_utc_now()
     
@@ -46,7 +46,7 @@ def process_citizen_report(db: Session, report_in: CitizenReportCreate) -> Citiz
         
         canonical_incident.updated_at = now
     else:
-        # No matching incident -> Create new Canonical Incident with Incident #N deterministic title
+        # No matching incident -> Create new Canonical Incident with status = PENDING
         is_new = True
         inc_count = db.query(Incident).count() + 1
         canonical_incident = Incident(
@@ -56,7 +56,7 @@ def process_citizen_report(db: Session, report_in: CitizenReportCreate) -> Citiz
             disaster_type=report_in.disaster_type.lower(),
             severity="CRITICAL" if (report_in.is_people_trapped or report_in.is_immediate_danger) else "HIGH",
             priority_level="Level 1" if report_in.is_people_trapped else "Level 2",
-            status="ACTIVE",
+            status="PENDING",
             latitude=report_in.latitude,
             longitude=report_in.longitude,
             location_name=report_in.location,
@@ -100,7 +100,7 @@ def process_citizen_report(db: Session, report_in: CitizenReportCreate) -> Citiz
     )
     db.add(source_entry)
 
-    # 4. Generate Proactive Alert for Authority Dispatch Queue
+    # 4. Generate Proactive Alert for Authority Dispatch Queue referencing exact incident ID
     alert_record = Alert(
         id=str(uuid.uuid4()),
         incident_id=canonical_incident.id,
