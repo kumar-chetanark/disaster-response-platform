@@ -432,6 +432,12 @@ export default function App() {
             incidents={incidents}
             selectedReportId={selectedReportId}
             onSelectReport={(id) => setSelectedReportId(id)}
+            onDownloadPDF={async (reportId: string) => {
+              const rep = reports.find((r) => r.id === reportId)
+              const fname = rep ? `report_${rep.id}_${(rep.type || rep.reportType || 'sitrep').toLowerCase()}.pdf` : undefined
+              showNotification('Generating and downloading official PDF briefing...', 'info')
+              await platformDataService.downloadReportPDF(reportId, fname)
+            }}
             onNavigateToIncident={(incId: string) => {
               setSelectedIncidentId(incId)
               setCurrentTab('incidents')

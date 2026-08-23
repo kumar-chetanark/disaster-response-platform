@@ -102,12 +102,22 @@ export default function ReportsConsole({
     setIsMobileDetailView(false)
   }
 
-  const handleDownloadPDF = (repId: string) => {
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false)
+
+  const handleDownloadPDF = async (repId: string) => {
     if (onDownloadPDF) {
       onDownloadPDF(repId)
-    } else {
-      const targetUrl = `http://localhost:8000/api/reports/${encodeURIComponent(repId)}/pdf`
-      window.open(targetUrl, '_blank')
+      return
+    }
+    setIsDownloadingPdf(true)
+    try {
+      const rep = reportsList.find((r) => r.id === repId)
+      const fname = rep ? `report_${rep.id}_${(rep.type || rep.reportType || 'sitrep').toLowerCase()}.pdf` : undefined
+      await platformDataService.downloadReportPDF(repId, fname)
+    } catch (err) {
+      console.error('Failed to download PDF:', err)
+    } finally {
+      setIsDownloadingPdf(false)
     }
   }
 
@@ -390,11 +400,12 @@ export default function ReportsConsole({
                   </button>
                   <button
                     type="button"
+                    disabled={isDownloadingPdf}
                     onClick={() => handleDownloadPDF(selectedReport.id)}
                     className="px-4 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center gap-1.5 shadow"
                   >
-                    <span className="material-symbols-outlined text-[16px]">download</span>
-                    Download PDF
+                    <span className="material-symbols-outlined text-[16px]">{isDownloadingPdf ? 'sync' : 'download'}</span>
+                    {isDownloadingPdf ? 'Generating PDF...' : 'Download PDF'}
                   </button>
                 </div>
               </section>

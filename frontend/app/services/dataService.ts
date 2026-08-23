@@ -553,6 +553,31 @@ class PlatformDataService {
     return []
   }
 
+  async downloadReportPDF(reportId: string, filename?: string): Promise<boolean> {
+    try {
+      const url = `${API_BASE_URL}/api/reports/${encodeURIComponent(reportId)}/pdf`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to download PDF`)
+      const blob = await res.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = filename || `report_${reportId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(downloadUrl)
+      document.body.removeChild(a)
+      return true
+    } catch (err) {
+      console.error('[DataService] PDF Download error:', err)
+      // Fallback: direct window open
+      if (typeof window !== 'undefined') {
+        window.open(`${API_BASE_URL}/api/reports/${encodeURIComponent(reportId)}/pdf`, '_blank')
+      }
+      return false
+    }
+  }
+
   async createReport(payload: {
     title: string
     report_type: string
