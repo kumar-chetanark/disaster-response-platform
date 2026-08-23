@@ -42,8 +42,10 @@ export default function ReportsConsole({
   const [newRepType, setNewRepType] = useState<string>('SITREP')
   const [newRepTitle, setNewRepTitle] = useState<string>('')
   const [newRepAuthor, setNewRepAuthor] = useState<string>('Crisis Command Officer')
-  const [newRepIncidentId, setNewRepIncidentId] = useState<string>('inc-a')
+  const [newRepIncidentId, setNewRepIncidentId] = useState<string>(incidents.length > 0 ? incidents[0].id : '')
   const [newRepSummary, setNewRepSummary] = useState<string>('')
+  const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false)
+  const [createReportError, setCreateReportError] = useState<string | null>(null)
 
   const fetchLiveReports = useCallback(async () => {
     if (isFetchingRef.current) return
@@ -112,6 +114,8 @@ export default function ReportsConsole({
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newRepTitle.trim() || !newRepSummary.trim()) return
+    setIsSubmittingReport(true)
+    setCreateReportError(null)
 
     try {
       const created = await platformDataService.createReport({
@@ -127,9 +131,15 @@ export default function ReportsConsole({
         setIsCreateModalOpen(false)
         setNewRepTitle('')
         setNewRepSummary('')
+        await fetchLiveReports()
+      } else {
+        setCreateReportError('Failed to create report. Please verify inputs.')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('[ReportsConsole] Failed to create report on backend:', err)
+      setCreateReportError(err.message || 'Error communicating with backend reports service.')
+    } finally {
+      setIsSubmittingReport(false)
     }
   }
 
@@ -174,7 +184,11 @@ export default function ReportsConsole({
 
           <button
             type="button"
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={() => {
+              setNewRepIncidentId(incidents.length > 0 ? incidents[0].id : '')
+              setCreateReportError(null)
+              setIsCreateModalOpen(true)
+            }}
             className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center gap-1.5 shadow-sm"
           >
             <span className="material-symbols-outlined text-[16px]">add_circle</span>
@@ -483,6 +497,13 @@ export default function ReportsConsole({
               </button>
             </div>
 
+            {createReportError && (
+              <div className="p-2.5 bg-red-950/20 border border-red-500/40 rounded text-red-400 font-mono-label text-[11px] flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px]">error</span>
+                {createReportError}
+              </div>
+            )}
+
             <form onSubmit={handleCreateSubmit} className="space-y-3 font-body-sm text-[12px]">
               <div>
                 <label className="block text-outline font-mono-label text-[10px] uppercase mb-1">Report Title *</label>
@@ -518,10 +539,12 @@ export default function ReportsConsole({
                     onChange={(e) => setNewRepIncidentId(e.target.value)}
                     className="w-full bg-background border border-outline-variant rounded px-2.5 py-1.5 text-on-surface focus:border-primary"
                   >
-                    <option value="inc-a">Incident #1 (inc-a)</option>
-                    
-                    <option value="inc-c">Incident #3 (inc-c)</option>
                     <option value="">None (Platform General)</option>
+                    {incidents.map((inc, idx) => (
+                      <option key={inc.id} value={inc.id}>
+                        {inc.title} ({inc.id})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -558,9 +581,17 @@ export default function ReportsConsole({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-primary text-on-primary font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer shadow"
+                  disabled={isSubmittingReport}
+                  className="px-4 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer shadow flex items-center gap-1.5"
                 >
-                  Generate Dossier
+                  {isSubmittingReport ? (
+                    <>
+                      <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>
+                      Generating...
+                    </>
+                  ) : (
+                    'Generate Dossier'
+                  )}
                 </button>
               </div>
             </form>
