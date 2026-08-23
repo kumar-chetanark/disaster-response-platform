@@ -41,6 +41,40 @@ export default function ResourcesConsole({
 
   // Add Resource Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [starredOnly, setStarredOnly] = useState(false)
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set())
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setStarredIds(platformDataService.getStarredIds('resource'))
+  }, [])
+
+  const handleToggleStar = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    platformDataService.toggleStar('resource', id)
+    setStarredIds(new Set(platformDataService.getStarredIds('resource')))
+  }
+
+  const handleDeleteResource = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!window.confirm(`Are you sure you want to remove Resource ${id} from operational inventory?`)) {
+      return
+    }
+    setDeletingId(id)
+    try {
+      const ok = await platformDataService.deleteResource(id)
+      if (ok) {
+        setResourcesList((prev) => prev.filter((r) => r.id !== id))
+        if (selectedResourceId === id) {
+          setSelectedResourceId(null)
+        }
+      }
+    } catch (err) {
+      console.error('Delete resource failed:', err)
+    } finally {
+      setDeletingId(null)
+    }
+  }
   const [newResName, setNewResName] = useState('')
   const [newResCategory, setNewResCategory] = useState('rescue')
   const [newResLocation, setNewResLocation] = useState('')

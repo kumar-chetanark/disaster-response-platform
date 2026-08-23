@@ -111,3 +111,23 @@ def patch_resource_status(
             detail=f"Resource with ID '{resource_id}' not found.",
         )
     return updated
+
+
+@router.delete("/{resource_id}", status_code=status.HTTP_200_OK)
+def delete_resource(
+    resource_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently removes a resource unit from inventory.
+    """
+    from app.models.resource import Resource
+    res = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not res:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Resource with ID '{resource_id}' not found.",
+        )
+    db.delete(res)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Resource '{resource_id}' removed from inventory."}

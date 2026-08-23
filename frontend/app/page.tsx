@@ -118,6 +118,64 @@ export default function App() {
     loadData()
   }, [])
 
+
+  // Global Real-Time Deletion Handlers with synchronised app state updates
+  const handleDeleteIncidentGlobal = async (incId: string) => {
+    if (!window.confirm(`Permanently delete Incident ${incId}? All linked alerts and operational records will be removed from the platform.`)) {
+      return
+    }
+    try {
+      const ok = await platformDataService.deleteIncident(incId)
+      if (ok) {
+        showNotification(`Incident ${incId} permanently deleted.`, 'info')
+        const [updatedIncidents, updatedAlerts, updatedOps] = await Promise.all([
+          platformDataService.getIncidents(),
+          platformDataService.getAlerts(),
+          platformDataService.getOperations(),
+        ])
+        setIncidents(updatedIncidents)
+        setAlerts(updatedAlerts)
+        setOperations(updatedOps)
+        if (selectedIncidentId === incId) setSelectedIncidentId(null)
+      }
+    } catch (err: any) {
+      showNotification(err.message || 'Failed to delete incident.', 'warning')
+    }
+  }
+
+  const handleDeleteAlertGlobal = async (altId: string) => {
+    if (!window.confirm(`Permanently delete Alert ${altId}? It will be removed from the broadcast registry and dashboard ticker.`)) {
+      return
+    }
+    try {
+      const ok = await platformDataService.deleteAlert(altId)
+      if (ok) {
+        showNotification(`Alert ${altId} permanently deleted.`, 'info')
+        const updatedAlerts = await platformDataService.getAlerts()
+        setAlerts(updatedAlerts)
+      }
+    } catch (err: any) {
+      showNotification(err.message || 'Failed to delete alert.', 'warning')
+    }
+  }
+
+  const handleDeleteReportGlobal = async (repId: string) => {
+    if (!window.confirm(`Permanently delete Report ${repId}?`)) {
+      return
+    }
+    try {
+      const ok = await platformDataService.deleteReport(repId)
+      if (ok) {
+        showNotification(`Report ${repId} permanently deleted.`, 'info')
+        const updatedReports = await platformDataService.getReports()
+        setReports(updatedReports)
+        if (selectedReportId === repId) setSelectedReportId(null)
+      }
+    } catch (err: any) {
+      showNotification(err.message || 'Failed to delete report.', 'warning')
+    }
+  }
+
   // 1. Citizen Report Ingestion
   const handleCitizenReport = async (sub: CitizenReportSubmission) => {
     const result = await platformDataService.submitCitizenReport(sub)

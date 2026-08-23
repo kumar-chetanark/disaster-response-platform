@@ -28,6 +28,41 @@ export default function IncidentsConsole({
   const [filterSeverity, setFilterSeverity] = useState<string>('ALL')
   const [filterStatus, setFilterStatus] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
+  const [starredOnly, setStarredOnly] = useState(false)
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set())
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setStarredIds(platformDataService.getStarredIds('incident'))
+  }, [])
+
+  const handleToggleStar = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    platformDataService.toggleStar('incident', id)
+    setStarredIds(new Set(platformDataService.getStarredIds('incident')))
+  }
+
+  const handleDeleteIncident = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!window.confirm(`Are you sure you want to permanently delete Incident ${id}? This action cannot be undone and will clean up all associated alerts and logs across the platform.`)) {
+      return
+    }
+    setDeletingId(id)
+    try {
+      const ok = await platformDataService.deleteIncident(id)
+      if (ok) {
+        setIncidentsList((prev) => prev.filter((i) => i.id !== id))
+        if (selectedIncidentId === id) {
+          setSelectedIncidentId(null)
+          setSelectedIncidentDetail(null)
+        }
+      }
+    } catch (err) {
+      console.error('Delete incident failed:', err)
+    } finally {
+      setDeletingId(null)
+    }
+  }
   const [isMobileDetailView, setIsMobileDetailView] = useState(false)
 
   // Real backend live state & in-memory dossier cache to eliminate switching latency
@@ -235,7 +270,8 @@ export default function IncidentsConsole({
       inc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       inc.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
       inc.id.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesSeverity && matchesStatus && matchesSearch
+    const matchesStar = !starredOnly || starredIds.has(inc.id)
+    return matchesSeverity && matchesStatus && matchesSearch && matchesStar
   })
 
   // Get index for stable simple naming: Incident #1, Incident #2, etc.

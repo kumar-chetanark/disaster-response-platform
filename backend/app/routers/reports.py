@@ -97,3 +97,23 @@ def download_report_pdf(report_id: str, db: Session = Depends(get_db)):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.delete("/{report_id}", status_code=status.HTTP_200_OK)
+def delete_report(
+    report_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently deletes an operational report / SITREP dossier.
+    """
+    from app.models.report import Report
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report with ID '{report_id}' not found.",
+        )
+    db.delete(report)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Report '{report_id}' deleted successfully."}

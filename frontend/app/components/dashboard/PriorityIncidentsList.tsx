@@ -1,4 +1,6 @@
-﻿'use client'
+'use client'
+
+import { platformDataService } from '../../services/dataService'
 
 import React from 'react'
 import { PriorityIncident } from '../../types'

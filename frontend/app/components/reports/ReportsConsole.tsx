@@ -28,6 +28,40 @@ export default function ReportsConsole({
   const [filterType, setFilterType] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [isMobileDetailView, setIsMobileDetailView] = useState(false)
+  const [starredOnly, setStarredOnly] = useState(false)
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set())
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setStarredIds(platformDataService.getStarredIds('report'))
+  }, [])
+
+  const handleToggleStar = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    platformDataService.toggleStar('report', id)
+    setStarredIds(new Set(platformDataService.getStarredIds('report')))
+  }
+
+  const handleDeleteReport = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!window.confirm(`Are you sure you want to permanently delete Report ${id}? This action will remove the SITREP and PDF dossier from the database.`)) {
+      return
+    }
+    setDeletingId(id)
+    try {
+      const ok = await platformDataService.deleteReport(id)
+      if (ok) {
+        setReportsList((prev) => prev.filter((r) => r.id !== id))
+        if (selectedReportId === id) {
+          setSelectedReportId(null)
+        }
+      }
+    } catch (err) {
+      console.error('Delete report failed:', err)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   // Real backend live state
   const [reportsList, setReportsList] = useState<PlatformReport[]>(initialReports)
@@ -84,7 +118,8 @@ export default function ReportsConsole({
       rep.author.toLowerCase().includes(q) ||
       (rep.incidentTitle && rep.incidentTitle.toLowerCase().includes(q))
 
-    return matchesType && matchesSearch
+    const matchesStar = !starredOnly || starredIds.has(rep.id)
+    return matchesType && matchesSearch && matchesStar
   })
 
   const selectedReport =

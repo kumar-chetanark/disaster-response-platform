@@ -27,6 +27,40 @@ export default function AlertsConsole({
   const [filterCategory, setFilterCategory] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [isMobileDetailView, setIsMobileDetailView] = useState(false)
+  const [starredOnly, setStarredOnly] = useState(false)
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set())
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setStarredIds(platformDataService.getStarredIds('alert'))
+  }, [])
+
+  const handleToggleStar = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    platformDataService.toggleStar('alert', id)
+    setStarredIds(new Set(platformDataService.getStarredIds('alert')))
+  }
+
+  const handleDeleteAlert = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!window.confirm(`Are you sure you want to delete Alert ${id}? It will be permanently removed from the disaster broadcast registry and dashboard ticker.`)) {
+      return
+    }
+    setDeletingId(id)
+    try {
+      const ok = await platformDataService.deleteAlert(id)
+      if (ok) {
+        setAlertsList((prev) => prev.filter((a) => a.id !== id))
+        if (activeAlertId === id) {
+          setActiveAlertId(null)
+        }
+      }
+    } catch (err) {
+      console.error('Delete alert failed:', err)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   // Real backend live state with initial fast population
   const [alertsList, setAlertsList] = useState<ActiveAlert[]>(initialAlerts)

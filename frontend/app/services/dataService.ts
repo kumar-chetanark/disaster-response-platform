@@ -880,6 +880,134 @@ class PlatformDataService {
       throw new Error(errData.detail || `Approval failed with HTTP ${res.status}`)
     }
   }
+
+  // ==========================================
+  // Global Real-Time Deletion Methods
+  // ==========================================
+  async deleteIncident(incidentId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/incidents/${encodeURIComponent(incidentId)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        this.removeStar('incident', incidentId)
+        return true
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to delete incident ${incidentId}:`, err)
+    }
+    return false
+  }
+
+  async deleteAlert(alertId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/alerts/${encodeURIComponent(alertId)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        this.removeStar('alert', alertId)
+        return true
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to delete alert ${alertId}:`, err)
+    }
+    return false
+  }
+
+  async deleteReport(reportId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reports/${encodeURIComponent(reportId)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        this.removeStar('report', reportId)
+        return true
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to delete report ${reportId}:`, err)
+    }
+    return false
+  }
+
+  async deleteOperation(operationId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/operations/${encodeURIComponent(operationId)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        this.removeStar('operation', operationId)
+        return true
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to delete operation ${operationId}:`, err)
+    }
+    return false
+  }
+
+  async deleteResource(resourceId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/resources/${encodeURIComponent(resourceId)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        this.removeStar('resource', resourceId)
+        return true
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to delete resource ${resourceId}:`, err)
+    }
+    return false
+  }
+
+  // ==========================================
+  // Persistent Favorite (Star) Helpers
+  // ==========================================
+  getStarredIds(category: 'incident' | 'alert' | 'report' | 'operation' | 'resource'): Set<string> {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const raw = localStorage.getItem(`starred_${category}s`)
+      return new Set(raw ? JSON.parse(raw) : [])
+    } catch {
+      return new Set()
+    }
+  }
+
+  isStarred(category: 'incident' | 'alert' | 'report' | 'operation' | 'resource', id: string): boolean {
+    return this.getStarredIds(category).has(id)
+  }
+
+  toggleStar(category: 'incident' | 'alert' | 'report' | 'operation' | 'resource', id: string): boolean {
+    if (typeof window === 'undefined') return false
+    try {
+      const current = this.getStarredIds(category)
+      let newState = false
+      if (current.has(id)) {
+        current.delete(id)
+        newState = false
+      } else {
+        current.add(id)
+        newState = true
+      }
+      localStorage.setItem(`starred_${category}s`, JSON.stringify(Array.from(current)))
+      return newState
+    } catch {
+      return false
+    }
+  }
+
+  removeStar(category: 'incident' | 'alert' | 'report' | 'operation' | 'resource', id: string): void {
+    if (typeof window === 'undefined') return
+    try {
+      const current = this.getStarredIds(category)
+      if (current.has(id)) {
+        current.delete(id)
+        localStorage.setItem(`starred_${category}s`, JSON.stringify(Array.from(current)))
+      }
+    } catch {
+      // ignore
+    }
+  }
+
 }
 
 export const platformDataService = new PlatformDataService()

@@ -104,3 +104,30 @@ def patch_operation_status(
             detail=f"Operation with ID '{operation_id}' not found.",
         )
     return updated_op
+
+
+@router.delete("/{operation_id}", status_code=status.HTTP_200_OK)
+def delete_operation(
+    operation_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Deletes an operational mission record and resets attached resource availability.
+    """
+    from app.models.operation import Operation
+    from app.models.resource import Resource
+    op = db.query(Operation).filter(Operation.id == operation_id).first()
+    if not op:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Operation with ID '{operation_id}' not found.",
+        )
+    if op.resource_id:
+        res = db.query(Resource).filter(Resource.id == op.resource_id).first()
+        if res:
+            res.status = "AVAILABLE"
+            res.assigned_incident_id = None
+            res.assigned_operation_id = None
+    db.delete(op)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Operation '{operation_id}' deleted and resource freed."}

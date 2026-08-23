@@ -47,3 +47,23 @@ def acknowledge_alert(
             detail=f"Alert with ID '{alert_id}' not found.",
         )
     return updated
+
+
+@router.delete("/{alert_id}", status_code=status.HTTP_200_OK)
+def delete_alert(
+    alert_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently deletes a broadcast alert from the emergency communications registry.
+    """
+    from app.models.alert import Alert
+    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Alert with ID '{alert_id}' not found.",
+        )
+    db.delete(alert)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Alert '{alert_id}' deleted successfully."}

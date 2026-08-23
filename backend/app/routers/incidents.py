@@ -341,3 +341,49 @@ def get_incident_geospatial_endpoint(
             detail=f"Incident with ID '{incident_id}' not found.",
         )
     return geospatial_context
+
+
+@router.delete("/{incident_id}", status_code=status.HTTP_200_OK)
+def delete_incident(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently deletes an incident from the disaster registry with cascade cleanup
+    of citizen reports, incident sources, linked alerts, operations, and associated intelligence.
+    """
+    from app.models.incident import Incident
+    from app.models.citizen_report import CitizenReport
+    from app.models.incident_source import IncidentSource
+    from app.models.alert import Alert
+    from app.models.operation import Operation
+    from app.models.resource import Resource
+
+    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not inc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found.",
+        )
+
+    # Free up any attached resources
+    operations = db.query(Operation).filter(Operation.incident_id == incident_id).all()
+    for op in operations:
+        if op.resource_id:
+            res = db.query(Resource).filter(Resource.id == op.resource_id).first()
+            if res:
+                res.status = "AVAILABLE"
+                res.assigned_incident_id = None
+                res.assigned_operation_id = None
+        db.delete(op)
+
+    # Delete linked alerts, citizen reports, and sources
+    db.query(Alert).filter(Alert.incident_id == incident_id).delete(synchronize_session=False)
+    db.query(CitizenReport).filter(CitizenReport.incident_id == incident_id).delete(synchronize_session=False)
+    db.query(IncidentSource).filter(IncidentSource.incident_id == incident_id).delete(synchronize_session=False)
+
+    # Delete incident
+    db.delete(inc)
+    db.commit()
+
+    return {"status": "SUCCESS", "message": f"Incident '{incident_id}' and all associated records deleted successfully."}

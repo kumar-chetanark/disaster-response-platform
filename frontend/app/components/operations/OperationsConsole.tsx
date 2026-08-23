@@ -24,6 +24,40 @@ export default function OperationsConsole({
   const [searchQuery, setSearchQuery] = useState('')
   const [filterState, setFilterState] = useState<string>('ALL')
   const [isMobileDetailView, setIsMobileDetailView] = useState(false)
+  const [starredOnly, setStarredOnly] = useState(false)
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set())
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setStarredIds(platformDataService.getStarredIds('operation'))
+  }, [])
+
+  const handleToggleStar = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    platformDataService.toggleStar('operation', id)
+    setStarredIds(new Set(platformDataService.getStarredIds('operation')))
+  }
+
+  const handleDeleteOperation = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!window.confirm(`Are you sure you want to permanently delete Operation ${id}? This will cancel the mission and free up any attached resources.`)) {
+      return
+    }
+    setDeletingId(id)
+    try {
+      const ok = await platformDataService.deleteOperation(id)
+      if (ok) {
+        setOperationsList((prev) => prev.filter((o) => o.id !== id))
+        if (activeOpId === id) {
+          setActiveOpId('')
+        }
+      }
+    } catch (err) {
+      console.error('Delete operation failed:', err)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   // Fetch live operations from REST backend
   useEffect(() => {
