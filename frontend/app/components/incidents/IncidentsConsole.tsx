@@ -35,7 +35,28 @@ export default function IncidentsConsole({
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(initialSelectedId || null)
   const [selectedIncidentDetail, setSelectedIncidentDetail] = useState<Incident | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false)
+  const [statusActionError, setStatusActionError] = useState<string | null>(null)
   const dossierCache = useRef<Record<string, Incident>>({})
+
+  const handleStatusTransition = async (targetStatus: string, notes?: string) => {
+    if (!selectedIncident || isUpdatingStatus) return
+    setIsUpdatingStatus(true)
+    setStatusActionError(null)
+    try {
+      const updated = await platformDataService.updateIncidentStatus(selectedIncident.id, targetStatus, notes)
+      if (updated) {
+        setSelectedIncidentDetail(updated)
+        dossierCache.current[updated.id] = updated
+        setIncidentsList((prev) => prev.map((inc) => (inc.id === updated.id ? updated : inc)))
+      }
+    } catch (err: any) {
+      console.error('Failed to transition incident status:', err)
+      setStatusActionError(err.message || 'Status transition failed')
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
 
   // 1. Fetch live incidents list
   useEffect(() => {
@@ -484,7 +505,112 @@ export default function IncidentsConsole({
                 })()}
               </section>
 
-              {/* 5. Actions */}
+              {/* 5. Authority Lifecycle & Operational Actions */}
+              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
+                  <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[18px]">verified_user</span>
+                    Authority Lifecycle Control
+                  </h4>
+                  <span className={`font-mono-label text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
+                    selectedIncident.status === 'ACTIVE'
+                      ? 'bg-red-950/30 text-red-400 border-red-500/40'
+                      : selectedIncident.status === 'PENDING'
+                      ? 'bg-amber-950/30 text-amber-400 border-amber-500/40'
+                      : selectedIncident.status === 'MONITORING'
+                      ? 'bg-cyan-950/30 text-cyan-400 border-cyan-500/40'
+                      : 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40'
+                  }`}>
+                    STATUS: {selectedIncident.status}
+                  </span>
+                </div>
+
+                {statusActionError && (
+                  <div className="p-2.5 bg-red-950/20 border border-red-500/30 rounded text-red-400 text-[11px] font-mono-label">
+                    {statusActionError}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2.5">
+                  {selectedIncident.status === 'PENDING' && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleStatusTransition('ACTIVE', 'Verified and escalated to ACTIVE emergency by command authority')}
+                        className="flex-1 min-w-[140px] py-2 px-3 bg-red-600 hover:bg-red-500 text-white font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                        Verify &amp; Activate →
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleStatusTransition('MONITORING', 'Moved to active radar/field monitoring')}
+                        className="flex-1 min-w-[140px] py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-cyan-400 font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">visibility</span>
+                        Move to Monitoring
+                      </button>
+                    </>
+                  )}
+
+                  {selectedIncident.status === 'ACTIVE' && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleStatusTransition('MONITORING', 'Active response stabilized, transitioned to monitoring')}
+                        className="flex-1 min-w-[140px] py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-cyan-400 font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">visibility</span>
+                        Transition to Monitoring
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleStatusTransition('RESOLVED', 'Crisis contained and field operations concluded')}
+                        className="flex-1 min-w-[140px] py-2 px-3 bg-emerald-700 hover:bg-emerald-600 text-white font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">task_alt</span>
+                        Resolve Incident
+                      </button>
+                    </>
+                  )}
+
+                  {selectedIncident.status === 'MONITORING' && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleStatusTransition('ACTIVE', 'Incident escalating, reactivated emergency response')}
+                        className="flex-1 min-w-[140px] py-2 px-3 bg-red-600 hover:bg-red-500 text-white font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">warning</span>
+                        Re-escalate to Active
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleStatusTransition('RESOLVED', 'Monitoring period completed successfully')}
+                        className="flex-1 min-w-[140px] py-2 px-3 bg-emerald-700 hover:bg-emerald-600 text-white font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">task_alt</span>
+                        Resolve Incident
+                      </button>
+                    </>
+                  )}
+
+                  {selectedIncident.status === 'RESOLVED' && (
+                    <div className="w-full p-2.5 bg-emerald-950/20 border border-emerald-500/30 rounded text-emerald-400 font-mono-label text-[11px] text-center flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined text-[16px]">verified</span>
+                      Incident formally closed &amp; resolved in disaster registry. Read-only archive.
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* 6. Operational Actions */}
               <div className="flex flex-col sm:flex-row gap-3 pt-1">
                 {onOpenAssessment && (
                   <button

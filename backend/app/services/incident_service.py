@@ -297,3 +297,73 @@ def get_incident_detail(db: Session, incident_id: str) -> Optional[IncidentDetai
         associated_operations=[op.operation_type for op in operations],
         timeline=timeline_events,
     )
+
+VALID_LIFECYCLE_TRANSITIONS = {
+    "PENDING": {"ACTIVE", "MONITORING"},
+    "ACTIVE": {"MONITORING", "RESOLVED"},
+    "MONITORING": {"ACTIVE", "RESOLVED"},
+    "RESOLVED": set(),  # Terminal state
+}
+
+def update_incident_status(
+    db: Session,
+    incident_id: str,
+    target_status: str,
+    authority_user: dict,
+    notes: Optional[str] = None,
+) -> Incident:
+    from fastapi import HTTPException, status as http_status
+    from datetime import datetime, timezone
+    import uuid
+
+    clean_target = target_status.strip().upper()
+    if clean_target not in {"PENDING", "ACTIVE", "MONITORING", "RESOLVED"}:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid lifecycle status '{target_status}'. Supported states: PENDING, ACTIVE, MONITORING, RESOLVED."
+        )
+
+    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not inc:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found."
+        )
+
+    current_status = (inc.status or "PENDING").upper()
+    
+    # If already in target status, return cleanly
+    if current_status == clean_target:
+        return inc
+
+    allowed_targets = VALID_LIFECYCLE_TRANSITIONS.get(current_status, set())
+    if clean_target not in allowed_targets:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=f"Invalid lifecycle transition: Cannot move incident from '{current_status}' to '{clean_target}'."
+        )
+
+    now = datetime.now(timezone.utc)
+    inc.status = clean_target
+    inc.updated_at = now
+    if clean_target in {"ACTIVE", "MONITORING"} and current_status == "PENDING":
+        inc.is_field_verified = True
+
+    # Record auditable authority source entry on the incident
+    auth_name = authority_user.get("name") or authority_user.get("username") or "Command Authority"
+    badge = authority_user.get("badge_id") or "AUTH"
+    audit_source = IncidentSource(
+        id=str(uuid.uuid4()),
+        incident_id=inc.id,
+        source_type="GOVERNMENT",
+        source_label=f"Authority Verification: {auth_name} ({badge})",
+        channel_badge="GOV_COMMAND",
+        confidence_score=99.0,
+        summary=f"Lifecycle transition: {current_status} -> {clean_target}. {notes or 'Authority command verified.'}",
+        raw_content=f"AUTHORITY: {auth_name} | BADGE: {badge} | PREV: {current_status} | NEW: {clean_target}",
+        created_at=now,
+    )
+    db.add(audit_source)
+    db.commit()
+    db.refresh(inc)
+    return inc

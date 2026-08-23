@@ -13,7 +13,7 @@ export interface UserSession {
 
 // 1. INCIDENTS & CORRELATION
 export type IncidentSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
-export type IncidentStatus = 'ACTIVE' | 'MONITORING' | 'RESOLVED' | 'UNRESOLVED'
+export type IncidentStatus = 'PENDING' | 'ACTIVE' | 'MONITORING' | 'RESOLVED' | 'UNRESOLVED'
 export type IncidentCategory =
   | 'Flood'
   | 'Cyclone'

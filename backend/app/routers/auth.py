@@ -7,9 +7,7 @@ from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/auth", tags=["Authority Authentication"])
 
-# Authority credentials store (In production, stored hashed in DB/Vault)
-# Default authority credentials for Command Center:
-# Username: authority_admin / Pass: Commander@2026!
+# Authority credentials store
 AUTHORITY_USERS = {
     "authority_admin": {
         "password_hash": hashlib.sha256("Commander@2026!".encode()).hexdigest(),
@@ -33,8 +31,8 @@ AUTHORITY_USERS = {
 ACTIVE_SESSIONS: Dict[str, dict] = {}
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., example="authority_admin")
-    password: str = Field(..., example="Commander@2026!")
+    username: str = Field(..., description="Authority username")
+    password: str = Field(..., description="Authority password")
 
 class UserSessionResponse(BaseModel):
     token: str
@@ -49,6 +47,25 @@ class UserSessionResponse(BaseModel):
 class VerifyResponse(BaseModel):
     authenticated: bool
     user: Optional[dict] = None
+
+def get_current_authority(authorization: Optional[str] = Header(None)) -> dict:
+    """
+    Dependency to enforce authenticated authority session on protected endpoints.
+    """
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please provide a valid authority token."
+        )
+    
+    token = authorization.replace("Bearer ", "").strip()
+    session = ACTIVE_SESSIONS.get(token)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired or invalid authority token."
+        )
+    return session
 
 @router.post("/login", response_model=UserSessionResponse)
 def login(req: LoginRequest):

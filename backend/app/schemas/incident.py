@@ -108,3 +108,7 @@ class IncidentListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+class IncidentStatusUpdateRequest(BaseModel):
+    status: str = Field(..., description="Target status: PENDING, ACTIVE, MONITORING, RESOLVED")
+    notes: Optional[str] = Field(None, description="Optional verification or resolution notes")

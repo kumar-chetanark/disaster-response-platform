@@ -3,9 +3,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.incident import Incident
-from app.schemas.incident import IncidentListResponse, IncidentDetailSchema
-from app.services.incident_service import get_incidents_list, get_incident_detail
+from app.schemas.incident import (
+    IncidentListResponse,
+    IncidentDetailSchema,
+    IncidentStatusUpdateRequest,
+)
+from app.services.incident_service import (
+    get_incidents_list,
+    get_incident_detail,
+    update_incident_status,
+)
 from app.services.allocation_engine import analyze_incident
+from app.routers.auth import get_current_authority
 
 router = APIRouter(prefix="/incidents", tags=["Incidents Registry"])
 
@@ -37,10 +46,7 @@ def get_incident_analysis(
 ):
     """
     Deterministic Incident Analysis Endpoint:
-    Evaluates real database fields:
-    - severity, disaster_type, location, description, trapped people, immediate danger
-    - field verification status, affected population, corroborating sources
-    Returns structured analysis: priority score, key risks, required capabilities, reasoning, confidence.
+    Evaluates real database fields and returns structured risk telemetry.
     """
     inc = db.query(Incident).filter(Incident.id == incident_id).first()
     if not inc:
@@ -56,13 +62,7 @@ def get_incident(
     db: Session = Depends(get_db),
 ):
     """
-    Returns complete incident dossier including:
-    - Canonical information & geography
-    - Corroborating source ledger (Citizen, News, Weather radar, Gov)
-    - Field assessments (Drone, Helicopter, Land, Boat)
-    - Allocated operations & active tracks
-    - AI-recommended resource allocations
-    - Incident progression timeline
+    Returns complete incident dossier including corroborating source ledger.
     """
     incident = get_incident_detail(db=db, incident_id=incident_id)
     if not incident:
@@ -71,3 +71,24 @@ def get_incident(
             detail=f"Incident with ID '{incident_id}' not found.",
         )
     return incident
+
+@router.patch("/{incident_id}/status", response_model=IncidentDetailSchema)
+def patch_incident_status(
+    incident_id: str,
+    req: IncidentStatusUpdateRequest,
+    authority: dict = Depends(get_current_authority),
+    db: Session = Depends(get_db),
+):
+    """
+    Authority-Controlled Incident Lifecycle Transition Endpoint:
+    Enforces deterministic state transitions (PENDING -> ACTIVE/MONITORING -> RESOLVED).
+    Records auditable authority attribution.
+    """
+    updated_inc = update_incident_status(
+        db=db,
+        incident_id=incident_id,
+        target_status=req.status,
+        authority_user=authority,
+        notes=req.notes,
+    )
+    return get_incident_detail(db=db, incident_id=updated_inc.id)

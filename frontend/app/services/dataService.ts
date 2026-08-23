@@ -117,6 +117,68 @@ class PlatformDataService {
     return null
   }
 
+  async updateIncidentStatus(incidentId: string, status: string, notes?: string): Promise<Incident | null> {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authority_session_token') || '' : ''
+      const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status, notes }),
+      })
+      if (res.ok) {
+        const item = await res.json()
+        return {
+          id: item.id,
+          title: item.title,
+          category: item.category,
+          type: item.type,
+          location: item.location,
+          sector: item.sector,
+          impact: item.impact,
+          severity: item.severity,
+          status: item.status,
+          timeReported: item.time_reported,
+          lastUpdated: item.last_updated,
+          affectedPopulationEst: item.affected_population_est,
+          affectedAreaSqKm: item.affected_area_sq_km,
+          priorityLevel: item.priority_level,
+          resourceCoverage: item.resource_coverage,
+          isFieldVerified: item.is_field_verified,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          sourceCounts: item.source_counts || {
+            citizenReports: 0,
+            newsReports: 0,
+            governmentReports: 0,
+            weatherReports: 0,
+            fieldAssessments: 0,
+          },
+          associatedOperations: item.associated_operations || [],
+          reports: (item.sources || []).map((s: any) => ({
+            id: s.id,
+            sourceType: s.source_type,
+            sourceLabel: s.source_label,
+            timestamp: s.created_at,
+            channelBadge: s.channel_badge,
+            confidence: s.confidence_score,
+            summary: s.summary,
+            rawContent: s.raw_content,
+          })),
+          timeline: item.timeline || [],
+        }
+      } else {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.detail || `Status transition failed with HTTP ${res.status}`)
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to update status for incident ${incidentId}:`, err)
+      throw err
+    }
+  }
+
   // 2. Resources — Live REST backend
   async getResources(category?: string, location?: string): Promise<ResourceUnit[]> {
     try {
