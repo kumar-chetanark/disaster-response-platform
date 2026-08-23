@@ -686,7 +686,7 @@ class PlatformDataService {
       inc.id === 'inc-a'
         ? {
             ...inc,
-            title: 'Cyclone Alpha 4 — Sector 7G Coastal Basin (Field Verified)',
+            title: 'Incident #1 — Sector 7G Coastal Basin (Field Verified)',
             impact: `Verified: ${sub.structuresAffected} structures damaged • ${sub.peopleObserved} • ${sub.roadAccessibility}`,
             isFieldVerified: true,
             lastUpdated: 'Just now',
