@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { UserSession } from '../../types'
+import { platformDataService } from '../../services/dataService'
 
 interface AuthorityLoginModalProps {
   isOpen: boolean
@@ -14,20 +15,32 @@ export default function AuthorityLoginModal({
   onClose,
   onLoginSuccess,
 }: AuthorityLoginModalProps) {
-  const [badgeId, setBadgeId] = useState('AUTH-7721')
-  const [passcode, setPasscode] = useState('••••••••')
-  const [selectedRole, setSelectedRole] = useState('Commander (Level 5)')
+  const [username, setUsername] = useState('authority_admin')
+  const [password, setPassword] = useState('Commander@2026!')
+  const [isLoading, setIsLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   if (!isOpen) return null
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    onLoginSuccess({
-      role: 'AUTHORITY',
-      userName: 'Cmdr. J. Vance',
-      badgeId,
-      authorityLevel: 5,
-    })
+    setIsLoading(true)
+    setErrorMsg(null)
+
+    try {
+      const data = await platformDataService.authLogin(username, password)
+      onLoginSuccess({
+        role: 'AUTHORITY',
+        userName: data.name,
+        badgeId: data.badge_id,
+        authorityLevel: data.authority_level,
+      })
+    } catch (err: any) {
+      console.error('Authority authentication error:', err)
+      setErrorMsg(err.message || 'Authentication failed. Please verify credentials.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -56,26 +69,34 @@ export default function AuthorityLoginModal({
           </button>
         </div>
 
-        {/* Demo Fast Login Banner */}
+        {/* Credentials Info Banner */}
         <div className="p-3 bg-primary/10 border border-primary/20 rounded font-mono-label text-[11px] text-on-surface space-y-1">
           <div className="font-bold text-primary flex items-center gap-1">
             <span className="material-symbols-outlined text-[14px]">key</span>
-            Demo Session Credentials Ready
+            Verified Authority Credentials Pre-Loaded
           </div>
           <p className="text-[10px] text-on-surface-variant">
-            Authorized as Command Director (Cmdr. J. Vance) with full resource deployment and mission approval permissions.
+            Account: <strong>Commander R. Vance</strong> (Level 5 Command Authority). Automatically requests backend cryptographic session token.
           </p>
         </div>
+
+        {errorMsg && (
+          <div className="p-2.5 bg-red-950/20 border border-red-500/40 rounded text-red-400 font-mono-label text-[11px] flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[14px]">error</span>
+            {errorMsg}
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-1">
             <label className="block font-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider">
-              Authority Badge ID
+              Authority Username
             </label>
             <input
               type="text"
-              value={badgeId}
-              onChange={(e) => setBadgeId(e.target.value)}
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[13px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -86,25 +107,11 @@ export default function AuthorityLoginModal({
             </label>
             <input
               type="password"
-              value={passcode}
-              onChange={(e) => setPasscode(e.target.value)}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[13px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary"
             />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block font-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider">
-              Command Station Role
-            </label>
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[12px] rounded px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary"
-            >
-              <option value="Commander (Level 5)">Commander (Level 5) — Full Authorization</option>
-              <option value="Operations Director">Operations Director — Dispatch &amp; Logistics</option>
-              <option value="Incident Supervisor">Incident Supervisor — Field Intelligence</option>
-            </select>
           </div>
 
           <div className="pt-3 flex gap-3">
@@ -117,9 +124,17 @@ export default function AuthorityLoginModal({
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded uppercase transition-colors shadow"
+              disabled={isLoading}
+              className="flex-1 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[11px] font-bold rounded uppercase transition-colors shadow flex items-center justify-center gap-1"
             >
-              Authenticate &amp; Enter
+              {isLoading ? (
+                <>
+                  <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>
+                  Authenticating...
+                </>
+              ) : (
+                'Authenticate & Enter'
+              )}
             </button>
           </div>
         </form>

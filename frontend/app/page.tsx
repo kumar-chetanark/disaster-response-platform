@@ -38,6 +38,30 @@ export default function App() {
   // Session: Default CITIZEN experience
   const [session, setSession] = useState<UserSession>({ role: 'CITIZEN' })
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+
+  // Auto-verify and restore authority session from localStorage on startup
+  useEffect(() => {
+    async function restoreSession() {
+      try {
+        const token = localStorage.getItem('authority_session_token')
+        if (token) {
+          const res = await platformDataService.authVerify(token)
+          if (res && res.authenticated && res.user) {
+            setSession({
+              role: 'AUTHORITY',
+              userName: res.user.name,
+              badgeId: res.user.badge_id,
+              authorityLevel: res.user.authority_level,
+            })
+          }
+        }
+      } catch (err) {
+        console.warn('Could not restore previous authority session:', err)
+      }
+    }
+    restoreSession()
+  }, [])
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
