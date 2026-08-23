@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem, IncidentRequirementsResponse, IncidentCapabilityRequirement, OperationRecord, LiveOperationalTelemetry, ResourceTelemetryState, IncidentIntelligenceTelemetry, DecisionActionItem } from '../../types'
+import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem, IncidentRequirementsResponse, IncidentCapabilityRequirement, OperationRecord, LiveOperationalTelemetry, ResourceTelemetryState, IncidentIntelligenceTelemetry, DecisionActionItem, IncidentGeospatialContext, GeospatialResource, GeospatialOperation } from '../../types'
 import SearchInput from '../common/SearchInput'
 import DetailsHeader from '../common/DetailsHeader'
 import { platformDataService } from '../../services/dataService'
@@ -45,6 +45,9 @@ export default function IncidentsConsole({
   const [deployError, setDeployError] = useState<string | null>(null)
   const [telemetryData, setTelemetryData] = useState<LiveOperationalTelemetry | null>(null)
   const [intelligenceData, setIntelligenceData] = useState<IncidentIntelligenceTelemetry | null>(null)
+  const [geospatialData, setGeospatialData] = useState<IncidentGeospatialContext | null>(null)
+  const [selectedMapEntity, setSelectedMapEntity] = useState<{ type: 'incident' | 'resource' | 'operation'; data: any } | null>(null)
+
 
   const [lastRefreshedSec, setLastRefreshedSec] = useState<number>(0)
 
@@ -129,13 +132,15 @@ export default function IncidentsConsole({
 
     const fetchTelemetry = async () => {
       try {
-        const [tData, iData] = await Promise.all([
+        const [tData, iData, gData] = await Promise.all([
           platformDataService.getIncidentTelemetry(selectedIncidentId),
-          platformDataService.getIncidentIntelligence(selectedIncidentId)
+          platformDataService.getIncidentIntelligence(selectedIncidentId),
+          platformDataService.getIncidentGeospatial(selectedIncidentId)
         ])
         if (isMounted) {
           if (tData) setTelemetryData(tData)
           if (iData) setIntelligenceData(iData)
+          if (gData) setGeospatialData(gData)
           setLastRefreshedSec(0)
         }
       } catch (err) {
@@ -557,7 +562,233 @@ export default function IncidentsConsole({
                 )}
               </section>
 
-              {/* 3. Evidence & Explainable Confidence Telemetry */}
+              {/* 3. Geospatial Command Center & Live Incident Map (Phase 9) */}
+              <section className="bg-surface-container-lowest border border-cyan-500/40 rounded-lg p-4 space-y-3.5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-cyan-400 text-[20px]">explore</span>
+                    <div>
+                      <h4 className="font-headline-sm text-[13px] font-bold text-on-surface">
+                        GEOSPATIAL COMMAND CENTER
+                      </h4>
+                      <div className="text-[10px] font-mono-label text-on-surface-variant">
+                        LIVE INCIDENT • RESOURCE • MISSION POSITION
+                      </div>
+                    </div>
+                  </div>
+                  {geospatialData && (
+                    <div className="flex items-center gap-2">
+                      <span className={`font-mono-label text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
+                        geospatialData.map_summary.incident_coordinates_available
+                          ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40'
+                          : 'bg-amber-950/30 text-amber-400 border-amber-500/40'
+                      }`}>
+                        {geospatialData.map_summary.incident_coordinates_available ? 'GPS GEO-MAPPED' : 'COORDINATES UNAVAILABLE'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Map Grid / Geospatial Entity Matrix */}
+                {geospatialData ? (
+                  <div className="space-y-3">
+                    {/* Map Legend Bar */}
+                    <div className="flex flex-wrap items-center gap-3 p-2 bg-surface-container rounded border border-outline-variant text-[10px] font-mono-label">
+                      <span className="text-on-surface-variant font-bold uppercase">MAP LEGEND:</span>
+                      <span className="flex items-center gap-1 text-red-400">
+                        <span className="h-2 w-2 rounded-full bg-red-500 inline-block"></span> INCIDENT
+                      </span>
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span> AVAILABLE SQUAD
+                      </span>
+                      <span className="flex items-center gap-1 text-amber-400">
+                        <span className="h-2 w-2 rounded-full bg-amber-500 inline-block"></span> ASSIGNED
+                      </span>
+                      <span className="flex items-center gap-1 text-blue-400">
+                        <span className="h-2 w-2 rounded-full bg-blue-500 inline-block"></span> EN ROUTE
+                      </span>
+                      <span className="flex items-center gap-1 text-purple-400">
+                        <span className="h-2 w-2 rounded-full bg-purple-500 inline-block"></span> ON SCENE
+                      </span>
+                      <span className="flex items-center gap-1 text-cyan-400">
+                        <span className="h-2 w-2 rounded-full bg-cyan-500 inline-block"></span> ACTIVE MISSION
+                      </span>
+                    </div>
+
+                    {/* Operational Map Canvas & Entities Layer */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {/* Left 2 Cols: Tactical Geographic Radar / Sector Positions */}
+                      <div className="md:col-span-2 bg-surface-container-low rounded border border-outline-variant/80 p-3 space-y-2 relative min-h-[220px]">
+                        <div className="flex items-center justify-between text-[11px] font-mono-label text-on-surface-variant pb-1 border-b border-outline-variant/60">
+                          <span className="font-bold uppercase text-primary">Sector Grid Position:</span>
+                          <span>{geospatialData.incident.location_name}</span>
+                        </div>
+
+                        {/* Incident Position Card */}
+                        <div
+                          onClick={() => setSelectedMapEntity({ type: 'incident', data: geospatialData.incident })}
+                          className="p-2.5 bg-red-950/20 border border-red-500/40 rounded cursor-pointer hover:border-red-400 transition-colors flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-red-400 text-[18px]">crisis_alert</span>
+                            <div>
+                              <div className="text-[12px] font-bold text-on-surface">{geospatialData.incident.title}</div>
+                              <div className="text-[10px] font-mono-label text-on-surface-variant">
+                                {geospatialData.incident.severity} • {geospatialData.incident.status} • {geospatialData.incident.priority_level}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right font-mono-label text-[10px]">
+                            <div className="text-red-400 font-bold">TARGET INCIDENT</div>
+                            <div className="text-on-surface-variant">
+                              {geospatialData.incident.coordinates_available
+                                ? `${geospatialData.incident.latitude?.toFixed(4)}, ${geospatialData.incident.longitude?.toFixed(4)}`
+                                : 'COORDINATES UNAVAILABLE'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Active Missions Overlay */}
+                        {geospatialData.operations.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            <div className="text-[10px] font-mono-label uppercase text-cyan-400 font-bold flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[13px]">navigation</span>
+                              Active Missions ({geospatialData.operations.length})
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {geospatialData.operations.map((op: GeospatialOperation) => (
+                                <div
+                                  key={op.operation_id}
+                                  onClick={() => setSelectedMapEntity({ type: 'operation', data: op })}
+                                  className="p-2 bg-surface-container rounded border border-cyan-500/40 cursor-pointer hover:border-cyan-400 transition-colors text-[11px] font-mono-label flex flex-col justify-between"
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-bold text-cyan-300 truncate mr-1">{op.resource_name}</span>
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase bg-cyan-950/40 text-cyan-400 border border-cyan-500/30 shrink-0">
+                                      {op.status}
+                                    </span>
+                                  </div>
+                                  <div className="text-[9px] text-on-surface-variant truncate">
+                                    Obj: {op.mission_objective}
+                                  </div>
+                                  <div className="text-[9px] text-on-surface-variant mt-1 flex items-center justify-between border-t border-outline-variant/40 pt-1">
+                                    <span>Auth: {op.authorized_by.split(' ')[0]}</span>
+                                    <span className="text-cyan-400 font-bold">
+                                      {op.distance_to_incident_km !== null ? `${op.distance_to_incident_km} km away` : 'Dist N/A'}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Surrounding Tracked Squads */}
+                        <div className="space-y-1.5 pt-1">
+                          <div className="text-[10px] font-mono-label uppercase text-on-surface-variant font-bold flex items-center justify-between">
+                            <span>Tracked Units in Sector ({geospatialData.resources.length})</span>
+                            <span className="text-outline font-normal">
+                              {geospatialData.map_summary.mapped_resources_count} GPS Enabled
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {geospatialData.resources.slice(0, 4).map((r: GeospatialResource) => (
+                              <div
+                                key={r.resource_id}
+                                onClick={() => setSelectedMapEntity({ type: 'resource', data: r })}
+                                className="p-2 bg-surface-container rounded border border-outline-variant/80 cursor-pointer hover:border-primary/60 transition-colors text-[11px] font-mono-label flex items-center justify-between"
+                              >
+                                <div className="truncate mr-2">
+                                  <div className="font-bold text-on-surface truncate">{r.name}</div>
+                                  <div className="text-[9px] text-on-surface-variant capitalize">
+                                    {r.category} • {r.base_location}
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase border ${
+                                    r.operational_state === 'AVAILABLE'
+                                      ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/30'
+                                      : 'bg-cyan-950/30 text-cyan-400 border-cyan-500/30'
+                                  }`}>
+                                    {r.operational_state}
+                                  </span>
+                                  <div className="text-[9px] text-on-surface-variant mt-0.5">
+                                    {r.distance_to_incident_km !== null ? `${r.distance_to_incident_km} km` : 'Pos Known'}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right 1 Col: Selected Entity Inspector / Telemetry Inspector */}
+                      <div className="bg-surface-container rounded border border-outline-variant/80 p-3 space-y-2 font-mono-label text-[11px]">
+                        <div className="text-[10px] uppercase font-bold text-primary pb-1 border-b border-outline-variant/60 flex items-center justify-between">
+                          <span>Entity Inspector:</span>
+                          <span className="text-on-surface-variant">{selectedMapEntity ? selectedMapEntity.type.toUpperCase() : 'SELECT ENTITY'}</span>
+                        </div>
+
+                        {selectedMapEntity ? (
+                          <div className="space-y-2">
+                            {selectedMapEntity.type === 'incident' && (
+                              <div className="space-y-1 text-on-surface">
+                                <div className="font-bold text-[12px]">{selectedMapEntity.data.title}</div>
+                                <div className="text-on-surface-variant text-[10px]">Location: {selectedMapEntity.data.location_name}</div>
+                                <div className="text-on-surface-variant text-[10px]">Severity: {selectedMapEntity.data.severity}</div>
+                                <div className="text-on-surface-variant text-[10px]">Confidence: {selectedMapEntity.data.confidence_score}%</div>
+                                <div className="text-on-surface-variant text-[10px]">
+                                  Coordinates: {selectedMapEntity.data.coordinates_available
+                                    ? `${selectedMapEntity.data.latitude}, ${selectedMapEntity.data.longitude}`
+                                    : 'COORDINATES UNAVAILABLE'}
+                                </div>
+                              </div>
+                            )}
+                            {selectedMapEntity.type === 'operation' && (
+                              <div className="space-y-1 text-on-surface">
+                                <div className="font-bold text-[12px] text-cyan-400">Mission #{selectedMapEntity.data.operation_id}</div>
+                                <div className="text-on-surface-variant text-[10px]">Unit: {selectedMapEntity.data.resource_name}</div>
+                                <div className="text-on-surface-variant text-[10px]">Status: {selectedMapEntity.data.status}</div>
+                                <div className="text-on-surface-variant text-[10px]">Authorized By: {selectedMapEntity.data.authorized_by}</div>
+                                <div className="text-on-surface-variant text-[10px]">Objective: {selectedMapEntity.data.mission_objective}</div>
+                                <div className="text-cyan-300 text-[10px]">
+                                  Distance: {selectedMapEntity.data.distance_to_incident_km !== null
+                                    ? `${selectedMapEntity.data.distance_to_incident_km} km`
+                                    : 'Position estimated'}
+                                </div>
+                              </div>
+                            )}
+                            {selectedMapEntity.type === 'resource' && (
+                              <div className="space-y-1 text-on-surface">
+                                <div className="font-bold text-[12px]">{selectedMapEntity.data.name}</div>
+                                <div className="text-on-surface-variant text-[10px]">Category: {selectedMapEntity.data.category}</div>
+                                <div className="text-on-surface-variant text-[10px]">Base: {selectedMapEntity.data.base_location}</div>
+                                <div className="text-on-surface-variant text-[10px]">Status: {selectedMapEntity.data.operational_state}</div>
+                                <div className="text-on-surface-variant text-[10px]">Personnel: {selectedMapEntity.data.personnel_count} active</div>
+                                <div className="text-emerald-400 text-[10px]">
+                                  Distance to Incident: {selectedMapEntity.data.distance_to_incident_km !== null
+                                    ? `${selectedMapEntity.data.distance_to_incident_km} km`
+                                    : 'LAST KNOWN POSITION'}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-on-surface-variant text-[10px] py-8 text-center leading-relaxed">
+                            Click any incident, squad, or mission card to inspect real-time geospatial telemetry.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-surface-container rounded border border-outline-variant text-center font-mono-label text-[11px] text-on-surface-variant">
+                    Loading geospatial command telemetry...
+                  </div>
+                )}
+              </section>
+
+              {/* 4. Evidence & Explainable Confidence Telemetry */}
               <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
                   <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">

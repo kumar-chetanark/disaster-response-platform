@@ -8,6 +8,7 @@ from app.schemas.incident import (
     IncidentDetailSchema,
     IncidentStatusUpdateRequest,
     IncidentIntelligenceResponse,
+    IncidentGeospatialResponse,
 )
 from app.services.incident_service import (
     get_incidents_list,
@@ -320,3 +321,23 @@ def get_incident_intelligence_endpoint(
             detail=f"Incident with ID '{incident_id}' not found.",
         )
     return intelligence
+
+
+@router.get("/{incident_id}/geospatial", response_model=IncidentGeospatialResponse)
+def get_incident_geospatial_endpoint(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Geospatial Command Center Endpoint (Phase 9):
+    Returns real-time geospatial positioning, active missions, and distance matrices
+    derived strictly from real persisted SQLite records.
+    """
+    from app.services.geospatial_service import get_incident_geospatial_context
+    geospatial_context = get_incident_geospatial_context(db=db, incident_id=incident_id)
+    if not geospatial_context:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found.",
+        )
+    return geospatial_context

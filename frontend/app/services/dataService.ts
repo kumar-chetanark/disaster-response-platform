@@ -14,6 +14,7 @@ import {
   IncidentConfidenceTelemetry,
   LiveOperationalTelemetry,
   IncidentIntelligenceTelemetry,
+  IncidentGeospatialContext,
 } from '../types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -703,6 +704,19 @@ class PlatformDataService {
 
 
 
+
+
+  async getIncidentGeospatial(incidentId: string): Promise<IncidentGeospatialContext | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/geospatial`, { cache: 'no-store' })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to fetch geospatial context for incident ${incidentId}:`, err)
+    }
+    return null
+  }
 
   async getIncidentIntelligence(incidentId: string): Promise<IncidentIntelligenceTelemetry | null> {
     try {

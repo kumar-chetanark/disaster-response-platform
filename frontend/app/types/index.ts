@@ -486,3 +486,67 @@ export interface IncidentIntelligenceTelemetry {
   decision_support: DecisionSupportSummary
   evidence: any[]
 }
+
+export interface GeospatialIncident {
+  incident_id: string
+  title: string
+  status: string
+  severity: string
+  priority_level: string
+  priority_score: number
+  confidence_score: number
+  confidence_level: string
+  location_name: string
+  latitude?: number | null
+  longitude?: number | null
+  coordinates_available: boolean
+}
+
+export interface GeospatialResource {
+  resource_id: string
+  name: string
+  category: string
+  status: string
+  operational_state: string
+  base_location: string
+  latitude?: number | null
+  longitude?: number | null
+  coordinates_available: boolean
+  distance_to_incident_km?: number | null
+  assigned_incident_id?: string | null
+  assigned_operation_id?: string | null
+  personnel_count: number
+  last_updated: string
+}
+
+export interface GeospatialOperation {
+  operation_id: string
+  resource_id: string
+  resource_name: string
+  resource_category: string
+  status: string
+  destination_location: string
+  destination_latitude?: number | null
+  destination_longitude?: number | null
+  mission_objective: string
+  authorized_by: string
+  dispatched_time: string
+  resource_latitude?: number | null
+  resource_longitude?: number | null
+  distance_to_incident_km?: number | null
+}
+
+export interface GeospatialMapSummary {
+  incident_coordinates_available: boolean
+  mapped_resources_count: number
+  total_resources_count: number
+  active_operations_count: number
+  available_resources_count: number
+}
+
+export interface IncidentGeospatialContext {
+  incident: GeospatialIncident
+  resources: GeospatialResource[]
+  operations: GeospatialOperation[]
+  map_summary: GeospatialMapSummary
+}

@@ -397,3 +397,87 @@ def test_phase8_incident_intelligence_and_decision_support():
     assert intel_resolved["incident_status"] == "RESOLVED"
     resolved_actions = [a["action"] for a in intel_resolved["decision_support"]["recommended_actions"]]
     assert "ARCHIVE_DOSSIER" in resolved_actions
+
+
+def test_phase9_geospatial_command_center():
+    # 1. Nonexistent incident geospatial -> 404
+    nf_geo = client.get("/api/incidents/inc-nonexistent-999/geospatial")
+    assert nf_geo.status_code == 404
+
+    # 2. Create fresh incident with real coordinates (Mumbai Coastal Sector: 18.9220, 72.8347)
+    cit_payload = {
+        "disaster_type": "flood",
+        "location": "Coastal Gateway Underpass",
+        "description": "Severe storm surge waterlogging at coastal dockyard.",
+        "latitude": 18.9220,
+        "longitude": 72.8347,
+        "is_people_trapped": True,
+        "is_immediate_danger": True,
+        "name": "Harbor Patrol 9",
+        "contact_info": "+919876543266"
+    }
+    cit_res = client.post("/api/citizen-reports", json=cit_payload)
+    assert cit_res.status_code == 201
+    inc_id = cit_res.json()["incident_id"]
+
+    # 3. Fetch initial geospatial context
+    geo0 = client.get(f"/api/incidents/{inc_id}/geospatial")
+    assert geo0.status_code == 200
+    d0 = geo0.json()
+    assert d0["incident"]["incident_id"] == inc_id
+    assert d0["incident"]["latitude"] == 18.9220
+    assert d0["incident"]["longitude"] == 72.8347
+    assert d0["incident"]["coordinates_available"] is True
+    assert d0["map_summary"]["active_operations_count"] == 0
+
+    # 4. Create resource with coordinates (Naval Base: 18.9290, 72.8420 ~ 1.08 km away)
+    res_payload = {
+        "name": "Naval Inshore Patrol Craft 1",
+        "category": "water",
+        "personnel_count": 4,
+        "equipment_details": "Twin Outboard Inflatable",
+        "base_location": "Naval Inshore Dock",
+        "latitude": 18.9290,
+        "longitude": 72.8420,
+        "status": "AVAILABLE"
+    }
+    create_res = client.post("/api/resources", json=res_payload)
+    assert create_res.status_code == 201
+    res_id = create_res.json()["id"]
+
+    # 5. Check calculated distance
+    geo1 = client.get(f"/api/incidents/{inc_id}/geospatial").json()
+    matched_r = next(r for r in geo1["resources"] if r["resource_id"] == res_id)
+    assert matched_r["coordinates_available"] is True
+    assert matched_r["distance_to_incident_km"] is not None
+    assert 0.5 < matched_r["distance_to_incident_km"] < 2.0
+
+    # 6. Authority login & Approve deployment
+    login_res = client.post("/api/auth/login", json={"username": "authority_admin", "password": "Commander@2026!"})
+    token = login_res.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    app_res = client.post(
+        f"/api/allocations/rec-p9/approve?incident_id={inc_id}&resource_id={res_id}&notes=Deploy+inshore+craft",
+        headers=headers
+    )
+    assert app_res.status_code == 200
+    op_id = app_res.json()["operation_id"]
+
+    # 7. Check active mission appears in geospatial context
+    geo2 = client.get(f"/api/incidents/{inc_id}/geospatial").json()
+    assert geo2["map_summary"]["active_operations_count"] == 1
+    assert len(geo2["operations"]) == 1
+    assert geo2["operations"][0]["operation_id"] == op_id
+    assert geo2["operations"][0]["resource_id"] == res_id
+
+    # 8. Progress mission through valid transitions and Complete -> active operation removed from active map layer
+    client.patch(f"/api/operations/{op_id}/status", json={"status": "DISPATCHED"}, headers=headers)
+    client.patch(f"/api/operations/{op_id}/status", json={"status": "EN_ROUTE"}, headers=headers)
+    client.patch(f"/api/operations/{op_id}/status", json={"status": "ON_SCENE"}, headers=headers)
+    comp_res = client.patch(f"/api/operations/{op_id}/status", json={"status": "COMPLETED"}, headers=headers)
+    assert comp_res.status_code == 200
+
+    geo3 = client.get(f"/api/incidents/{inc_id}/geospatial").json()
+    assert geo3["map_summary"]["active_operations_count"] == 0
+    assert len(geo3["operations"]) == 0

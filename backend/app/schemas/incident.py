@@ -158,3 +158,63 @@ class IncidentIntelligenceResponse(BaseModel):
     operational_state: OperationalStateMetrics
     decision_support: DecisionSupportSummary
     evidence: List[Dict[str, Any]] = []
+
+
+class GeospatialIncidentDetail(BaseModel):
+    incident_id: str
+    title: str
+    status: str
+    severity: str
+    priority_level: str
+    priority_score: float
+    confidence_score: int
+    confidence_level: str
+    location_name: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    coordinates_available: bool
+
+class GeospatialResourceItem(BaseModel):
+    resource_id: str
+    name: str
+    category: str
+    status: str
+    operational_state: str
+    base_location: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    coordinates_available: bool
+    distance_to_incident_km: Optional[float] = None
+    assigned_incident_id: Optional[str] = None
+    assigned_operation_id: Optional[str] = None
+    personnel_count: int
+    last_updated: str
+
+class GeospatialOperationItem(BaseModel):
+    operation_id: str
+    resource_id: str
+    resource_name: str
+    resource_category: str
+    status: str
+    destination_location: str
+    destination_latitude: Optional[float] = None
+    destination_longitude: Optional[float] = None
+    mission_objective: str
+    authorized_by: str
+    dispatched_time: str
+    resource_latitude: Optional[float] = None
+    resource_longitude: Optional[float] = None
+    distance_to_incident_km: Optional[float] = None
+
+class GeospatialMapSummary(BaseModel):
+    incident_coordinates_available: bool
+    mapped_resources_count: int
+    total_resources_count: int
+    active_operations_count: int
+    available_resources_count: int
+
+class IncidentGeospatialResponse(BaseModel):
+    incident: GeospatialIncidentDetail
+    resources: List[GeospatialResourceItem] = []
+    operations: List[GeospatialOperationItem] = []
+    map_summary: GeospatialMapSummary

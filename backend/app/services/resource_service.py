@@ -34,6 +34,8 @@ def to_resource_response(res: Resource, distance_km: Optional[float] = None) -> 
         category=res.category,
         status=res.status,
         base_location=res.base_location,
+        latitude=res.latitude,
+        longitude=res.longitude,
         personnel_count=res.personnel_count or 0,
         equipment_details=res.equipment_details,
         distance_km=distance_km,
@@ -79,6 +81,8 @@ def create_resource(db: Session, res_in: ResourceCreate) -> ResourceResponse:
         category=res_in.category.lower(),
         status=res_in.status.upper(),
         base_location=res_in.base_location,
+        latitude=res_in.latitude,
+        longitude=res_in.longitude,
         personnel_count=res_in.personnel_count or 0,
         equipment_details=res_in.equipment_details,
         shelter_capacity=res_in.shelter_capacity,
@@ -98,6 +102,10 @@ def update_resource(db: Session, resource_id: str, res_in: ResourceUpdate) -> Op
     if not res:
         return None
 
+    if hasattr(res_in, 'latitude') and res_in.latitude is not None:
+        res.latitude = res_in.latitude
+    if hasattr(res_in, 'longitude') and res_in.longitude is not None:
+        res.longitude = res_in.longitude
     if res_in.name is not None:
         res.name = res_in.name
     if res_in.status is not None:
