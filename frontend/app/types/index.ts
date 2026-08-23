@@ -435,3 +435,54 @@ export interface LiveOperationalTelemetry {
   latest_operations: OperationTelemetryItem[]
   latest_resource_states: ResourceTelemetryState[]
 }
+
+export interface DecisionActionItem {
+  action: string
+  priority: string
+  reason: string
+  capability?: string | null
+  resource_id?: string | null
+  resource_name?: string | null
+}
+
+export interface DecisionSupportSummary {
+  recommended_actions: DecisionActionItem[]
+  blocking_factors: string[]
+  warnings: string[]
+}
+
+export interface IncidentIntelligenceConfidence {
+  score: number
+  level: string
+  independent_sources: number
+}
+
+export interface IncidentIntelligencePriority {
+  score: number
+  level: string
+  reasons: string[]
+}
+
+export interface OperationalStateMetrics {
+  active_missions: number
+  assigned: number
+  en_route: number
+  on_scene: number
+  completed: number
+  available_resources: number
+}
+
+export interface IncidentIntelligenceTelemetry {
+  incident_id: string
+  incident_title: string
+  incident_status: string
+  situation_summary: string
+  confidence: IncidentIntelligenceConfidence
+  priority: IncidentIntelligencePriority
+  key_risks: any[]
+  required_capabilities: any[]
+  resource_recommendations: any[]
+  operational_state: OperationalStateMetrics
+  decision_support: DecisionSupportSummary
+  evidence: any[]
+}

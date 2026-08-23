@@ -7,6 +7,7 @@ from app.schemas.incident import (
     IncidentListResponse,
     IncidentDetailSchema,
     IncidentStatusUpdateRequest,
+    IncidentIntelligenceResponse,
 )
 from app.services.incident_service import (
     get_incidents_list,
@@ -300,3 +301,22 @@ def get_incident_operations_telemetry(
         "latest_operations": latest_operations,
         "latest_resource_states": latest_resource_states,
     }
+
+@router.get("/{incident_id}/intelligence", response_model=IncidentIntelligenceResponse)
+def get_incident_intelligence_endpoint(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Unified Incident Intelligence & Decision Support Endpoint (Phase 8):
+    Synthesizes situational summary, multi-source confidence, capability requirements,
+    live telemetry, and explainable decision-support directives.
+    """
+    from app.services.incident_intelligence_service import get_incident_intelligence
+    intelligence = get_incident_intelligence(db=db, incident_id=incident_id)
+    if not intelligence:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found.",
+        )
+    return intelligence

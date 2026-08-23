@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem, IncidentRequirementsResponse, IncidentCapabilityRequirement, OperationRecord, LiveOperationalTelemetry, ResourceTelemetryState } from '../../types'
+import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem, IncidentRequirementsResponse, IncidentCapabilityRequirement, OperationRecord, LiveOperationalTelemetry, ResourceTelemetryState, IncidentIntelligenceTelemetry, DecisionActionItem } from '../../types'
 import SearchInput from '../common/SearchInput'
 import DetailsHeader from '../common/DetailsHeader'
 import { platformDataService } from '../../services/dataService'
@@ -44,6 +44,8 @@ export default function IncidentsConsole({
   const [isDeployingResource, setIsDeployingResource] = useState<string | null>(null)
   const [deployError, setDeployError] = useState<string | null>(null)
   const [telemetryData, setTelemetryData] = useState<LiveOperationalTelemetry | null>(null)
+  const [intelligenceData, setIntelligenceData] = useState<IncidentIntelligenceTelemetry | null>(null)
+
   const [lastRefreshedSec, setLastRefreshedSec] = useState<number>(0)
 
 
@@ -127,13 +129,17 @@ export default function IncidentsConsole({
 
     const fetchTelemetry = async () => {
       try {
-        const data = await platformDataService.getIncidentTelemetry(selectedIncidentId)
-        if (isMounted && data) {
-          setTelemetryData(data)
+        const [tData, iData] = await Promise.all([
+          platformDataService.getIncidentTelemetry(selectedIncidentId),
+          platformDataService.getIncidentIntelligence(selectedIncidentId)
+        ])
+        if (isMounted) {
+          if (tData) setTelemetryData(tData)
+          if (iData) setIntelligenceData(iData)
           setLastRefreshedSec(0)
         }
       } catch (err) {
-        console.error('Error fetching live telemetry:', err)
+        console.error('Error fetching live telemetry/intelligence:', err)
       }
     }
 
@@ -442,6 +448,113 @@ export default function IncidentsConsole({
                     <span className="text-on-surface font-bold text-[12px]">{selectedIncident.lastUpdated || 'Just now'}</span>
                   </div>
                 </div>
+              </section>
+
+              {/* 2. Automated Incident Intelligence & Decision Support (Phase 8 Decision Layer) */}
+              <section className="bg-surface-container-lowest border border-primary/40 rounded-lg p-4 space-y-3.5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[20px]">smart_toy</span>
+                    <div>
+                      <h4 className="font-headline-sm text-[13px] font-bold text-on-surface">
+                        Automated Incident Intelligence &amp; Decision Support
+                      </h4>
+                      <div className="text-[10px] font-mono-label text-on-surface-variant">
+                        DECISION SUPPORT — AUTHORITY ACTION REQUIRED
+                      </div>
+                    </div>
+                  </div>
+                  {intelligenceData && (
+                    <span className={`font-mono-label text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
+                      intelligenceData.confidence.level === 'HIGH'
+                        ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40'
+                        : intelligenceData.confidence.level === 'MODERATE'
+                        ? 'bg-amber-950/30 text-amber-400 border-amber-500/40'
+                        : 'bg-red-950/30 text-red-400 border-red-500/40'
+                    }`}>
+                      {intelligenceData.confidence.score}% CONFIDENCE • {intelligenceData.priority.level}
+                    </span>
+                  )}
+                </div>
+
+                {intelligenceData ? (
+                  <div className="space-y-3">
+                    {/* Situation Narrative */}
+                    <div className="p-3 bg-surface-container rounded border border-outline-variant/80 text-[12px] font-body-sm leading-relaxed text-on-surface">
+                      <span className="font-bold text-primary font-mono-label mr-1.5 uppercase text-[11px]">Intelligence Brief:</span>
+                      {intelligenceData.situation_summary}
+                    </div>
+
+                    {/* Blocking Factors & Warnings if any */}
+                    {intelligenceData.decision_support.warnings.length > 0 && (
+                      <div className="p-2.5 bg-amber-950/20 border border-amber-500/30 rounded space-y-1">
+                        {intelligenceData.decision_support.warnings.map((w: string, idx: number) => (
+                          <div key={idx} className="text-[11px] text-amber-300 font-mono-label flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[14px]">warning</span>
+                            {w}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {intelligenceData.decision_support.blocking_factors.length > 0 && (
+                      <div className="p-2.5 bg-red-950/20 border border-red-500/30 rounded space-y-1">
+                        {intelligenceData.decision_support.blocking_factors.map((bf: string, idx: number) => (
+                          <div key={idx} className="text-[11px] text-red-300 font-mono-label flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[14px]">block</span>
+                            {bf}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Recommended Decision Directives */}
+                    <div className="space-y-1.5">
+                      <div className="text-[11px] font-mono-label text-on-surface-variant font-bold uppercase">
+                        Recommended Tactical Actions:
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {intelligenceData.decision_support.recommended_actions.map((act: DecisionActionItem, idx: number) => (
+                          <div key={idx} className="p-2.5 bg-surface-container rounded border border-outline-variant/80 text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-mono-label text-[9px] px-1.5 py-0.2 rounded font-bold uppercase border ${
+                                  act.priority === 'CRITICAL'
+                                    ? 'bg-red-950/30 text-red-400 border-red-500/30'
+                                    : act.priority === 'HIGH'
+                                    ? 'bg-amber-950/30 text-amber-400 border-amber-500/30'
+                                    : 'bg-cyan-950/30 text-cyan-400 border-cyan-500/30'
+                                }`}>
+                                  {act.priority}
+                                </span>
+                                <span className="font-mono-label font-bold text-primary">
+                                  {act.action}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-on-surface-variant font-body-sm leading-snug">
+                                {act.reason}
+                              </p>
+                            </div>
+                            {act.resource_id && (
+                              <button
+                                type="button"
+                                disabled={isDeployingResource === act.resource_id}
+                                onClick={() => handleApproveAndDeploy(`rec-${act.resource_id}`, act.resource_id!, act.reason)}
+                                className="px-3 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer transition-colors shrink-0 flex items-center gap-1 self-start sm:self-auto"
+                              >
+                                <span className="material-symbols-outlined text-[13px]">send</span>
+                                Execute {act.action} →
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-surface-container rounded border border-outline-variant text-center font-mono-label text-[11px] text-on-surface-variant">
+                    Synthesizing intelligence vectors...
+                  </div>
+                )}
               </section>
 
               {/* 3. Evidence & Explainable Confidence Telemetry */}

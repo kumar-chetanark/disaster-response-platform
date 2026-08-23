@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 class IncidentSourceSchema(BaseModel):
@@ -112,3 +112,49 @@ class IncidentListResponse(BaseModel):
 class IncidentStatusUpdateRequest(BaseModel):
     status: str = Field(..., description="Target status: PENDING, ACTIVE, MONITORING, RESOLVED")
     notes: Optional[str] = Field(None, description="Optional verification or resolution notes")
+
+
+class DecisionActionItem(BaseModel):
+    action: str
+    priority: str
+    reason: str
+    capability: Optional[str] = None
+    resource_id: Optional[str] = None
+    resource_name: Optional[str] = None
+
+class DecisionSupportSummary(BaseModel):
+    recommended_actions: List[DecisionActionItem] = []
+    blocking_factors: List[str] = []
+    warnings: List[str] = []
+
+class IncidentIntelligenceConfidence(BaseModel):
+    score: int
+    level: str
+    independent_sources: int
+
+class IncidentIntelligencePriority(BaseModel):
+    score: float
+    level: str
+    reasons: List[str] = []
+
+class OperationalStateMetrics(BaseModel):
+    active_missions: int
+    assigned: int
+    en_route: int
+    on_scene: int
+    completed: int
+    available_resources: int
+
+class IncidentIntelligenceResponse(BaseModel):
+    incident_id: str
+    incident_title: str
+    incident_status: str
+    situation_summary: str
+    confidence: IncidentIntelligenceConfidence
+    priority: IncidentIntelligencePriority
+    key_risks: List[Any] = []
+    required_capabilities: List[Dict[str, Any]] = []
+    resource_recommendations: List[Dict[str, Any]] = []
+    operational_state: OperationalStateMetrics
+    decision_support: DecisionSupportSummary
+    evidence: List[Dict[str, Any]] = []

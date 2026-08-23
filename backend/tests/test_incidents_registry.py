@@ -308,3 +308,92 @@ def test_phase7_live_command_center_telemetry():
     matched_res = [r for r in tel4["latest_resource_states"] if r["resource_id"] == res_id]
     assert len(matched_res) == 1
     assert matched_res[0]["status"] == "AVAILABLE"
+
+
+def test_phase8_incident_intelligence_and_decision_support():
+    # 1. Nonexistent incident intelligence -> 404
+    nf_intel = client.get("/api/incidents/inc-nonexistent-888/intelligence")
+    assert nf_intel.status_code == 404
+
+    # 2. Create fresh PENDING incident with trapped people
+    cit_payload = {
+        "disaster_type": "flood",
+        "location": "Sector 9 Underpass",
+        "description": "Rising floodwaters submerged 2 vehicles, 4 passengers trapped inside.",
+        "is_people_trapped": True,
+        "is_immediate_danger": True,
+        "name": "Citizen Alert 8",
+        "contact_info": "+919876543288"
+    }
+    cit_res = client.post("/api/citizen-reports", json=cit_payload)
+    assert cit_res.status_code == 201
+    inc_id = cit_res.json()["incident_id"]
+
+    # 3. Fetch initial intelligence
+    intel0 = client.get(f"/api/incidents/{inc_id}/intelligence")
+    assert intel0.status_code == 200
+    d0 = intel0.json()
+    assert d0["incident_id"] == inc_id
+    assert d0["incident_status"] == "PENDING"
+    assert "Sector 9 Underpass" in d0["situation_summary"]
+    assert d0["confidence"]["score"] == 25
+    assert len(d0["required_capabilities"]) >= 1
+    assert len(d0["decision_support"]["recommended_actions"]) >= 1
+
+    # Check reason field exists on recommended actions
+    for act in d0["decision_support"]["recommended_actions"]:
+        assert "action" in act
+        assert "priority" in act
+        assert "reason" in act and len(act["reason"]) > 5
+
+    # 4. Authority verify and activate incident
+    login_res = client.post("/api/auth/login", json={"username": "authority_admin", "password": "Commander@2026!"})
+    token = login_res.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    client.patch(f"/api/incidents/{inc_id}/status", json={"status": "ACTIVE", "notes": "Verified by Sector Commander"}, headers=headers)
+
+    # 5. Create available rescue resource and approve deployment
+    res_payload = {
+        "name": "Rapid Water Squad Bravo",
+        "category": "rescue",
+        "personnel_count": 5,
+        "equipment_details": "Rigid Inflatable Craft, Divers",
+        "base_location": "Sector 9 Marina Station",
+        "status": "AVAILABLE"
+    }
+    create_res = client.post("/api/resources", json=res_payload)
+    assert create_res.status_code == 201
+    res_id = create_res.json()["id"]
+
+    app_res = client.post(
+        f"/api/allocations/rec-p8/approve?incident_id={inc_id}&resource_id={res_id}&notes=Deploy+rapid+rescue",
+        headers=headers
+    )
+    assert app_res.status_code == 200
+    op_id = app_res.json()["operation_id"]
+
+    # 6. Verify intelligence reflects active deployment (MONITOR action recommended, no duplicate deployment)
+    intel1 = client.get(f"/api/incidents/{inc_id}/intelligence").json()
+    assert intel1["operational_state"]["active_missions"] == 1
+    assert intel1["operational_state"]["assigned"] == 1
+    action_types = [a["action"] for a in intel1["decision_support"]["recommended_actions"]]
+    assert "MONITOR_RESCUE_MISSION" in action_types
+    assert "DEPLOY_RESCUE" not in action_types
+
+    # 7. Add contradictory report and verify warning in intelligence
+    client.post(
+        f"/api/incidents/{inc_id}/evidence/contradiction?reason=East+lane+clear+false+alarm+on+second+van&source_label=Patrol+12",
+        headers=headers
+    )
+    intel2 = client.get(f"/api/incidents/{inc_id}/intelligence").json()
+    assert len(intel2["decision_support"]["warnings"]) >= 1
+
+    # 8. Complete mission and resolve incident -> Verify read-only archive directive
+    client.patch(f"/api/operations/{op_id}/status", json={"status": "COMPLETED"}, headers=headers)
+    client.patch(f"/api/incidents/{inc_id}/status", json={"status": "RESOLVED", "notes": "All victims extracted"}, headers=headers)
+
+    intel_resolved = client.get(f"/api/incidents/{inc_id}/intelligence").json()
+    assert intel_resolved["incident_status"] == "RESOLVED"
+    resolved_actions = [a["action"] for a in intel_resolved["decision_support"]["recommended_actions"]]
+    assert "ARCHIVE_DOSSIER" in resolved_actions
