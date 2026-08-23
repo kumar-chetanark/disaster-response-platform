@@ -1,76 +1,110 @@
 'use client'
 
+import React, { useState, useEffect } from 'react'
+import { Incident } from '../../types'
 import { platformDataService } from '../../services/dataService'
 
-import React from 'react'
-import { PriorityIncident } from '../../types'
-
 interface PriorityIncidentsListProps {
-  incidents: PriorityIncident[]
-  selectedIncidentId: string | null
-  onSelectIncident: (id: string) => void
+  incidents: Incident[]
+  onSelectIncident?: (id: string) => void
+  onDeleteIncident?: (id: string) => void
 }
 
 export default function PriorityIncidentsList({
   incidents,
-  selectedIncidentId,
   onSelectIncident,
+  onDeleteIncident,
 }: PriorityIncidentsListProps) {
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    setStarredIds(platformDataService.getStarredIds('incident'))
+  }, [])
+
+  const handleToggleStar = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    platformDataService.toggleStar('incident', id)
+    setStarredIds(new Set(platformDataService.getStarredIds('incident')))
+  }
+
+  const getSeverityBadgeStyle = (severity: string) => {
+    switch (severity.toUpperCase()) {
+      case 'CRITICAL':
+        return 'bg-error/20 text-error border-error/30'
+      case 'HIGH':
+        return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+      case 'MEDIUM':
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+      case 'LOW':
+        return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+      default:
+        return 'bg-surface-container text-on-surface-variant border-outline-variant'
+    }
+  }
+
+  if (incidents.length === 0) {
+    return (
+      <div className="bg-surface-container rounded-lg border border-outline-variant p-6 text-center text-on-surface-variant font-mono-label text-[12px]">
+        No active incidents reported in central disaster registry.
+      </div>
+    )
+  }
+
   return (
-    <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-col h-[260px]">
-      <div className="flex items-center justify-between pb-2.5 border-b border-outline-variant mb-2.5 shrink-0">
-        <h3 className="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2 font-semibold text-[14px]">
-          <span className="material-symbols-outlined text-primary text-[18px]">list_alt</span>
-          Priority Incidents
-        </h3>
-        <span className="font-mono-label text-[11px] text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded border border-outline-variant">
-          {incidents.length} active
-        </span>
-      </div>
-
-      {/* Scrollable Container with custom scrollbar */}
-      <div className="space-y-2 flex-1 overflow-y-auto pr-1.5 scrollbar-thin">
-        {incidents.map((incident) => {
-          const isSelected = selectedIncidentId === incident.id
-          return (
-            <div
-              key={incident.id}
-              onClick={() => onSelectIncident(incident.id)}
-              className={`flex justify-between items-center p-2.5 border rounded transition-all cursor-pointer ${
-                isSelected
-                  ? 'bg-surface-container-highest border-primary shadow-sm'
-                  : 'bg-surface-container-low border-outline-variant hover:border-outline hover:bg-surface-container'
-              }`}
-            >
-              <div className="flex-1 min-w-0 pr-2">
-                <div className="font-body-sm font-semibold text-on-surface text-[13px] truncate">
-                  {incident.title}
-                </div>
-                <div className="font-mono-label text-[11px] text-on-surface-variant truncate">
-                  {incident.location} • {incident.impact}
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <span
-                  className={`font-status-badge text-[10px] px-2 py-0.5 rounded border uppercase tracking-wider font-bold ${
-                    incident.severity === 'CRITICAL'
-                      ? 'bg-error/15 text-error border-error/30'
-                      : incident.severity === 'HIGH'
-                      ? 'bg-tertiary/15 text-tertiary border-tertiary/30'
-                      : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
-                  }`}
-                >
-                  {incident.severity}
+    <div className="space-y-3">
+      {incidents.slice(0, 6).map((incident) => (
+        <div
+          key={incident.id}
+          onClick={() => onSelectIncident && onSelectIncident(incident.id)}
+          className="bg-surface-container hover:bg-surface-container-high border border-outline-variant hover:border-outline rounded-lg p-4 transition-all cursor-pointer space-y-2.5 shadow-sm relative group"
+        >
+          {/* Header: Star + Title + Actions + Severity */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Star Button */}
+              <button
+                type="button"
+                onClick={(e) => handleToggleStar(e, incident.id)}
+                className="p-0.5 rounded text-outline hover:text-amber-400 transition-colors"
+                title="Star / Favorite incident"
+              >
+                <span className={`material-symbols-outlined text-[18px] ${starredIds.has(incident.id) ? 'text-amber-400 fill-current' : ''}`}>
+                  {starredIds.has(incident.id) ? 'star' : 'star_border'}
                 </span>
-                <span className="font-mono-label text-[9px] text-on-surface-variant">
-                  {incident.timeReported}
-                </span>
-              </div>
+              </button>
+              <h3 className="font-body-base text-body-base font-semibold text-on-surface leading-tight truncate">
+                {incident.title}
+              </h3>
             </div>
-          )
-        })}
-      </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Delete Button */}
+              {onDeleteIncident && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDeleteIncident(incident.id)
+                  }}
+                  className="p-1 rounded text-outline hover:text-red-400 hover:bg-red-950/30 transition-colors"
+                  title="Delete incident"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                </button>
+              )}
+              <span className={`font-mono-label text-[10px] px-2 py-0.5 rounded font-bold uppercase shrink-0 border ${getSeverityBadgeStyle(incident.severity)}`}>
+                {incident.severity}
+              </span>
+            </div>
+          </div>
+
+          {/* Details Bar */}
+          <div className="flex items-center justify-between font-mono-label text-[11px] text-on-surface-variant pt-1 border-t border-outline-variant/60">
+            <span className="truncate max-w-[200px]">📍 {incident.location}</span>
+            <span>Status: <strong className="text-primary">{incident.status}</strong></span>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

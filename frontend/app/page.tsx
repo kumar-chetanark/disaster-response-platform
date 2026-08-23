@@ -615,14 +615,21 @@ export default function App() {
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
               <PriorityIncidentsList
                 incidents={incidents}
-                selectedIncidentId={selectedIncidentId}
                 onSelectIncident={(id) => {
                   setSelectedIncidentId(id)
                   setCurrentTab('incidents')
                 }}
+                onDeleteIncident={handleDeleteIncidentGlobal}
               />
 
-              <ActiveAlertsTicker alerts={alerts} />
+              <ActiveAlertsTicker
+                alerts={alerts}
+                onSelectAlert={(id) => {
+                  setCurrentTab('alerts')
+                }}
+                onDeleteAlert={handleDeleteAlertGlobal}
+                onNavigateToAlerts={() => setCurrentTab('alerts')}
+              />
             </section>
 
             {/* 3. Resource Allocation Advisory Card */}

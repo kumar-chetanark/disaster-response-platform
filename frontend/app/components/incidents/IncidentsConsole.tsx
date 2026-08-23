@@ -330,6 +330,22 @@ export default function IncidentsConsole({
             className="flex-1 sm:w-60"
           />
 
+          <button
+            type="button"
+            onClick={() => setStarredOnly(!starredOnly)}
+            title={starredOnly ? 'Showing starred incidents only' : 'Filter by starred incidents'}
+            className={`px-2.5 py-1.5 rounded border transition-colors cursor-pointer flex items-center gap-1.5 font-mono-label text-[11px] ${
+              starredOnly
+                ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 font-bold'
+                : 'bg-background border-outline-variant text-outline hover:text-on-surface'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[16px] ${starredOnly ? 'text-amber-400 fill-current' : ''}`}>
+              star
+            </span>
+            <span>Starred</span>
+          </button>
+
           <select
             value={filterSeverity}
             onChange={(e) => setFilterSeverity(e.target.value)}
@@ -403,7 +419,18 @@ export default function IncidentsConsole({
                     />
 
                     <div className="flex items-start justify-between gap-2 pl-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                        {/* Star / Favorite Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleStar(e, inc.id)}
+                          className="p-1 rounded hover:bg-surface-container-high transition-colors cursor-pointer text-outline hover:text-amber-400"
+                          title="Star / Favorite this incident"
+                        >
+                          <span className={`material-symbols-outlined text-[18px] ${starredIds.has(inc.id) ? 'text-amber-400 fill-current' : ''}`}>
+                            {starredIds.has(inc.id) ? 'star' : 'star_border'}
+                          </span>
+                        </button>
                         <span className="font-mono-label text-[12px] font-bold text-primary">
                           Incident #{incidentNumber}
                         </span>
@@ -425,9 +452,23 @@ export default function IncidentsConsole({
                         )}
                       </div>
 
-                      <span className="font-mono-label text-[10px] text-on-surface-variant">
-                        {inc.lastUpdated || inc.timeReported}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono-label text-[10px] text-on-surface-variant">
+                          {inc.lastUpdated || inc.timeReported}
+                        </span>
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          disabled={deletingId === inc.id}
+                          onClick={(e) => handleDeleteIncident(e, inc.id)}
+                          className="p-1 rounded hover:bg-red-950/40 text-outline hover:text-red-400 transition-colors cursor-pointer"
+                          title="Permanently delete incident"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">
+                            {deletingId === inc.id ? 'sync' : 'delete'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
 
                     <p className="pl-1 font-body-sm font-semibold text-[13px] text-on-surface leading-snug line-clamp-1">
