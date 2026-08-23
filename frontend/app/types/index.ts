@@ -341,3 +341,33 @@ export interface BackendAllocationAdvisory {
   scarcity_warning: boolean
   unmet_demand: boolean
 }
+
+export interface EvidenceBreakdownItem {
+  source_type: string
+  count: number
+  contribution: number
+  reason: string
+}
+
+export interface ContradictionItem {
+  id: string
+  source_label: string
+  reason: string
+  timestamp: string
+  penalty: number
+}
+
+export interface IncidentConfidenceTelemetry {
+  incident_id: string
+  incident_title: string
+  status: string
+  confidence_score: number
+  confidence_level: 'HIGH' | 'MODERATE' | 'LOW'
+  evidence_count: number
+  independent_source_count: number
+  duplicate_submissions_filtered: number
+  breakdown: EvidenceBreakdownItem[]
+  contradictions: ContradictionItem[]
+  recommendation: string
+  last_evidence_time: string
+}

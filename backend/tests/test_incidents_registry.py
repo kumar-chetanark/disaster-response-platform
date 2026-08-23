@@ -115,3 +115,101 @@ def test_authority_lifecycle_transitions_workflow():
     # 9. Verify Nonexistent Incident (HTTP 404)
     nf_res = client.patch("/api/incidents/inc-nonexistent-999/status", json={"status": "ACTIVE"}, headers=headers)
     assert nf_res.status_code == 404
+
+
+def test_multi_source_corroboration_and_confidence_scoring():
+    # 1. First citizen report -> Single citizen baseline confidence (25 pts)
+    cit1 = {
+        "disaster_type": "flood",
+        "location": "North Basin Levee Road",
+        "description": "Rising river water flooding outer road section.",
+        "name": "Local Resident A",
+        "contact_info": "+919876543201"
+    }
+    res1 = client.post("/api/citizen-reports", json=cit1)
+    assert res1.status_code == 201
+    inc_id = res1.json()["incident_id"]
+
+    # Query initial confidence
+    conf_res1 = client.get(f"/api/incidents/{inc_id}/confidence")
+    assert conf_res1.status_code == 200
+    cdata1 = conf_res1.json()
+    assert cdata1["confidence_score"] == 25
+    assert cdata1["confidence_level"] == "LOW"
+    assert cdata1["independent_source_count"] == 1
+
+    # 2. Duplicate submission from same contact -> No double counting
+    cit_dup = {
+        "disaster_type": "flood",
+        "location": "North Basin Levee Road",
+        "description": "Still flooding, water rising further.",
+        "name": "Local Resident A",
+        "contact_info": "+919876543201"
+    }
+    client.post("/api/citizen-reports", json=cit_dup)
+    conf_dup = client.get(f"/api/incidents/{inc_id}/confidence").json()
+    assert conf_dup["independent_source_count"] == 1
+    assert conf_dup["duplicate_submissions_filtered"] >= 1
+    assert conf_dup["confidence_score"] == 25
+
+    # 3. Second independent citizen report -> Corroboration bonus (+10 pts = 35 pts)
+    cit2 = {
+        "disaster_type": "flood",
+        "location": "North Basin Levee Road near Bridge",
+        "description": "Confirming water breach on levee avenue, cars turning back.",
+        "name": "Driver B",
+        "contact_info": "+919876543202"
+    }
+    res2 = client.post("/api/citizen-reports", json=cit2)
+    assert res2.status_code == 201
+    assert res2.json()["incident_id"] == inc_id
+    conf_res2 = client.get(f"/api/incidents/{inc_id}/confidence").json()
+    assert conf_res2["independent_source_count"] == 2
+    assert conf_res2["confidence_score"] == 35
+
+    # 4. Authority verification -> Strong confidence boost (+30 pts = 65 pts, MODERATE)
+    login_res = client.post("/api/auth/login", json={"username": "authority_admin", "password": "Commander@2026!"})
+    token = login_res.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    client.patch(f"/api/incidents/{inc_id}/status", json={"status": "ACTIVE", "notes": "Verified by Sector Command"}, headers=headers)
+    
+    conf_res3 = client.get(f"/api/incidents/{inc_id}/confidence").json()
+    assert conf_res3["confidence_score"] == 65
+    assert conf_res3["confidence_level"] == "MODERATE"
+
+    # 5. Field assessment survey -> Reconnaissance boost (+25 pts = 90 pts, HIGH)
+    draft_res = client.post("/api/assessments", json={
+        "incident_id": inc_id,
+        "assessment_mode": "Aerial - Drone",
+        "mission_type": "Area Scan / Survey",
+        "asset_name": "SkyWatch UAV 9",
+        "weather_conditions": "Overcast",
+        "area_surveyed": "North Basin Levee",
+        "structures_damaged_count": 2,
+        "road_accessibility_status": "Partially Flooded",
+        "evacuation_route_status": "Routes Clear",
+        "operator_observations": "Levee overtop confirmed, 200m road section submerged.",
+        "confidence_score": 95
+    })
+    assert draft_res.status_code == 201
+    asm_id = draft_res.json()["id"]
+    sub_res = client.post(f"/api/assessments/{asm_id}/submit")
+    assert sub_res.status_code == 200
+
+    conf_res4 = client.get(f"/api/incidents/{inc_id}/confidence").json()
+    assert conf_res4["confidence_score"] == 90
+    assert conf_res4["confidence_level"] == "HIGH"
+
+    # 6. Add contradictory report -> Penalty (-20 pts = 70 pts)
+    client.post(
+        f"/api/incidents/{inc_id}/evidence/contradiction?reason=False+alarm+reported+by+patrol+unit+on+east+gate&source_label=Patrol+Unit+7",
+        headers=headers
+    )
+    conf_res5 = client.get(f"/api/incidents/{inc_id}/confidence").json()
+    assert conf_res5["confidence_score"] == 70
+    assert len(conf_res5["contradictions"]) == 1
+    assert "False alarm" in conf_res5["contradictions"][0]["reason"]
+
+    # 7. Test Nonexistent incident confidence -> 404
+    nf_conf = client.get("/api/incidents/inc-nonexistent-404/confidence")
+    assert nf_conf.status_code == 404

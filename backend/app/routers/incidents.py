@@ -92,3 +92,63 @@ def patch_incident_status(
         notes=req.notes,
     )
     return get_incident_detail(db=db, incident_id=updated_inc.id)
+
+@router.get("/{incident_id}/confidence")
+def get_incident_confidence(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Deterministic Multi-Source Corroboration & Confidence Scoring Endpoint:
+    Returns explainable breakdown of evidence sources (Citizen, Gov, Recon, Weather, News)
+    and contradiction telemetry.
+    """
+    from app.services.confidence_service import calculate_incident_confidence
+    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not inc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found.",
+        )
+    return calculate_incident_confidence(db=db, incident=inc)
+
+@router.post("/{incident_id}/evidence/contradiction")
+def add_incident_contradiction(
+    incident_id: str,
+    reason: str = Query(..., description="Details of conflicting/contradictory field report"),
+    source_label: str = Query("Conflicting Field Intelligence", description="Source description"),
+    authority: dict = Depends(get_current_authority),
+    db: Session = Depends(get_db),
+):
+    """
+    Records a verified contradictory field report against an incident.
+    Affects confidence score deterministically without overwriting earlier evidence.
+    """
+    from app.models.incident_source import IncidentSource
+    from datetime import datetime, timezone
+    import uuid
+
+    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not inc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found.",
+        )
+    
+    now = datetime.now(timezone.utc)
+    contra_source = IncidentSource(
+        id=str(uuid.uuid4()),
+        incident_id=inc.id,
+        source_type="CONTRADICTION",
+        source_label=source_label,
+        channel_badge="FIELD_CONFLICT",
+        confidence_score=50.0,
+        summary=f"CONTRADICTORY EVIDENCE: {reason}",
+        raw_content=f"Reported by: {authority.get('name', 'Authority')} | Conflict: {reason}",
+        is_contradiction=True,
+        contradiction_reason=reason,
+        created_at=now,
+    )
+    db.add(contra_source)
+    db.commit()
+    return {"status": "SUCCESS", "message": "Contradictory evidence registered."}

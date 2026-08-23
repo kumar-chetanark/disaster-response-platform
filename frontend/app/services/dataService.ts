@@ -9,6 +9,7 @@ import {
   CitizenReportSubmission,
   AssessmentSubmission,
   ResourceStatus,
+  IncidentConfidenceTelemetry,
 } from '../types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -177,6 +178,19 @@ class PlatformDataService {
       console.error(`[DataService] Failed to update status for incident ${incidentId}:`, err)
       throw err
     }
+  }
+
+
+  async getIncidentConfidence(incidentId: string): Promise<IncidentConfidenceTelemetry | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/confidence`, { cache: 'no-store' })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to fetch confidence for incident ${incidentId}:`, err)
+    }
+    return null
   }
 
   // 2. Resources — Live REST backend

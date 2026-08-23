@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Incident } from '../../types'
+import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem } from '../../types'
 import SearchInput from '../common/SearchInput'
 import DetailsHeader from '../common/DetailsHeader'
 import { platformDataService } from '../../services/dataService'
@@ -37,6 +37,9 @@ export default function IncidentsConsole({
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false)
   const [statusActionError, setStatusActionError] = useState<string | null>(null)
+  const [confidenceData, setConfidenceData] = useState<IncidentConfidenceTelemetry | null>(null)
+  const [isLoadingConfidence, setIsLoadingConfidence] = useState<boolean>(false)
+
   const dossierCache = useRef<Record<string, Incident>>({})
 
   const handleStatusTransition = async (targetStatus: string, notes?: string) => {
@@ -372,7 +375,80 @@ export default function IncidentsConsole({
                 </div>
               </section>
 
-              {/* 3. Multi-Channel Corroborating Feed (Exact source counts restored) */}
+              {/* 3. Evidence & Explainable Confidence Telemetry */}
+              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
+                  <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
+                    Multi-Source Evidence &amp; Confidence Ledger
+                  </h4>
+                  {confidenceData ? (
+                    <div className="flex items-center gap-2">
+                      <span className={`font-mono-label text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
+                        confidenceData.confidence_level === 'HIGH'
+                          ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40'
+                          : confidenceData.confidence_level === 'MODERATE'
+                          ? 'bg-amber-950/30 text-amber-400 border-amber-500/40'
+                          : 'bg-red-950/30 text-red-400 border-red-500/40'
+                      }`}>
+                        {confidenceData.confidence_score}% CONFIDENCE ({confidenceData.confidence_level})
+                      </span>
+                      <span className="font-mono-label text-[10px] text-on-surface-variant">
+                        {confidenceData.independent_source_count} INDEPENDENT {confidenceData.independent_source_count === 1 ? 'SOURCE' : 'SOURCES'}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="font-mono-label text-[10px] text-outline">
+                      {isLoadingConfidence ? 'Calculating telemetry...' : 'INSUFFICIENT EVIDENCE'}
+                    </span>
+                  )}
+                </div>
+
+                {confidenceData ? (
+                  <div className="space-y-3">
+                    {/* Score Breakdown Pills */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {confidenceData.breakdown.map((b: EvidenceBreakdownItem, idx: number) => (
+                        <div
+                          key={idx}
+                          className="p-2.5 bg-surface-container rounded border border-outline-variant/70 flex flex-col justify-between text-[11px]"
+                        >
+                          <div className="flex items-center justify-between font-mono-label">
+                            <span className="text-primary font-bold">{b.source_type} ({b.count})</span>
+                            <span className={b.contribution >= 0 ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                              {b.contribution >= 0 ? `+${b.contribution}` : b.contribution} pts
+                            </span>
+                          </div>
+                          <p className="font-body-sm text-[11px] text-on-surface-variant mt-1 leading-snug">
+                            {b.reason}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Contradictions Alert if any */}
+                    {confidenceData.contradictions && confidenceData.contradictions.length > 0 && (
+                      <div className="p-3 bg-red-950/20 border border-red-500/30 rounded space-y-1">
+                        <div className="flex items-center gap-1.5 text-red-400 font-mono-label text-[11px] font-bold">
+                          <span className="material-symbols-outlined text-[15px]">report_problem</span>
+                          {confidenceData.contradictions.length} Conflicting Evidence Item(s) Flagged
+                        </div>
+                        {confidenceData.contradictions.map((c: ContradictionItem) => (
+                          <div key={c.id} className="text-[11px] text-red-300/90 font-body-sm">
+                            • [{c.timestamp}] {c.source_label}: {c.reason} ({c.penalty} pts)
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-surface-container rounded border border-outline-variant text-center font-mono-label text-[11px] text-on-surface-variant">
+                    Initial evidence ingested. Multi-source corroboration in progress.
+                  </div>
+                )}
+              </section>
+
+              {/* 4. Multi-Channel Corroborating Feed */}
               <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
                   <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
