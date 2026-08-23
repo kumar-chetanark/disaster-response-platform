@@ -218,7 +218,7 @@ export default function AssessmentForm({
       relatedIncidentTitle: currentIncident?.title || 'Incident #1',
       assessmentMode,
       assetId: initialAsset?.id || 'asset-uav-9',
-      assetName: initialAsset?.name || 'SkyWatch Heavy UAV Recon Drone 9',
+      assetName: initialAsset?.name || 'Field UAV Recon Asset',
       missionType,
       assessmentTime,
       weatherCondition,
@@ -386,7 +386,7 @@ export default function AssessmentForm({
               <div ref={mapContainerRef} className="w-full h-full bg-surface-container-lowest" />
               <div className="absolute top-2 left-2 z-400 bg-surface/90 border border-outline-variant px-2.5 py-1 rounded backdrop-blur text-[10px] font-mono-label text-on-surface flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>RECON SECTOR: {currentIncident?.location || 'Sector 7G'}</span>
+                <span>RECON SECTOR: {currentIncident?.location || (incidentsList.length > 0 ? incidentsList[0].location : 'Unassigned Sector')}</span>
               </div>
             </div>
 

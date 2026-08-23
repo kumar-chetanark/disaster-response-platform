@@ -186,7 +186,7 @@ export default function OperationsConsole({
                       {op.resourceName}
                     </span>
                     <span className="text-[10px] text-outline font-mono-label">
-                      {op.destinationLocation || 'Sector 7G'}
+                      {op.destinationLocation || 'Incident Location'}
                     </span>
                   </div>
                 </div>
@@ -229,7 +229,7 @@ export default function OperationsConsole({
                 accentColor="primary"
                 subItems={[
                   { label: 'Resource Assigned', value: selectedOp.resourceName, icon: 'shield' },
-                  { label: 'Target Destination', value: selectedOp.destinationLocation || 'Sector 7G / Coastal Basin', icon: 'location_on' },
+                  { label: 'Target Destination', value: selectedOp.destinationLocation || 'Incident Location', icon: 'location_on' },
                   { label: 'Authorized By', value: selectedOp.authorizedBy || 'Authority Command (Level 5)', highlight: true },
                   { label: 'Dispatched At', value: selectedOp.dispatchedTime },
                 ]}

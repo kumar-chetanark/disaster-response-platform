@@ -219,7 +219,7 @@ export default function App() {
     setOperations((prev) => [newOp, ...prev])
 
     showNotification(
-      `Authority Action: ${asset.name} authorized & dispatched to Sector 7G. Assessment console ready.`,
+      `Authority Action: ${asset.name} authorized & dispatched to active sector. Assessment console ready.`,
       'success'
     )
   }
@@ -342,6 +342,29 @@ export default function App() {
             advisories={advisories}
             onSelectIncident={(id) => setSelectedIncidentId(id)}
             onOpenAssessment={() => setCurrentTab('assessment')}
+            onOpenReportPreview={async (incId) => {
+              try {
+                const targetInc = incidents.find((i) => i.id === incId)
+                const newReport = await platformDataService.createReport({
+                  title: `SITREP — ${targetInc?.title || 'Incident Dossier'} (${targetInc?.location || 'Operational Area'})`,
+                  report_type: 'Situation Report',
+                  incident_id: incId,
+                  author: session.userName || 'Commander R. Vance',
+                  status: 'OFFICIAL',
+                  summary: `Comprehensive operational situation dossier for ${targetInc?.title || incId}. Priority: ${targetInc?.priorityLevel || targetInc?.severity || 'HIGH'}. Status: ${targetInc?.status || 'PENDING'}.`,
+                })
+                if (newReport) {
+                  showNotification(`Official SITREP ${newReport.id} generated successfully! Opening Reports Console...`, 'success')
+                  const updatedReports = await platformDataService.getReports()
+                  setReports(updatedReports)
+                  setSelectedReportId(newReport.id)
+                  setCurrentTab('reports')
+                }
+              } catch (err: any) {
+                console.error('Failed to generate SITREP from Incident Console:', err)
+                showNotification(err.message || 'Report generation failed.', 'warning')
+              }
+            }}
           />
         )
 

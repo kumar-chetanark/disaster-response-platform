@@ -27,8 +27,8 @@ export default function ResourcesConsole({
   onNavigateToIncident,
 }: ResourcesConsoleProps) {
   // Location-First discovery state
-  const [locationSearch, setLocationSearch] = useState<string>('Sector 7G Coastal Basin')
-  const [activeLocation, setActiveLocation] = useState<string>('Sector 7G Coastal Basin')
+  const [locationSearch, setLocationSearch] = useState<string>('')
+  const [activeLocation, setActiveLocation] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('ALL')
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null)
@@ -43,7 +43,7 @@ export default function ResourcesConsole({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [newResName, setNewResName] = useState('')
   const [newResCategory, setNewResCategory] = useState('rescue')
-  const [newResLocation, setNewResLocation] = useState('Sector 7G')
+  const [newResLocation, setNewResLocation] = useState('')
   const [newResPersonnel, setNewResPersonnel] = useState(10)
   const [newResShelterCap, setNewResShelterCap] = useState(250)
   const [newResFoodDays, setNewResFoodDays] = useState(14)
@@ -236,8 +236,7 @@ export default function ResourcesConsole({
                   </div>
                   <div className="max-h-56 overflow-y-auto">
                     {[
-                      { name: 'Sector 7G Coastal Basin', desc: 'Coastal Flood Relief Zone & Marine Substation', type: 'COASTAL' },
-                      { name: 'Sector 4 Ridge Highway', desc: 'Highway Landslide Corridor & Mountain Access', type: 'HIGHWAY' },
+                                            { name: 'Sector 4 Ridge Highway', desc: 'Highway Landslide Corridor & Mountain Access', type: 'HIGHWAY' },
                       { name: 'MG Road Central Depot', desc: 'Central Urban Transit & Trauma Staging Area', type: 'URBAN' },
                       { name: 'District Emergency Operations Center', desc: 'Armed Forces & NGO Coordination Hub', type: 'COMMAND' },
                       { name: 'Highland Sports Evacuation Hub', desc: 'Mass Civilian Shelter & NGO Logistics Center', type: 'SHELTER' },

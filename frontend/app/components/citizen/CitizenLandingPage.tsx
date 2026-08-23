@@ -86,7 +86,8 @@ export default function CitizenLandingPage({
       }
     } catch (err: any) {
       console.error('Error submitting citizen report:', err)
-      setErrorMessage(err.message || 'Validation error: Please ensure your location and description provide genuine disaster details.')
+      const msg = typeof err === 'string' ? err : (err?.message || (typeof err?.detail === 'string' ? err.detail : 'Validation error: Please ensure your location and description provide genuine disaster details.'))
+      setErrorMessage(typeof msg === 'string' ? msg : JSON.stringify(msg))
     } finally {
       setIsSubmitting(false)
     }

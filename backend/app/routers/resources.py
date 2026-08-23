@@ -2,6 +2,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from pydantic import BaseModel
 from app.schemas.resource import ResourceCreate, ResourceUpdate, ResourceResponse, ResourceListResponse
 from app.services.resource_service import (
     get_resources_list,
@@ -90,3 +91,23 @@ def get_single_resource(
         )
     from app.services.resource_service import to_resource_response
     return to_resource_response(res)
+
+class ResourceStatusPatch(BaseModel):
+    status: str
+
+@router.patch("/{resource_id}/status", response_model=ResourceResponse)
+def patch_resource_status(
+    resource_id: str,
+    req: ResourceStatusPatch,
+    db: Session = Depends(get_db),
+):
+    """
+    Updates the operational status of a resource unit (e.g. AVAILABLE, IN OPERATION, MAINTENANCE).
+    """
+    updated = update_resource(db=db, resource_id=resource_id, res_in=ResourceUpdate(status=req.status))
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Resource with ID '{resource_id}' not found.",
+        )
+    return updated

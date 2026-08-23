@@ -373,12 +373,19 @@ class PlatformDataService {
     return null
   }
 
-  async updateOperationStatus(operationId: string, newState: string): Promise<boolean> {
+  async updateOperationStatus(operationId: string, newState: string, fieldUpdate?: string): Promise<boolean> {
     try {
+      const token = await this.getAuthorityToken()
       const res = await fetch(`${API_BASE_URL}/api/operations/${operationId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: newState }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          status: newState,
+          field_update: fieldUpdate || `Operation status transitioned to ${newState}`,
+        }),
       })
       return res.ok
     } catch (err) {
@@ -426,9 +433,13 @@ class PlatformDataService {
 
   async updateResourceStatus(resourceId: string, newStatus: ResourceStatus): Promise<boolean> {
     try {
+      const token = await this.getAuthorityToken()
       const res = await fetch(`${API_BASE_URL}/api/resources/${resourceId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ status: newStatus }),
       })
       return res.ok
@@ -616,8 +627,20 @@ class PlatformDataService {
     })
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.detail || 'Citizen SOS intake failed to register with command server.')
+      let detailMsg = 'Citizen SOS intake failed to register with command server.'
+      try {
+        const err = await res.json()
+        if (typeof err.detail === 'string') {
+          detailMsg = err.detail
+        } else if (Array.isArray(err.detail) && err.detail.length > 0) {
+          detailMsg = err.detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ')
+        } else if (err.message) {
+          detailMsg = err.message
+        }
+      } catch {
+        // use fallback detailMsg
+      }
+      throw new Error(detailMsg)
     }
 
     const data = await res.json()

@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 SUPPORTED_DISASTER_TYPES = {
-    "flood", "cyclone", "fire", "earthquake", "landslide", "infrastructure", "tsunami", "storm", "other"
+    "flood", "cyclone", "fire", "earthquake", "landslide", "infrastructure", "tsunami", "storm", "building collapse", "medical emergency", "medical", "collapse", "other"
 }
 
 SPAM_GIBBERISH_REGEX = re.compile(
@@ -31,11 +31,19 @@ class CitizenReportCreate(BaseModel):
     @classmethod
     def validate_disaster_type(cls, v: str) -> str:
         clean = v.strip().lower()
-        if clean not in SUPPORTED_DISASTER_TYPES:
+        mapping = {
+            "building collapse": "infrastructure",
+            "collapse": "infrastructure",
+            "medical emergency": "other",
+            "medical": "other",
+            "cyclone / storm": "cyclone",
+        }
+        clean = mapping.get(clean, clean)
+        if clean not in SUPPORTED_DISASTER_TYPES and clean not in {"flood", "cyclone", "fire", "earthquake", "landslide", "infrastructure", "tsunami", "storm", "other"}:
             raise ValueError(
-                f"Unsupported disaster type '{v}'. Must be one of: {', '.join(sorted(SUPPORTED_DISASTER_TYPES))}"
+                f"Unsupported disaster type '{v}'. Must be one of: flood, cyclone, fire, earthquake, landslide, building collapse, medical emergency, other."
             )
-        return v.strip()
+        return clean.capitalize()
 
     @field_validator("location")
     @classmethod

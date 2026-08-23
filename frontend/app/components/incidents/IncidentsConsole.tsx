@@ -36,6 +36,8 @@ export default function IncidentsConsole({
   const [selectedIncidentDetail, setSelectedIncidentDetail] = useState<Incident | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false)
+  const [isGeneratingReport, setIsGeneratingReport] = useState<boolean>(false)
+  const [reportSuccessMsg, setReportSuccessMsg] = useState<string | null>(null)
   const [statusActionError, setStatusActionError] = useState<string | null>(null)
   const [confidenceData, setConfidenceData] = useState<IncidentConfidenceTelemetry | null>(null)
   const [isLoadingConfidence, setIsLoadingConfidence] = useState<boolean>(false)
@@ -82,6 +84,38 @@ export default function IncidentsConsole({
     } catch (err: any) {
       console.error('Failed to update operation status:', err)
       setDeployError(err.message || 'Operation status transition failed')
+    }
+  }
+
+
+  const handleGenerateDossierReport = async () => {
+    if (!selectedIncident || isGeneratingReport) return
+    setIsGeneratingReport(true)
+    setReportSuccessMsg(null)
+    try {
+      if (onOpenReportPreview) {
+        onOpenReportPreview(selectedIncident.id)
+      } else {
+        const newReport = await platformDataService.createReport({
+          title: `SITREP — ${selectedIncident.title} (${selectedIncident.location})`,
+          report_type: 'Situation Report',
+          incident_id: selectedIncident.id,
+          author: 'Commander R. Vance',
+          status: 'OFFICIAL',
+          summary: `Comprehensive operational situation dossier for ${selectedIncident.title}. Priority Level: ${selectedIncident.priorityLevel || selectedIncident.severity}. Status: ${selectedIncident.status}. Estimated affected population: ${selectedIncident.affectedPopulationEst || 0}.`,
+        })
+        if (newReport) {
+          setReportSuccessMsg(`Dossier SITREP generated successfully (ID: ${newReport.id}).`)
+          if (typeof window !== 'undefined') {
+            window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/reports/${newReport.id}/download`, '_blank')
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Error generating dossier report:', err)
+      setStatusActionError(err.message || 'Failed to generate SITREP report.')
+    } finally {
+      setIsGeneratingReport(false)
     }
   }
 
@@ -1314,17 +1348,22 @@ export default function IncidentsConsole({
                     Launch Field Assessment →
                   </button>
                 )}
-                {onOpenReportPreview && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenReportPreview(selectedIncident.id)}
-                    className="flex-1 py-2.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary font-mono-label text-[11px] font-bold rounded uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
-                    Generate Incident Dossier PDF
-                  </button>
-                )}
+                <button
+                  type="button"
+                  disabled={isGeneratingReport}
+                  onClick={handleGenerateDossierReport}
+                  className="flex-1 py-2.5 bg-primary/15 hover:bg-primary/25 border border-primary/40 text-primary font-mono-label text-[11px] font-bold rounded uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[16px]">{isGeneratingReport ? 'hourglass_top' : 'picture_as_pdf'}</span>
+                  {isGeneratingReport ? 'Generating Official SITREP...' : 'Generate Incident Dossier PDF'}
+                </button>
               </div>
+              {reportSuccessMsg && (
+                <div className="p-3 bg-emerald-950/20 border border-emerald-500/40 rounded text-emerald-400 font-mono-label text-[11px] flex items-center gap-2 animate-in fade-in">
+                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                  {reportSuccessMsg}
+                </div>
+              )}
             </>
           ) : (
             <div className="p-8 text-center text-on-surface-variant font-mono-label text-[12px]">
