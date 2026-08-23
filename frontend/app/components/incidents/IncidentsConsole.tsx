@@ -430,55 +430,58 @@ export default function IncidentsConsole({
                   </span>
                 </div>
 
-                {selectedIncident.id === 'inc-a' ? (
-                  <div className="space-y-2.5">
-                    <div className="p-3 bg-surface-container rounded border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono-label text-[11px] text-primary font-bold">NDRF Swift Rescue Squad 4</span>
-                          <span className="font-mono-label text-[9px] bg-emerald-950/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">98% MATCH</span>
-                        </div>
-                        <p className="font-body-sm text-[12px] text-on-surface-variant mt-0.5">
-                          Priority extraction for civilians stranded in flood zone • ETA: 12 min
-                        </p>
-                      </div>
-                      {onOpenOperations && (
-                        <button
-                          type="button"
-                          onClick={() => onOpenOperations()}
-                          className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer transition-colors shrink-0"
-                        >
-                          Dispatch Squad →
-                        </button>
-                      )}
-                    </div>
+                {(() => {
+                  const matchingAdvisories = advisories.filter(
+                    (adv) => adv.targetIncidentId === selectedIncident.id || !adv.targetIncidentId
+                  )
 
-                    <div className="p-3 bg-surface-container rounded border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono-label text-[11px] text-primary font-bold">Mobile Trauma Care Unit 1</span>
-                          <span className="font-mono-label text-[9px] bg-emerald-950/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">95% MATCH</span>
-                        </div>
-                        <p className="font-body-sm text-[12px] text-on-surface-variant mt-0.5">
-                          Emergency triage setup for field sector • ETA: 15 min
-                        </p>
+                  if (matchingAdvisories.length === 0) {
+                    return (
+                      <div className="p-4 bg-surface-container rounded border border-outline-variant/60 text-center font-mono-label text-[12px] text-on-surface-variant">
+                        No suitable resources currently available.
                       </div>
-                      {onOpenOperations && (
-                        <button
-                          type="button"
-                          onClick={() => onOpenOperations()}
-                          className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer transition-colors shrink-0"
+                    )
+                  }
+
+                  return (
+                    <div className="space-y-2.5">
+                      {matchingAdvisories.map((adv) => (
+                        <div
+                          key={adv.id}
+                          className="p-3 bg-surface-container rounded border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                         >
-                          Dispatch Unit →
-                        </button>
-                      )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono-label text-[11px] text-primary font-bold">
+                                {adv.resourceName || adv.recommendedResourceName}
+                              </span>
+                              <span className="font-mono-label text-[9px] bg-emerald-950/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">
+                                {adv.metrics?.capabilityMatch || 95}% MATCH
+                              </span>
+                              {adv.resourceId && (
+                                <span className="font-mono-label text-[9px] text-outline">
+                                  ID: {adv.resourceId}
+                                </span>
+                              )}
+                            </div>
+                            <p className="font-body-sm text-[12px] text-on-surface-variant mt-0.5">
+                              {adv.reason || adv.details} • ETA: {adv.metrics?.travelTime || '15 mins'}
+                            </p>
+                          </div>
+                          {onOpenOperations && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenOperations(adv.id)}
+                              className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer transition-colors shrink-0"
+                            >
+                              Dispatch Unit →
+                            </button>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-surface-container rounded border border-outline-variant/60 text-center font-mono-label text-[12px] text-on-surface-variant">
-                    No active resource recommendations for this incident.
-                  </div>
-                )}
+                  )
+                })()}
               </section>
 
               {/* 5. Actions */}

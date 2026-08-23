@@ -209,33 +209,24 @@ def get_incident_detail(db: Session, incident_id: str) -> Optional[IncidentDetai
         for ra in allocations
     ]
 
-    # Default capability matching if none in DB
+    # Resolve real dynamic recommendations from database if none stored
     if not recommendations:
-        if "cyclone" in inc.disaster_type or "flood" in inc.disaster_type:
-            recommendations.append(
-                ResourceAdvisorySchema(
-                    id="adv-auto-1",
-                    resource_id="res-rec-1",
-                    resource_name="NDRF Swift Rescue Squad 4",
-                    resource_category="rescue",
-                    status="RECOMMENDED",
-                    match_score=98,
-                    travel_time_est="18 min",
-                    reason=f"Water and storm surge extraction matched for {inc.location_name}.",
+        from app.services.allocation_engine import compute_allocation_recommendations
+        live_recs = compute_allocation_recommendations(db=db, incident_id=inc.id)
+        for lr in live_recs:
+            if lr.get("resource_id"):
+                recommendations.append(
+                    ResourceAdvisorySchema(
+                        id=lr["id"],
+                        resource_id=lr["resource_id"],
+                        resource_name=lr["resource_name"],
+                        resource_category=lr["resource_category"],
+                        status="RECOMMENDED",
+                        match_score=lr["match_score"],
+                        travel_time_est=lr["travel_time_est"],
+                        reason=lr["reason"],
+                    )
                 )
-            )
-            recommendations.append(
-                ResourceAdvisorySchema(
-                    id="adv-auto-2",
-                    resource_id="res-med-1",
-                    resource_name="Mobile Trauma Care Unit 1",
-                    resource_category="medical",
-                    status="RECOMMENDED",
-                    match_score=94,
-                    travel_time_est="15 min",
-                    reason=f"Triage and emergency medical coverage for {inc.affected_population or 'civilians'}.",
-                )
-            )
 
     # 6. Progression Timeline
     timeline_events = [

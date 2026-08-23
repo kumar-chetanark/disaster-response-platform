@@ -2,8 +2,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.models.incident import Incident
 from app.schemas.incident import IncidentListResponse, IncidentDetailSchema
 from app.services.incident_service import get_incidents_list, get_incident_detail
+from app.services.allocation_engine import analyze_incident
 
 router = APIRouter(prefix="/incidents", tags=["Incidents Registry"])
 
@@ -11,7 +13,7 @@ router = APIRouter(prefix="/incidents", tags=["Incidents Registry"])
 def list_incidents(
     search: Optional[str] = Query(None, description="Search by title, location, sector, ID"),
     severity: Optional[str] = Query(None, description="Filter by CRITICAL, HIGH, MEDIUM, LOW"),
-    status: Optional[str] = Query(None, description="Filter by ACTIVE, MONITORING, RESOLVED"),
+    status: Optional[str] = Query(None, description="Filter by PENDING, ACTIVE, MONITORING, RESOLVED"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
@@ -27,6 +29,26 @@ def list_incidents(
         page=page,
         page_size=page_size,
     )
+
+@router.get("/{incident_id}/analysis")
+def get_incident_analysis(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Deterministic Incident Analysis Endpoint:
+    Evaluates real database fields:
+    - severity, disaster_type, location, description, trapped people, immediate danger
+    - field verification status, affected population, corroborating sources
+    Returns structured analysis: priority score, key risks, required capabilities, reasoning, confidence.
+    """
+    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not inc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found.",
+        )
+    return analyze_incident(inc)
 
 @router.get("/{incident_id}", response_model=IncidentDetailSchema)
 def get_incident(

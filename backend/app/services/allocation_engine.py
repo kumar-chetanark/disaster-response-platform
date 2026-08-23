@@ -113,7 +113,7 @@ def compute_allocation_recommendations(db: Session, incident_id: Optional[str] =
     3. Handles resource scarcity across competing incidents.
     4. Generates explainable recommendations with alternatives and unmet demand flags.
     """
-    incidents_query = db.query(Incident).filter(Incident.status.in_(["ACTIVE", "MONITORING"]))
+    incidents_query = db.query(Incident).filter(Incident.status.in_(["PENDING", "ACTIVE", "MONITORING"]))
     if incident_id:
         incidents_query = incidents_query.filter(Incident.id == incident_id)
 
@@ -203,3 +203,53 @@ def compute_allocation_recommendations(db: Session, incident_id: Optional[str] =
             })
 
     return recommendations
+
+
+def analyze_incident(incident: Incident) -> Dict[str, Any]:
+    """
+    Structured Incident Analysis Engine:
+    Evaluates real database fields:
+    - severity, disaster_type, location, description, trapped people, immediate danger
+    - field verification status, affected population, corroborating sources
+    Returns structured analysis: priority score, key risks, required capabilities, reasoning, confidence.
+    """
+    priority_data = calculate_priority_score(incident)
+    req_cap = get_required_capability(incident)
+    
+    desc = (incident.description or "").lower()
+    is_trapped = "trapped" in desc or "isolated" in desc or "stranded" in desc
+    is_danger = bool(incident.severity == "CRITICAL" or is_trapped)
+
+    key_risks = []
+    if is_trapped:
+        key_risks.append("Imminent threat to life: Civilians trapped/isolated in structure/zone")
+    if incident.severity == "CRITICAL":
+        key_risks.append(f"High-impact emergency severity declared for {incident.location_name}")
+    if not incident.is_field_verified:
+        key_risks.append("Unverified field telemetry: Requires aerial/ground reconnaissance")
+    if "road" in desc or "bridge" in desc or "collapse" in desc:
+        key_risks.append("Structural and logistical access impairment")
+    if not key_risks:
+        key_risks.append(f"Active {incident.disaster_type} monitoring in {incident.location_name}")
+
+    recommended_categories = [req_cap]
+    if req_cap != "medical" and (is_danger or is_trapped):
+        recommended_categories.append("medical")
+    if not incident.is_field_verified and "drone" not in recommended_categories:
+        recommended_categories.append("drone")
+
+    return {
+        "incident_id": incident.id,
+        "incident_title": incident.title,
+        "disaster_type": incident.disaster_type,
+        "location": incident.location_name,
+        "status": incident.status,
+        "priority_score": priority_data["priority_score"],
+        "priority_level": priority_data["priority_level"],
+        "key_risks": key_risks,
+        "required_capabilities": [req_cap],
+        "recommended_categories": recommended_categories,
+        "explanation": priority_data["explanation"],
+        "breakdown": priority_data["breakdown"],
+        "confidence_score": 94.0 if incident.is_field_verified else 85.0,
+    }
