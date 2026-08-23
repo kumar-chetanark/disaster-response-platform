@@ -1,4 +1,6 @@
 import {
+  IncidentRequirementsResponse,
+  IncidentCapabilityRequirement,
   Incident,
   ActiveAlert,
   OperationRecord,
@@ -695,6 +697,66 @@ class PlatformDataService {
       throw new Error('Session invalid')
     }
     return await res.json()
+  }
+
+
+  async getIncidentRequirements(incidentId: string): Promise<IncidentRequirementsResponse | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/requirements`, { cache: 'no-store' })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to fetch requirements for incident ${incidentId}:`, err)
+    }
+    return null
+  }
+
+  async getIncidentOperations(incidentId: string): Promise<OperationRecord[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/operations`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        return (data.items || []).map((item: any) => ({
+          id: item.id,
+          operationType: item.operation_type,
+          incidentId: item.incident_id,
+          incidentTitle: item.incident_title,
+          resourceId: item.resource_id,
+          resourceName: item.resource_name,
+          resourceCategory: item.resource_category,
+          location: item.destination_location,
+          destinationLocation: item.destination_location,
+          state: item.status,
+          dispatchedTime: item.dispatched_time,
+          estimatedCompletion: item.estimated_completion,
+          authorizedBy: item.authorized_by,
+          missionObjective: item.mission_objective,
+          fieldUpdates: item.field_updates || [],
+        }))
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to fetch operations for incident ${incidentId}:`, err)
+    }
+    return []
+  }
+
+  async approveResourceAllocation(recommendationId: string, incidentId: string, resourceId: string, notes?: string): Promise<any> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authority_session_token') || '' : ''
+    const url = `${API_BASE_URL}/api/allocations/${recommendationId}/approve?incident_id=${encodeURIComponent(incidentId)}&resource_id=${encodeURIComponent(resourceId)}${notes ? `&notes=${encodeURIComponent(notes)}` : ''}`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+    })
+    if (res.ok) {
+      return await res.json()
+    } else {
+      const errData = await res.json().catch(() => ({}))
+      throw new Error(errData.detail || `Approval failed with HTTP ${res.status}`)
+    }
   }
 }
 

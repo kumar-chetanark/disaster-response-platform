@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem } from '../../types'
+import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem, IncidentRequirementsResponse, IncidentCapabilityRequirement, OperationRecord } from '../../types'
 import SearchInput from '../common/SearchInput'
 import DetailsHeader from '../common/DetailsHeader'
 import { platformDataService } from '../../services/dataService'
@@ -39,8 +39,43 @@ export default function IncidentsConsole({
   const [statusActionError, setStatusActionError] = useState<string | null>(null)
   const [confidenceData, setConfidenceData] = useState<IncidentConfidenceTelemetry | null>(null)
   const [isLoadingConfidence, setIsLoadingConfidence] = useState<boolean>(false)
+  const [requirementsData, setRequirementsData] = useState<IncidentRequirementsResponse | null>(null)
+  const [incidentOperations, setIncidentOperations] = useState<OperationRecord[]>([])
+  const [isDeployingResource, setIsDeployingResource] = useState<string | null>(null)
+  const [deployError, setDeployError] = useState<string | null>(null)
+
 
   const dossierCache = useRef<Record<string, Incident>>({})
+
+
+  const handleApproveAndDeploy = async (recId: string, resId: string, notes?: string) => {
+    if (!selectedIncident || isDeployingResource) return
+    setIsDeployingResource(resId)
+    setDeployError(null)
+    try {
+      await platformDataService.approveResourceAllocation(recId, selectedIncident.id, resId, notes)
+      const refreshedOps = await platformDataService.getIncidentOperations(selectedIncident.id)
+      setIncidentOperations(refreshedOps)
+    } catch (err: any) {
+      console.error('Failed to approve deployment:', err)
+      setDeployError(err.message || 'Deployment authorization failed')
+    } finally {
+      setIsDeployingResource(null)
+    }
+  }
+
+  const handleUpdateOpStatus = async (opId: string, newStatus: string) => {
+    try {
+      await platformDataService.updateOperationStatus(opId, newStatus)
+      if (selectedIncident) {
+        const refreshedOps = await platformDataService.getIncidentOperations(selectedIncident.id)
+        setIncidentOperations(refreshedOps)
+      }
+    } catch (err: any) {
+      console.error('Failed to update operation status:', err)
+      setDeployError(err.message || 'Operation status transition failed')
+    }
+  }
 
   const handleStatusTransition = async (targetStatus: string, notes?: string) => {
     if (!selectedIncident || isUpdatingStatus) return
@@ -515,18 +550,53 @@ export default function IncidentsConsole({
                 </div>
               </section>
 
-              {/* 4. Incident-Specific AI Operational Recommendations */}
-              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-3">
+              {/* 4. Incident-Specific AI Operational Recommendations & Requirements */}
+              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
                   <h4 className="font-headline-sm text-[13px] font-bold text-on-surface flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary text-[18px]">psychology</span>
-                    AI Operational Recommendations &amp; Advisories
+                    Resource Requirements &amp; AI Recommendations
                   </h4>
                   <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
                     Incident Specific
                   </span>
                 </div>
 
+                {/* Capability Requirements Breakdown */}
+                {requirementsData && requirementsData.requirements && requirementsData.requirements.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] font-mono-label text-on-surface-variant font-bold uppercase">
+                      Required Tactical Capabilities:
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {requirementsData.requirements.map((req: IncidentCapabilityRequirement, idx: number) => (
+                        <div key={idx} className="p-2.5 bg-surface-container rounded border border-outline-variant text-[11px] space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono-label font-bold text-primary uppercase">
+                              {req.capability} (min {req.minimum_units} unit)
+                            </span>
+                            <span className={`font-mono-label text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                              req.priority === 'CRITICAL' ? 'bg-red-950/30 text-red-400 border border-red-500/30' : 'bg-amber-950/30 text-amber-400 border border-amber-500/30'
+                            }`}>
+                              {req.priority}
+                            </span>
+                          </div>
+                          <p className="font-body-sm text-[11px] text-on-surface-variant leading-snug">
+                            {req.reason}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {deployError && (
+                  <div className="p-2.5 bg-red-950/20 border border-red-500/30 rounded text-red-400 text-[11px] font-mono-label">
+                    {deployError}
+                  </div>
+                )}
+
+                {/* Recommended Matching Resources */}
                 {(() => {
                   const matchingAdvisories = advisories.filter(
                     (adv) => adv.targetIncidentId === selectedIncident.id || !adv.targetIncidentId
@@ -534,14 +604,17 @@ export default function IncidentsConsole({
 
                   if (matchingAdvisories.length === 0) {
                     return (
-                      <div className="p-4 bg-surface-container rounded border border-outline-variant/60 text-center font-mono-label text-[12px] text-on-surface-variant">
+                      <div className="p-3 bg-surface-container rounded border border-outline-variant/60 text-center font-mono-label text-[11px] text-on-surface-variant">
                         No suitable resources currently available.
                       </div>
                     )
                   }
 
                   return (
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-mono-label text-on-surface-variant font-bold uppercase">
+                        Recommended Matching Units:
+                      </div>
                       {matchingAdvisories.map((adv) => (
                         <div
                           key={adv.id}
@@ -565,20 +638,97 @@ export default function IncidentsConsole({
                               {adv.reason || adv.details} • ETA: {adv.metrics?.travelTime || '15 mins'}
                             </p>
                           </div>
-                          {onOpenOperations && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenOperations(adv.id)}
-                              className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer transition-colors shrink-0"
-                            >
-                              Dispatch Unit →
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            disabled={isDeployingResource === adv.resourceId}
+                            onClick={() => handleApproveAndDeploy(adv.id, adv.resourceId || adv.id, adv.reason)}
+                            className="px-3.5 py-1.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[10px] font-bold rounded uppercase cursor-pointer transition-colors shrink-0 flex items-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">send</span>
+                            {isDeployingResource === adv.resourceId ? 'Deploying...' : 'Approve & Deploy →'}
+                          </button>
                         </div>
                       ))}
                     </div>
                   )
                 })()}
+
+                {/* Live Operations & Mission Tracking for this incident */}
+                {incidentOperations.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-outline-variant">
+                    <div className="text-[11px] font-mono-label text-on-surface-variant font-bold uppercase flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[15px] text-cyan-400">near_me</span>
+                      Active Mission Deployments ({incidentOperations.length})
+                    </div>
+                    {incidentOperations.map((op) => (
+                      <div key={op.id} className="p-3 bg-surface-container-high rounded border border-cyan-500/30 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono-label text-[11px] text-cyan-400 font-bold">
+                              MISSION #{op.id}: {op.resourceName}
+                            </span>
+                            <span className="font-mono-label text-[9px] bg-cyan-950/40 text-cyan-300 border border-cyan-500/40 px-1.5 py-0.2 rounded font-bold uppercase">
+                              {op.state}
+                            </span>
+                          </div>
+                          <span className="font-mono-label text-[10px] text-on-surface-variant">
+                            {op.dispatchedTime}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-on-surface font-body-sm">
+                          {op.missionObjective}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {op.state === 'ASSIGNED' && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateOpStatus(op.id, 'DISPATCHED')}
+                              className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white font-mono-label text-[9px] font-bold rounded uppercase cursor-pointer"
+                            >
+                              Dispatch Unit →
+                            </button>
+                          )}
+                          {op.state === 'DISPATCHED' && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateOpStatus(op.id, 'EN_ROUTE')}
+                              className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white font-mono-label text-[9px] font-bold rounded uppercase cursor-pointer"
+                            >
+                              Mark En Route →
+                            </button>
+                          )}
+                          {op.state === 'EN_ROUTE' && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateOpStatus(op.id, 'ON_SCENE')}
+                              className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white font-mono-label text-[9px] font-bold rounded uppercase cursor-pointer"
+                            >
+                              Mark On Scene →
+                            </button>
+                          )}
+                          {(op.state === 'ON_SCENE' || op.state === 'IN_PROGRESS' || op.state === 'IN OPERATION') && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateOpStatus(op.id, 'COMPLETED')}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono-label text-[9px] font-bold rounded uppercase cursor-pointer"
+                            >
+                              Complete Mission ✓
+                            </button>
+                          )}
+                          {op.state !== 'COMPLETED' && op.state !== 'CANCELLED' && op.state !== 'RECALLED' && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateOpStatus(op.id, 'RECALLED')}
+                              className="px-2.5 py-1 bg-surface-container-highest hover:bg-outline-variant text-on-surface-variant font-mono-label text-[9px] font-bold rounded uppercase cursor-pointer"
+                            >
+                              Recall Resource
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
               {/* 5. Authority Lifecycle & Operational Actions */}

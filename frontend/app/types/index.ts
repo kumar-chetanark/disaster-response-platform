@@ -138,11 +138,16 @@ export type OperationType =
 
 export type OperationState =
   | 'PLANNED'
+  | 'ASSIGNED'
   | 'DISPATCHED'
   | 'IN TRANSIT'
+  | 'EN_ROUTE'
   | 'IN OPERATION'
+  | 'ON_SCENE'
+  | 'IN_PROGRESS'
   | 'COMPLETED'
   | 'CANCELLED'
+  | 'RECALLED'
 
 export interface OperationRecord {
   destinationLocation?: string
@@ -370,4 +375,19 @@ export interface IncidentConfidenceTelemetry {
   contradictions: ContradictionItem[]
   recommendation: string
   last_evidence_time: string
+}
+
+export interface IncidentCapabilityRequirement {
+  capability: string
+  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+  reason: string
+  minimum_units: number
+}
+
+export interface IncidentRequirementsResponse {
+  incident_id: string
+  incident_title: string
+  severity: string
+  status: string
+  requirements: IncidentCapabilityRequirement[]
 }

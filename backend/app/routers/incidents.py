@@ -152,3 +152,38 @@ def add_incident_contradiction(
     db.add(contra_source)
     db.commit()
     return {"status": "SUCCESS", "message": "Contradictory evidence registered."}
+
+@router.get("/{incident_id}/requirements")
+def get_incident_requirements(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Deterministic Resource Requirements Engine Endpoint:
+    Returns required capabilities, priority levels, and reasons for an incident.
+    """
+    from app.services.allocation_engine import get_incident_resource_requirements
+    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not inc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found.",
+        )
+    return get_incident_resource_requirements(inc)
+
+@router.get("/{incident_id}/operations")
+def get_incident_operations(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns all operational tracks associated with a specific incident.
+    """
+    from app.services.operation_service import list_operations
+    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not inc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident with ID '{incident_id}' not found.",
+        )
+    return list_operations(db=db, incident_id=incident_id)

@@ -72,3 +72,21 @@ def modify_resource_status(
             detail=f"Resource with ID '{resource_id}' not found.",
         )
     return updated
+
+@router.get("/{resource_id}", response_model=ResourceResponse)
+def get_single_resource(
+    resource_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns complete details of a specific resource unit.
+    """
+    from app.models.resource import Resource
+    res = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not res:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Resource with ID '{resource_id}' not found.",
+        )
+    from app.services.resource_service import to_resource_response
+    return to_resource_response(res)

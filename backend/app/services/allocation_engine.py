@@ -253,3 +253,146 @@ def analyze_incident(incident: Incident) -> Dict[str, Any]:
         "breakdown": priority_data["breakdown"],
         "confidence_score": 94.0 if incident.is_field_verified else 85.0,
     }
+
+def calculate_incident_resource_requirements(incident: Incident) -> Dict[str, Any]:
+    """
+    Deterministic Resource Requirement Engine:
+    Evaluates real incident fields (disaster type, severity, trapped people, population, immediate danger)
+    and returns an explainable capability requirements structure.
+    """
+    dtype = (incident.disaster_type or "").lower()
+    desc = (incident.description or "").lower()
+    severity = (incident.severity or "MEDIUM").upper()
+    is_trapped = "trapped" in desc or "isolated" in desc or "stranded" in desc
+    is_danger = severity == "CRITICAL" or is_trapped
+    
+    requirements = []
+
+    # 1. Rescue requirement
+    if is_trapped or "collapse" in desc or "rescue" in desc or dtype in ["earthquake", "landslide", "building damage"]:
+        requirements.append({
+            "capability": "rescue",
+            "priority": "CRITICAL" if is_trapped else "HIGH",
+            "reason": "Civilians reported trapped or physical structural debris extraction required.",
+            "minimum_units": 2 if is_trapped else 1
+        })
+    elif dtype in ["flood", "cyclone", "tsunami", "water"]:
+        requirements.append({
+            "capability": "water",
+            "priority": "CRITICAL" if is_danger else "HIGH",
+            "reason": "Water surge and flood zone civilian extraction / boat evacuation capability.",
+            "minimum_units": 1
+        })
+
+    # 2. Medical requirement
+    if is_danger or "medical" in desc or "casualt" in desc or "injur" in desc:
+        requirements.append({
+            "capability": "medical",
+            "priority": "CRITICAL" if is_trapped else "HIGH",
+            "reason": "On-site trauma care and triage stabilization required for endangered population.",
+            "minimum_units": 1
+        })
+
+    # 3. Aerial Reconnaissance requirement
+    if not incident.is_field_verified or "recon" in desc or "survey" in desc:
+        requirements.append({
+            "capability": "aerial",
+            "priority": "MEDIUM",
+            "reason": "Aerial thermal/optical sensor sweep required to verify impact footprint and access corridors.",
+            "minimum_units": 1
+        })
+
+    # 4. Land / Engineering requirement
+    if "road" in desc or "bridge" in desc or "blockage" in desc or dtype == "landslide":
+        requirements.append({
+            "capability": "land",
+            "priority": "HIGH",
+            "reason": "Heavy route clearance and obstacle removal equipment required.",
+            "minimum_units": 1
+        })
+
+    if not requirements:
+        requirements.append({
+            "capability": "rescue",
+            "priority": "MEDIUM",
+            "reason": f"Standard emergency standby response for {incident.disaster_type} incident.",
+            "minimum_units": 1
+        })
+
+    return {
+        "incident_id": incident.id,
+        "incident_title": incident.title,
+        "severity": incident.severity,
+        "status": incident.status,
+        "requirements": requirements,
+    }
+
+
+def get_incident_resource_requirements(incident: Incident) -> Dict[str, Any]:
+    """
+    Deterministic Resource Requirement Engine:
+    Calculates required capabilities, priority levels, minimum units, and reasons based on real database fields:
+    - disaster_type, severity, priority_level, affected_population, description, trapped people, immediate danger, is_field_verified
+    """
+    dtype = str(incident.disaster_type or "").lower()
+    desc = (incident.description or "").lower() + " " + (incident.title or "").lower()
+    is_critical = incident.severity == "CRITICAL"
+    is_trapped = "trapped" in desc or "isolated" in desc or "stranded" in desc
+    
+    requirements = []
+
+    # 1. Primary capability based on disaster characteristics
+    if "flood" in dtype or "surge" in desc or "water" in desc or "submerged" in desc:
+        requirements.append({
+            "capability": "rescue",
+            "priority": "CRITICAL" if is_critical or is_trapped else "HIGH",
+            "reason": "Water rescue and swift-water extraction required for flooded zones",
+            "minimum_units": 2 if is_trapped else 1
+        })
+    elif "earthquake" in dtype or "collapse" in desc or "rubble" in desc or "debris" in desc or "landslide" in dtype:
+        requirements.append({
+            "capability": "land",
+            "priority": "CRITICAL" if is_trapped else "HIGH",
+            "reason": "Heavy equipment / obstacle clearance and structural breach response",
+            "minimum_units": 1
+        })
+    elif "fire" in dtype:
+        requirements.append({
+            "capability": "rescue",
+            "priority": "CRITICAL",
+            "reason": "Active blaze containment and civilian fire evacuation",
+            "minimum_units": 1
+        })
+    else:
+        requirements.append({
+            "capability": "rescue",
+            "priority": "HIGH",
+            "reason": f"General emergency response squad required for {incident.disaster_type}",
+            "minimum_units": 1
+        })
+
+    # 2. Medical capability if trapped/injured/high severity
+    if is_trapped or is_critical or "casualt" in desc or "injured" in desc or "medical" in desc:
+        requirements.append({
+            "capability": "medical",
+            "priority": "CRITICAL" if is_trapped else "HIGH",
+            "reason": "Field medical triage, trauma care, and emergency casualty transport",
+            "minimum_units": 1
+        })
+
+    # 3. Aerial Recon capability if unverified telemetry
+    if not incident.is_field_verified or "recon" in desc or "survey" in desc:
+        requirements.append({
+            "capability": "aerial",
+            "priority": "MEDIUM" if not is_critical else "HIGH",
+            "reason": "Aerial UAV reconnaissance to establish visual damage and route validation",
+            "minimum_units": 1
+        })
+
+    return {
+        "incident_id": incident.id,
+        "incident_title": incident.title,
+        "severity": incident.severity,
+        "status": incident.status,
+        "requirements": requirements
+    }

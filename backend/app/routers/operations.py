@@ -70,3 +70,37 @@ def update_operation_status(
             detail=f"Operation with ID '{operation_id}' not found.",
         )
     return updated
+
+from pydantic import BaseModel, Field
+from app.routers.auth import get_current_authority
+
+class OperationStatusPatch(BaseModel):
+    status: str = Field(..., description="ASSIGNED, DISPATCHED, EN_ROUTE, ON_SCENE, COMPLETED, CANCELLED, RECALLED")
+    field_update: Optional[str] = Field(None, description="Field situation message or telemetry report")
+
+@router.patch("/{operation_id}/status", response_model=OperationResponse)
+def patch_operation_status(
+    operation_id: str,
+    req: OperationStatusPatch,
+    authority: dict = Depends(get_current_authority),
+    db: Session = Depends(get_db),
+):
+    """
+    Authority-Controlled Mission Status Machine Endpoint:
+    Enforces deterministic state transitions (ASSIGNED -> DISPATCHED -> EN_ROUTE -> ON_SCENE -> COMPLETED / RECALLED / CANCELLED).
+    Synchronizes attached resource availability atomically on completion/recall/cancel.
+    """
+    updated_op = update_operation(
+        db=db,
+        operation_id=operation_id,
+        op_update=OperationUpdate(
+            status=req.status,
+            field_updates_log=req.field_update or f"Status transitioned to {req.status} by {authority.get('name', 'Authority')}"
+        )
+    )
+    if not updated_op:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Operation with ID '{operation_id}' not found.",
+        )
+    return updated_op
