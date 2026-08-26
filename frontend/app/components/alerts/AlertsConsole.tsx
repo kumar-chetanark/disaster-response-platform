@@ -33,6 +33,12 @@ export default function AlertsConsole({
 
   useEffect(() => {
     setStarredIds(platformDataService.getStarredIds('alert'))
+    if (initialAlerts.length > 0) {
+      const firstId = initialSelectedAlertId || initialAlerts[0]?.id
+      if (firstId) {
+        platformDataService.markAsSeen('alert', firstId)
+      }
+    }
   }, [])
 
   const handleToggleStar = (e: React.MouseEvent, id: string) => {
@@ -118,6 +124,7 @@ export default function AlertsConsole({
 
   const handleSelect = (alert: ActiveAlert) => {
     setActiveAlertId(alert.id)
+    platformDataService.markAsSeen('alert', alert.id)
     if (onSelectAlert) {
       onSelectAlert(alert)
     }
@@ -177,6 +184,22 @@ export default function AlertsConsole({
             placeholder="Search alerts, sensors..."
             className="flex-1 sm:w-56"
           />
+
+          <button
+            type="button"
+            onClick={() => setStarredOnly(!starredOnly)}
+            title={starredOnly ? 'Showing starred alerts only' : 'Filter by starred alerts'}
+            className={`px-2.5 py-1.5 rounded border transition-colors cursor-pointer flex items-center gap-1.5 font-mono-label text-[11px] ${
+              starredOnly
+                ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 font-bold'
+                : 'bg-background border-outline-variant text-outline hover:text-on-surface'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[16px] ${starredOnly ? 'text-amber-400 fill-current' : ''}`}>
+              star
+            </span>
+            <span>Starred</span>
+          </button>
 
           <select
             value={filterSeverity}
@@ -286,7 +309,22 @@ export default function AlertsConsole({
                     />
 
                     <div className="flex items-start justify-between gap-2 pl-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        {/* High-Visibility Star / Favorite Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleStar(e, alt.id)}
+                          className={`px-1.5 py-0.5 rounded border text-[13px] flex items-center gap-1 cursor-pointer transition-all ${
+                            starredIds.has(alt.id)
+                              ? 'bg-amber-500/25 border-amber-500/60 text-amber-300 font-bold shadow-sm'
+                              : 'bg-surface-container border-outline-variant text-outline hover:text-amber-300 hover:border-amber-400/50'
+                          }`}
+                          title={starredIds.has(alt.id) ? 'Starred (Click to unstar)' : 'Click to star / favorite'}
+                        >
+                          <span>{starredIds.has(alt.id) ? '★' : '☆'}</span>
+                          <span className="text-[10px] font-mono-label">{starredIds.has(alt.id) ? 'STARRED' : 'STAR'}</span>
+                        </button>
+
                         <span className="font-mono-label text-[11px] text-primary font-bold">
                           {alt.category}
                         </span>
@@ -308,9 +346,22 @@ export default function AlertsConsole({
                         )}
                       </div>
 
-                      <span className="font-mono-label text-[10px] text-on-surface-variant">
-                        {alt.alertTime || alt.timestamp}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono-label text-[10px] text-on-surface-variant">
+                          {alt.alertTime || alt.timestamp}
+                        </span>
+                        {/* High-Visibility Delete Button */}
+                        <button
+                          type="button"
+                          disabled={deletingId === alt.id}
+                          onClick={(e) => handleDeleteAlert(e, alt.id)}
+                          className="px-2 py-0.5 rounded border border-red-500/30 bg-red-950/20 hover:bg-red-900/40 text-red-400 font-mono-label text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                          title="Permanently delete alert"
+                        >
+                          <span>🗑️</span>
+                          <span>{deletingId === alt.id ? 'DELETING...' : 'DELETE'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     <p className="pl-1 font-body-sm font-semibold text-[13px] text-on-surface leading-snug">

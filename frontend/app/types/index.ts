@@ -482,6 +482,23 @@ export interface IncidentIntelligenceTelemetry {
   key_risks: any[]
   required_capabilities: any[]
   resource_recommendations: any[]
+  latest_assessment?: {
+    id: string
+    mode: string
+    mission_type: string
+    asset_name: string
+    weather: string
+    area_surveyed: string
+    hazards_detected: string
+    structures_damaged: number
+    road_accessibility: string
+    people_observed: string
+    recommended_resources: string
+    evacuation_status: string
+    operator_notes: string
+    confidence: number
+    timestamp: string
+  } | null
   operational_state: OperationalStateMetrics
   decision_support: DecisionSupportSummary
   evidence: any[]

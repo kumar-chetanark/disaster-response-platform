@@ -6,6 +6,7 @@ import { platformDataService } from '../../services/dataService'
 
 interface AssessmentFormProps {
   initialIncidentTitle?: string
+  initialIncidentId?: string | null
   initialAsset?: AerialAsset | null
   incidents?: Incident[]
   onSubmit: (data: AssessmentSubmission) => void
@@ -14,6 +15,7 @@ interface AssessmentFormProps {
 
 export default function AssessmentForm({
   initialIncidentTitle,
+  initialIncidentId,
   initialAsset,
   incidents: providedIncidents = [],
   onSubmit,
@@ -21,7 +23,7 @@ export default function AssessmentForm({
 }: AssessmentFormProps) {
   // Real Incidents List for incident picker dropdown
   const [incidentsList, setIncidentsList] = useState<Incident[]>(providedIncidents)
-  const [selectedIncidentId, setSelectedIncidentId] = useState<string>('')
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string>(initialIncidentId || '')
 
   // Map refs
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -31,20 +33,16 @@ export default function AssessmentForm({
 
   // Form State
   const [assessmentMode, setAssessmentMode] = useState<AssessmentMode>('Aerial — Drone')
-  const [missionId] = useState(`RECON-${Math.floor(1000 + Math.random() * 9000)}`)
+  const [missionId] = useState(`ASSESS-${Math.floor(1000 + Math.random() * 9000)}`)
   const [missionType, setMissionType] = useState<MissionType>('Area Scan / Survey')
   const [assessmentTime, setAssessmentTime] = useState('12:00')
-  const [weatherCondition, setWeatherCondition] = useState('')
+  const [weatherCondition, setWeatherCondition] = useState('Clear, Good Visibility')
   const [areaSurveyed, setAreaSurveyed] = useState('')
   
   const [hazards, setHazards] = useState<string[]>([])
-  const [structuresAffected, setStructuresAffected] = useState<number>(0)
+  const [structuresAffected, setStructuresAffected] = useState<string>('')
   const [roadAccessibility, setRoadAccessibility] = useState('Clear')
   const [peopleObserved, setPeopleObserved] = useState('')
-  
-  const [deliveryStatus, setDeliveryStatus] = useState('')
-  const [commsStatus, setCommsStatus] = useState('')
-  const [evacRouteRisk, setEvacRouteRisk] = useState('Low')
   
   const [recommendedResources, setRecommendedResources] = useState('')
   const [evacuationStatus, setEvacuationStatus] = useState<'Routes Clear' | 'Compromised'>('Routes Clear')
@@ -53,6 +51,7 @@ export default function AssessmentForm({
   const [operatorObservations, setOperatorObservations] = useState('')
   const [confidenceScore, setConfidenceScore] = useState<number>(90)
   const [draftSaved, setDraftSaved] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Load Incidents from backend if not provided
   useEffect(() => {
@@ -69,8 +68,11 @@ export default function AssessmentForm({
     }
     if (providedIncidents.length === 0) {
       loadIncidents()
-    } else if (!selectedIncidentId && providedIncidents.length > 0) {
-      setSelectedIncidentId(providedIncidents[0].id)
+    } else {
+      setIncidentsList(providedIncidents)
+      if (!selectedIncidentId && providedIncidents.length > 0) {
+        setSelectedIncidentId(providedIncidents[0].id)
+      }
     }
   }, [providedIncidents])
 
@@ -80,7 +82,7 @@ export default function AssessmentForm({
   useEffect(() => {
     if (currentIncident) {
       setAreaSurveyed(currentIncident.location || currentIncident.sector || 'Target Disaster Sector')
-      setWeatherCondition(currentIncident.category === 'Flood' ? 'Heavy Rain, Low Visibility' : 'Overcast, Moderate Wind')
+      setWeatherCondition(currentIncident.category === 'Flood' ? 'Heavy Rain, Low Visibility' : 'Clear, Moderate Wind')
     }
   }, [selectedIncidentId, currentIncident])
 
@@ -179,7 +181,7 @@ export default function AssessmentForm({
       marker.bindPopup(`
         <div style="font-family: sans-serif; padding: 4px; color: #0f172a;">
           <div style="font-size: 10px; font-weight: bold; color: ${color}; text-transform: uppercase;">
-            ${currentIncident.severity} RECON TARGET
+            ${currentIncident.severity} ASSESSMENT TARGET
           </div>
           <div style="font-size: 12px; font-weight: bold; margin-top: 2px;">
             ${currentIncident.title}
@@ -191,6 +193,7 @@ export default function AssessmentForm({
       `).openPopup()
 
       mapInstanceRef.current.setView([lat, lon], 12)
+      mapInstanceRef.current.invalidateSize()
     })
   }, [isLeafletReady, selectedIncidentId, currentIncident])
 
@@ -200,31 +203,30 @@ export default function AssessmentForm({
     )
   }
 
-  const removeMediaFile = (fileName: string) => {
-    setMediaFiles((prev) => prev.filter((f) => f !== fileName))
-  }
-
   const handleSaveDraft = () => {
     setDraftSaved(true)
     setTimeout(() => setDraftSaved(false), 3000)
   }
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
+
+    const targetInc = currentIncident || (incidentsList.length > 0 ? incidentsList[0] : null)
 
     const submission: AssessmentSubmission = {
       id: missionId,
-      relatedIncidentId: currentIncident?.id || 'inc-1',
-      relatedIncidentTitle: currentIncident?.title || 'Incident #1',
+      relatedIncidentId: targetInc?.id || 'inc-1',
+      relatedIncidentTitle: targetInc?.title || 'Incident',
       assessmentMode,
-      assetId: initialAsset?.id || 'asset-uav-9',
-      assetName: initialAsset?.name || 'Field UAV Recon Asset',
+      assetId: initialAsset?.id || 'field-team-1',
+      assetName: initialAsset?.name || 'Field Assessment Unit',
       missionType,
       assessmentTime,
       weatherCondition,
       areaSurveyed,
       hazardsDetected: hazards,
-      structuresAffected,
+      structuresAffected: structuresAffected === '' ? 0 : Number(structuresAffected),
       roadAccessibility,
       peopleObserved,
       recommendedResources: recommendedResources || '',
@@ -235,46 +237,50 @@ export default function AssessmentForm({
       submittedAt: new Date().toISOString(),
     }
 
-    onSubmit(submission)
+    try {
+      await onSubmit(submission)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
-    <div className="flex flex-col gap-6 min-h-screen pb-16 bg-background">
-      {/* Top Breadcrumb & Incident Selection Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-outline-variant pb-4">
+    <div className="flex-1 flex flex-col h-full bg-background overflow-y-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 scrollbar-thin">
+      {/* Top Header Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border border-outline-variant/80 bg-surface-container-lowest p-3.5 sm:p-4 rounded-xl shadow-xs">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onBackToDashboard}
-            className="p-2 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface rounded transition-colors cursor-pointer"
-            title="Back to Dashboard"
+            className="p-2 sm:p-2.5 bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface rounded-lg transition-colors cursor-pointer shrink-0"
+            title="Return to Incident Console"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
           </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-headline-md text-[18px] sm:text-[20px] font-bold text-on-surface">
-                Field Assessment &amp; Reconnaissance Ingestion
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-headline-md text-[16px] sm:text-[19px] md:text-[20px] font-bold text-on-surface truncate">
+                Field Assessment
               </h1>
-              <span className="font-mono-label text-[10px] bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded font-bold uppercase">
+              <span className="font-mono-label text-[10px] bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 rounded font-bold uppercase shrink-0">
                 {missionId}
               </span>
             </div>
-            <p className="font-body-sm text-[12px] text-on-surface-variant mt-0.5">
-              Live multi-mode reconnaissance telemetry feeding central incident verification &amp; dynamic allocation.
+            <p className="font-body-sm text-[11px] sm:text-[12px] text-on-surface-variant mt-0.5 leading-snug">
+              Multi-mode field verification feeding central incident scoring and automated allocation.
             </p>
           </div>
         </div>
 
-        {/* Dynamic Incident Picker */}
-        <div className="flex items-center gap-2">
-          <label className="font-mono-label text-[11px] text-on-surface-variant font-bold uppercase shrink-0">
-            Select Incident:
+        {/* Dynamic Incident Picker Dropdown */}
+        <div className="flex items-center gap-2 bg-surface-container px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-outline-variant w-full sm:w-auto shrink-0 justify-between sm:justify-start">
+          <label className="font-mono-label text-[10px] sm:text-[11px] text-on-surface-variant font-bold uppercase shrink-0">
+            Target Incident:
           </label>
           <select
             value={selectedIncidentId}
             onChange={(e) => setSelectedIncidentId(e.target.value)}
-            className="bg-surface-container-high border border-primary text-on-surface font-mono-label text-[12px] rounded px-3 py-1.5 focus:ring-1 focus:ring-primary cursor-pointer max-w-xs truncate"
+            className="bg-background border border-primary/40 text-on-surface font-mono-label text-[11px] sm:text-[12px] rounded px-2 sm:px-2.5 py-1 focus:ring-1 focus:ring-primary cursor-pointer max-w-[200px] sm:max-w-xs truncate font-bold"
           >
             {incidentsList.length === 0 ? (
               <option value="">No Active Incidents Available</option>
@@ -289,109 +295,107 @@ export default function AssessmentForm({
         </div>
       </div>
 
-      <form onSubmit={handleFormSubmit} className="space-y-6">
-        {/* Section 1: Mission Metadata & Assessment Mode */}
-        <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-xs">
-          <div className="bg-surface-container-high px-4 sm:px-6 py-3 border-b border-outline-variant flex items-center justify-between">
+      <form onSubmit={handleFormSubmit} className="space-y-4 sm:space-y-6">
+        {/* Section 1: Assessment Modality & Mission Parameters */}
+        <section className="bg-surface-container-lowest rounded-xl border border-outline-variant/80 overflow-hidden shadow-xs">
+          <div className="bg-surface-container px-3.5 sm:px-5 py-2.5 sm:py-3 border-b border-outline-variant flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[18px]">info</span>
-              <h3 className="font-headline-sm text-[14px] font-bold text-on-surface">
-                1. Mission Metadata &amp; Recon Modality
+              <span className="material-symbols-outlined text-primary text-[18px]">satellite_alt</span>
+              <h3 className="font-headline-sm text-[13px] sm:text-[14px] font-bold text-on-surface">
+                1. Assessment Modality &amp; Parameters
               </h3>
             </div>
-            <span className="font-mono-label text-[10px] text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/30">
-              TARGET: {currentIncident?.title || 'Incident #1'}
+            <span className="font-mono-label text-[9px] sm:text-[10px] text-emerald-400 bg-emerald-950/40 px-2 sm:px-2.5 py-0.5 rounded border border-emerald-500/30 font-bold truncate max-w-[240px]">
+              TARGET: {currentIncident?.title || 'Active Incident'}
             </span>
           </div>
 
-          <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-1.5">
+          <div className="p-3.5 sm:p-5 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="space-y-1 sm:space-y-1.5">
               <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
                 Assessment Modality
               </label>
               <select
                 value={assessmentMode}
                 onChange={(e) => setAssessmentMode(e.target.value as AssessmentMode)}
-                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary cursor-pointer"
+                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary cursor-pointer"
               >
-                <option value="Aerial — Drone">Aerial  Drone (UAV)</option>
-                <option value="Aerial — Helicopter">Aerial  Helicopter</option>
-                <option value="Land Team / Vehicle">Land Team / 4x4 Vehicle</option>
-                <option value="Water / Boat Team">Water / Rescue Boat Team</option>
+                <option value="Aerial — Drone">Drone / UAV Reconnaissance</option>
+                <option value="Aerial — Helicopter">Helicopter Aerial Survey</option>
+                <option value="Land Team / Vehicle">Ground Team / 4x4 Survey Unit</option>
+                <option value="Water / Boat Team">Water / Rescue Boat Survey</option>
               </select>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1 sm:space-y-1.5">
               <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
-                Objective Type
+                Objective
               </label>
               <select
                 value={missionType}
                 onChange={(e) => setMissionType(e.target.value as MissionType)}
-                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary cursor-pointer"
+                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary cursor-pointer"
               >
-                <option value="Area Scan / Survey">1. Area Scan / Recon</option>
-                <option value="Damage Assessment">2. Damage Assessment</option>
-                <option value="Search & Rescue Support">3. Search &amp; Rescue Support</option>
-                <option value="Resource Delivery">4. Supply Drop / Delivery</option>
-                <option value="Evacuation / Route Assessment">5. Evacuation Route Assessment</option>
+                <option value="Area Scan / Survey">1. Area Scan &amp; Damage Mapping</option>
+                <option value="Damage Assessment">2. Structural &amp; Infrastructure Assessment</option>
+                <option value="Search & Rescue Support">3. Search &amp; Rescue Triage Support</option>
+                <option value="Resource Delivery">4. Supply Drop / Emergency Delivery</option>
+                <option value="Evacuation / Route Assessment">5. Evacuation Corridor Assessment</option>
                 <option value="Communication / Observation">6. Comms / Relay Observation</option>
               </select>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1 sm:space-y-1.5">
               <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
-                Assessment Time (ZULU)
+                Assessment Time
               </label>
               <input
                 type="time"
                 value={assessmentTime}
                 onChange={(e) => setAssessmentTime(e.target.value)}
-                className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[13px] rounded px-3 py-2 focus:border-primary"
+                className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary"
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1 sm:space-y-1.5">
               <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
-                Weather &amp; Visibility
+                Weather &amp; Ground Conditions
               </label>
               <input
                 type="text"
                 value={weatherCondition}
                 onChange={(e) => setWeatherCondition(e.target.value)}
-                placeholder="e.g. Overcast, 20kt wind"
-                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary"
+                placeholder="e.g. Overcast, 15kt wind"
+                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary"
               />
             </div>
           </div>
         </section>
 
-        {/* Section 2: Spatial Data & Real Leaflet GIS Map */}
-        <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-xs">
-          <div className="bg-surface-container-high px-4 sm:px-6 py-3 border-b border-outline-variant flex items-center justify-between">
+        {/* Section 2: Spatial Data & Interactive Leaflet Map */}
+        <section className="bg-surface-container-lowest rounded-xl border border-outline-variant/80 overflow-hidden shadow-xs">
+          <div className="bg-surface-container px-3.5 sm:px-5 py-2.5 sm:py-3 border-b border-outline-variant flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[18px]">map</span>
-              <h3 className="font-headline-sm text-[14px] font-bold text-on-surface">
-                2. Tactical Spatial Recon Map &amp; Hazards
+              <h3 className="font-headline-sm text-[13px] sm:text-[14px] font-bold text-on-surface">
+                2. Sector Geospatial Coordinates &amp; Recon Map
               </h3>
             </div>
-            <span className="font-mono-label text-[10px] text-on-surface-variant">
-              Target Lat: {currentIncident?.latitude?.toFixed(4) || '29.7604'}, Lon: {currentIncident?.longitude?.toFixed(4) || '-95.3698'}
+            <span className="font-mono-label text-[9px] sm:text-[10px] text-outline">
+              LAT: {currentIncident?.latitude?.toFixed(4) || '29.7604'}, LON: {currentIncident?.longitude?.toFixed(4) || '-95.3698'}
             </span>
           </div>
 
-          <div className="p-4 sm:p-6 space-y-4">
-            {/* Real GIS Leaflet Map for Assessment */}
-            <div className="w-full h-64 rounded border border-outline-variant overflow-hidden relative shadow-inner">
-              <div ref={mapContainerRef} className="w-full h-full bg-surface-container-lowest" />
-              <div className="absolute top-2 left-2 z-400 bg-surface/90 border border-outline-variant px-2.5 py-1 rounded backdrop-blur text-[10px] font-mono-label text-on-surface flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>RECON SECTOR: {currentIncident?.location || (incidentsList.length > 0 ? incidentsList[0].location : 'Unassigned Sector')}</span>
-              </div>
+          <div className="p-3.5 sm:p-5 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="lg:col-span-2 space-y-3">
+              <div
+                ref={mapContainerRef}
+                className="h-[240px] sm:h-[300px] md:h-[340px] w-full rounded-xl overflow-hidden border border-outline-variant relative shadow-inner z-0"
+              />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div className="space-y-1.5">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-1 sm:space-y-1.5">
                 <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
                   Area Surveyed / Sector
                 </label>
@@ -399,94 +403,108 @@ export default function AssessmentForm({
                   type="text"
                   value={areaSurveyed}
                   onChange={(e) => setAreaSurveyed(e.target.value)}
-                  className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary"
+                  className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary"
                 />
               </div>
 
-              <div className="space-y-1.5">
+              {/* Hazards Multi-Select Chips */}
+              <div className="space-y-1 sm:space-y-1.5">
                 <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
-                  Hazards Detected
+                  Identified Hazard Vectors
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { name: 'Flooding', color: 'error' },
-                    { name: 'Downed Power Lines', color: 'error' },
-                    { name: 'Debris', color: 'tertiary' },
-                    { name: 'Landslide Risk', color: 'tertiary' },
-                  ].map((hazard) => {
-                    const isChecked = hazards.includes(hazard.name)
-                    return (
-                      <button
-                        key={hazard.name}
-                        type="button"
-                        onClick={() => toggleHazard(hazard.name)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border transition-colors text-[11px] font-body-sm cursor-pointer ${
-                          isChecked
-                            ? hazard.color === 'error'
-                              ? 'border-error/60 bg-error/15 text-error font-medium'
-                              : 'border-tertiary/60 bg-tertiary/15 text-tertiary font-medium'
-                            : 'border-outline-variant bg-background text-on-surface-variant hover:bg-surface-container'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[14px]">
-                          {isChecked ? 'check_box' : 'check_box_outline_blank'}
-                        </span>
-                        {hazard.name}
-                      </button>
-                    )
-                  })}
+                <div className="flex flex-wrap gap-1.5">
+                  {['Submerged Roads', 'Downed Powerlines', 'Structural Collapse', 'Hazardous Materials', 'Active Fire Perimeter', 'Severe Mudslide'].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => toggleHazard(h)}
+                      className={`px-2.5 py-1 rounded-md text-[10px] sm:text-[11px] font-mono-label transition-colors cursor-pointer border ${
+                        hazards.includes(h)
+                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 font-bold'
+                          : 'bg-background text-on-surface-variant border-outline-variant hover:border-outline'
+                      }`}
+                    >
+                      {hazards.includes(h) ? `✓ ${h}` : `+ ${h}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1 sm:space-y-1.5">
+                <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
+                  Assessment Confidence
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="50"
+                    max="100"
+                    value={confidenceScore}
+                    onChange={(e) => setConfidenceScore(Number(e.target.value))}
+                    className="flex-1 accent-primary cursor-pointer"
+                  />
+                  <span className="font-mono-label text-[11px] sm:text-[12px] font-bold text-primary w-10 text-right">
+                    {confidenceScore}%
+                  </span>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Section 3: Impact Analysis */}
-        <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-xs">
-          <div className="bg-surface-container-high px-4 sm:px-6 py-3 border-b border-outline-variant flex items-center justify-between">
+        {/* Section 3: Ground Impact & Infrastructure Findings */}
+        <section className="bg-surface-container-lowest rounded-xl border border-outline-variant/80 overflow-hidden shadow-xs">
+          <div className="bg-surface-container px-3.5 sm:px-5 py-2.5 sm:py-3 border-b border-outline-variant flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[18px]">analytics</span>
-              <h3 className="font-headline-sm text-[14px] font-bold text-on-surface">
-                3. Field Impact Analysis
+              <h3 className="font-headline-sm text-[13px] sm:text-[14px] font-bold text-on-surface">
+                3. Ground Impact &amp; Accessibility Findings
               </h3>
             </div>
-            <span className="font-mono-label text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+            <span className="font-mono-label text-[9px] sm:text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
               Modality: {assessmentMode}
             </span>
           </div>
 
-          <div className="p-4 sm:p-6 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-3.5 sm:p-5 md:p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               {/* Structure Damaged */}
-              <div className="space-y-1.5">
+              <div className="space-y-1 sm:space-y-1.5">
                 <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
                   Structures Damaged
                 </label>
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-surface-container rounded border border-outline-variant flex items-center justify-center shrink-0">
+                  <div className="p-2 bg-surface-container rounded-lg border border-outline-variant flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[18px] text-on-surface-variant">home_work</span>
                   </div>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="e.g. 12"
                     value={structuresAffected}
-                    onChange={(e) => setStructuresAffected(Number(e.target.value))}
-                    className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[13px] rounded px-3 py-2 focus:border-primary"
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val === '' || /^[0-9]+$/.test(val)) {
+                        setStructuresAffected(val)
+                      }
+                    }}
+                    className="w-full bg-background border border-outline-variant text-on-surface font-mono-label text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary"
                   />
                 </div>
               </div>
 
               {/* Roads / Accessibility */}
-              <div className="space-y-1.5">
+              <div className="space-y-1 sm:space-y-1.5">
                 <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
-                  Roads / Accessibility
+                  Roads &amp; Evacuation Access
                 </label>
                 <select
                   value={roadAccessibility}
                   onChange={(e) => setRoadAccessibility(e.target.value)}
-                  className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary cursor-pointer"
+                  className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary cursor-pointer"
                 >
-                  <option value="Clear">Clear</option>
+                  <option value="Clear">Clear Access</option>
                   <option value="Partially Blocked">Partially Blocked</option>
                   <option value="Multiple Roads Blocked">Multiple Roads Blocked</option>
                   <option value="Impassable">Impassable (Boat / Helicopter Access Only)</option>
@@ -494,12 +512,12 @@ export default function AssessmentForm({
               </div>
 
               {/* People Observed */}
-              <div className="space-y-1.5">
+              <div className="space-y-1 sm:space-y-1.5 sm:col-span-2 md:col-span-1">
                 <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
                   People Observed / Trapped
                 </label>
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-surface-container rounded border border-outline-variant flex items-center justify-center shrink-0">
+                  <div className="p-2 bg-surface-container rounded-lg border border-outline-variant flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[18px] text-on-surface-variant">group</span>
                   </div>
                   <input
@@ -507,7 +525,7 @@ export default function AssessmentForm({
                     value={peopleObserved}
                     onChange={(e) => setPeopleObserved(e.target.value)}
                     placeholder="e.g. 10 trapped on roof"
-                    className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary"
+                    className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary"
                   />
                 </div>
               </div>
@@ -515,30 +533,30 @@ export default function AssessmentForm({
           </div>
         </section>
 
-        {/* Section 4: Recommended Resources & Notes */}
-        <section className="bg-surface rounded-lg border border-outline-variant overflow-hidden shadow-xs">
-          <div className="bg-surface-container-high px-4 sm:px-6 py-3 border-b border-outline-variant flex items-center gap-2">
+        {/* Section 4: Observations & Tactical Recommendations */}
+        <section className="bg-surface-container-lowest rounded-xl border border-outline-variant/80 overflow-hidden shadow-xs">
+          <div className="bg-surface-container px-3.5 sm:px-5 py-2.5 sm:py-3 border-b border-outline-variant flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[18px]">assignment</span>
-            <h3 className="font-headline-sm text-[14px] font-bold text-on-surface">
+            <h3 className="font-headline-sm text-[13px] sm:text-[14px] font-bold text-on-surface">
               4. Recon Observations &amp; Resource Recommendations
             </h3>
           </div>
 
-          <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+          <div className="p-3.5 sm:p-5 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1 sm:space-y-1.5">
               <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
-                Recommended Resources
+                Recommended Resources &amp; Equipment
               </label>
               <textarea
                 rows={3}
                 value={recommendedResources}
                 onChange={(e) => setRecommendedResources(e.target.value)}
-                placeholder="e.g. Water rescue team with inflatable boats, portable dewatering pumps."
-                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary resize-none"
+                placeholder="e.g. Water rescue squad with inflatable boats, dewatering pumps, trauma field kit."
+                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary resize-none"
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1 sm:space-y-1.5">
               <label className="block font-mono-label text-[10px] text-on-surface-variant font-bold uppercase">
                 Operator Field Observations
               </label>
@@ -546,29 +564,30 @@ export default function AssessmentForm({
                 rows={3}
                 value={operatorObservations}
                 onChange={(e) => setOperatorObservations(e.target.value)}
-                placeholder="Enter direct operator notes, access conditions, structural safety..."
-                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded px-3 py-2 focus:border-primary resize-none"
+                placeholder="Enter direct observations regarding flood surge, route bottlenecks, building stability..."
+                className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[12px] sm:text-[13px] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 focus:border-primary resize-none"
               />
             </div>
           </div>
         </section>
 
-        {/* Bottom Actions */}
-        <div className="flex items-center justify-between pt-2">
+        {/* Bottom Actions Toolbar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 pb-6">
           <button
             type="button"
             onClick={handleSaveDraft}
-            className="px-4 py-2 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-mono-label text-[11px] font-bold rounded uppercase cursor-pointer transition-colors"
+            className="px-4 py-2.5 bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface font-mono-label text-[11px] font-bold rounded-lg uppercase cursor-pointer transition-colors text-center"
           >
             {draftSaved ? 'Draft Saved ✓' : 'Save Draft'}
           </button>
 
           <button
             type="submit"
-            className="px-6 py-2.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[12px] font-bold rounded uppercase cursor-pointer transition-colors shadow-sm flex items-center gap-2"
+            disabled={isSubmitting}
+            className="px-6 py-2.5 bg-primary hover:bg-primary-container text-on-primary font-mono-label text-[12px] font-bold rounded-lg uppercase cursor-pointer transition-colors shadow-sm flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-[16px]">send</span>
-            <span>Submit Assessment &amp; Verify Incident</span>
+            <span>{isSubmitting ? 'Integrating Assessment...' : 'Submit Assessment & Verify Incident'}</span>
           </button>
         </div>
       </form>

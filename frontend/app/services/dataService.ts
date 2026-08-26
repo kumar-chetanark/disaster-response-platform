@@ -681,33 +681,68 @@ class PlatformDataService {
 
   // 10. Assessment Submission
   async submitAssessment(submission: AssessmentSubmission): Promise<any> {
+    // 1. Create the assessment draft matching AssessmentDraftCreate schema
+    const payload = {
+      incident_id: submission.relatedIncidentId,
+      assessment_mode: submission.assessmentMode,
+      mission_type: submission.missionType,
+      asset_id: submission.assetId || 'field-team-1',
+      asset_name: submission.assetName || 'Field Recon Team',
+      assessment_time: submission.assessmentTime || '12:00',
+      weather_conditions: submission.weatherCondition || 'Clear',
+      area_surveyed: submission.areaSurveyed || 'Target Sector',
+      hazards_detected: Array.isArray(submission.hazardsDetected)
+        ? submission.hazardsDetected.join(', ')
+        : (submission.hazardsDetected || ''),
+      structures_damaged_count: Number(submission.structuresAffected) || 0,
+      road_accessibility_status: submission.roadAccessibility || 'Clear',
+      people_observed: submission.peopleObserved || '',
+      recommended_resources: submission.recommendedResources || '',
+      evacuation_route_status: submission.evacuationStatus || 'Clear',
+      operator_observations: submission.operatorObservations || '',
+      confidence_score: Number(submission.confidenceScore) || 90.0,
+      media_file_urls: Array.isArray(submission.mediaFiles)
+        ? submission.mediaFiles.join(', ')
+        : (submission.mediaFiles || ''),
+    }
+
     const res = await fetch(`${API_BASE_URL}/api/assessments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        incident_id: submission.relatedIncidentId,
-        assessment_mode: submission.assessmentMode,
-        mission_type: submission.missionType,
-        assessment_time: submission.assessmentTime,
-        weather_condition: submission.weatherCondition,
-        area_surveyed: submission.areaSurveyed,
-        hazards_detected: submission.hazardsDetected,
-        structures_affected: submission.structuresAffected,
-        road_accessibility: submission.roadAccessibility,
-        people_observed: submission.peopleObserved,
-        recommended_resources: submission.recommendedResources,
-        evacuation_status: submission.evacuationStatus,
-        operator_observations: submission.operatorObservations,
-        confidence_score: submission.confidenceScore,
-        media_files: submission.mediaFiles,
-      }),
+      body: JSON.stringify(payload),
     })
 
     if (!res.ok) {
-      throw new Error('Failed to record field assessment in backend.')
+      let detailMsg = 'Failed to record field assessment in backend.'
+      try {
+        const err = await res.json()
+        if (err.detail) {
+          detailMsg = Array.isArray(err.detail)
+            ? err.detail.map((d: any) => `${d.loc?.join('.')} -> ${d.msg}`).join('; ')
+            : String(err.detail)
+        }
+      } catch {
+        // use fallback
+      }
+      throw new Error(detailMsg)
     }
 
-    return await res.json()
+    const createdAssessment = await res.json()
+
+    // 2. Submit to command to trigger closed-loop recalculation and verification
+    try {
+      const submitRes = await fetch(`${API_BASE_URL}/api/assessments/${createdAssessment.id}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (submitRes.ok) {
+        return await submitRes.json()
+      }
+    } catch (e) {
+      console.warn('Could not auto-submit assessment to command:', e)
+    }
+
+    return createdAssessment
   }
 
   // 11. SMS Degraded Intake
@@ -960,6 +995,58 @@ class PlatformDataService {
   }
 
   // ==========================================
+
+  // ==========================================
+  // Persistent "Seen / Read" Item Tracking
+  // ==========================================
+  getSeenIds(category: 'incident' | 'alert' | 'report' | 'operation'): Set<string> {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const raw = localStorage.getItem(`seen_${category}s`)
+      return new Set(raw ? JSON.parse(raw) : [])
+    } catch {
+      return new Set()
+    }
+  }
+
+  markAsSeen(category: 'incident' | 'alert' | 'report' | 'operation', id: string): void {
+    if (typeof window === 'undefined' || !id) return
+    try {
+      const current = this.getSeenIds(category)
+      if (!current.has(id)) {
+        current.add(id)
+        localStorage.setItem(`seen_${category}s`, JSON.stringify(Array.from(current)))
+        window.dispatchEvent(new Event('storage'))
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  markAllAsSeen(category: 'incident' | 'alert' | 'report' | 'operation', ids: string[]): void {
+    if (typeof window === 'undefined' || !ids || ids.length === 0) return
+    try {
+      const current = this.getSeenIds(category)
+      let changed = false
+      for (const id of ids) {
+        if (!current.has(id)) {
+          current.add(id)
+          changed = true
+        }
+      }
+      if (changed) {
+        localStorage.setItem(`seen_${category}s`, JSON.stringify(Array.from(current)))
+        window.dispatchEvent(new Event('storage'))
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  isSeen(category: 'incident' | 'alert' | 'report' | 'operation', id: string): boolean {
+    return this.getSeenIds(category).has(id)
+  }
+
   // Persistent Favorite (Star) Helpers
   // ==========================================
   getStarredIds(category: 'incident' | 'alert' | 'report' | 'operation' | 'resource'): Set<string> {

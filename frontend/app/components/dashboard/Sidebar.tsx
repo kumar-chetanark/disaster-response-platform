@@ -2,45 +2,46 @@
 
 import React from 'react'
 
-interface NavItem {
-  id: string
-  label: string
-  icon: string
-  badge?: number
-}
-
 interface SidebarProps {
   currentTab: string
   isCollapsed?: boolean
   isMobileOpen?: boolean
+  alertCount?: number
+  incidentCount?: number
+  operationCount?: number
+  reportCount?: number
   onSelectTab: (id: string) => void
   onCloseMobile?: () => void
   onLogout?: () => void
 }
 
-const mainNavItems: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { id: 'incidents', label: 'Incidents', icon: 'warning' },
-  { id: 'operations', label: 'Operations', icon: 'map' },
-  { id: 'resources', label: 'Resources', icon: 'inventory_2' },
-  { id: 'assessment', label: 'Assessment', icon: 'satellite_alt' },
-  { id: 'alerts', label: 'Alerts', icon: 'campaign', badge: 3 },
-  { id: 'reports', label: 'Reports', icon: 'description' },
-]
-
-const utilityNavItems: NavItem[] = [
-  { id: 'settings', label: 'Settings', icon: 'settings' },
-  { id: 'support', label: 'Support', icon: 'help' },
-]
-
 export default function Sidebar({
   currentTab,
   isCollapsed = false,
   isMobileOpen = false,
+  alertCount = 0,
+  incidentCount = 0,
+  operationCount = 0,
+  reportCount = 0,
   onSelectTab,
   onCloseMobile,
   onLogout,
 }: SidebarProps) {
+  const mainNavItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { id: 'incidents', label: 'Incidents', icon: 'warning', badge: incidentCount > 0 ? incidentCount : undefined },
+    { id: 'operations', label: 'Operations', icon: 'map', badge: operationCount > 0 ? operationCount : undefined },
+    { id: 'resources', label: 'Resources', icon: 'inventory_2' },
+    { id: 'assessment', label: 'Assessment', icon: 'satellite_alt' },
+    { id: 'alerts', label: 'Alerts', icon: 'campaign', badge: alertCount > 0 ? alertCount : undefined, isAlertBadge: true },
+    { id: 'reports', label: 'Reports', icon: 'description', badge: reportCount > 0 ? reportCount : undefined },
+  ]
+
+  const utilityNavItems = [
+    { id: 'settings', label: 'Settings', icon: 'settings' },
+    { id: 'support', label: 'Support', icon: 'help' },
+  ]
+
   const handleItemClick = (id: string) => {
     onSelectTab(id)
     if (onCloseMobile) {
@@ -95,8 +96,14 @@ export default function Sidebar({
 
                   {(!isCollapsed || isMobileOpen) && <span className="font-body-sm flex-grow truncate">{item.label}</span>}
 
-                  {(!isCollapsed || isMobileOpen) && item.badge && (
-                    <span className="bg-surface-variant text-on-surface-variant font-mono-label text-[10px] px-1.5 py-0.5 rounded border border-outline-variant shrink-0 ml-1">
+                  {(!isCollapsed || isMobileOpen) && item.badge !== undefined && (
+                    <span
+                      className={`font-mono-label text-[10px] px-1.5 py-0.5 rounded border shrink-0 ml-1 font-bold ${
+                        item.isAlertBadge
+                          ? 'bg-error/20 text-error border-error/40 animate-pulse'
+                          : 'bg-surface-variant text-on-surface font-semibold border-outline-variant'
+                      }`}
+                    >
                       {item.badge}
                     </span>
                   )}

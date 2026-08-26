@@ -34,6 +34,12 @@ export default function ReportsConsole({
 
   useEffect(() => {
     setStarredIds(platformDataService.getStarredIds('report'))
+    if (initialReports.length > 0) {
+      const firstId = initialSelectedId || initialReports[0]?.id
+      if (firstId) {
+        platformDataService.markAsSeen('report', firstId)
+      }
+    }
   }, [])
 
   const handleToggleStar = (e: React.MouseEvent, id: string) => {
@@ -314,7 +320,22 @@ export default function ReportsConsole({
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        {/* High-Visibility Star / Favorite Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleStar(e, rep.id)}
+                          className={`px-1.5 py-0.5 rounded border text-[13px] flex items-center gap-1 cursor-pointer transition-all ${
+                            starredIds.has(rep.id)
+                              ? 'bg-amber-500/25 border-amber-500/60 text-amber-300 font-bold shadow-sm'
+                              : 'bg-surface-container border-outline-variant text-outline hover:text-amber-300 hover:border-amber-400/50'
+                          }`}
+                          title={starredIds.has(rep.id) ? 'Starred (Click to unstar)' : 'Click to star / favorite'}
+                        >
+                          <span>{starredIds.has(rep.id) ? '★' : '☆'}</span>
+                          <span className="text-[10px] font-mono-label">{starredIds.has(rep.id) ? 'STARRED' : 'STAR'}</span>
+                        </button>
+
                         <span className="font-mono-label text-[10px] text-primary font-bold uppercase bg-primary/10 px-1.5 py-0.2 rounded border border-primary/20">
                           {rep.type || rep.reportType}
                         </span>
@@ -323,9 +344,22 @@ export default function ReportsConsole({
                         </span>
                       </div>
 
-                      <span className="font-mono-label text-[10px] text-on-surface-variant">
-                        {rep.date || rep.timestamp}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono-label text-[10px] text-on-surface-variant">
+                          {rep.date || rep.timestamp}
+                        </span>
+                        {/* High-Visibility Delete Button */}
+                        <button
+                          type="button"
+                          disabled={deletingId === rep.id}
+                          onClick={(e) => handleDeleteReport(e, rep.id)}
+                          className="px-2 py-0.5 rounded border border-red-500/30 bg-red-950/20 hover:bg-red-900/40 text-red-400 font-mono-label text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                          title="Permanently delete report"
+                        >
+                          <span>🗑️</span>
+                          <span>{deletingId === rep.id ? 'DELETING...' : 'DELETE'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     <h4 className="font-headline-sm font-semibold text-[13px] text-on-surface leading-snug">

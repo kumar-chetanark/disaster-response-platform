@@ -61,16 +61,19 @@ export default function PriorityIncidentsList({
           {/* Header: Star + Title + Actions + Severity */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              {/* Star Button */}
+              {/* High-Visibility Star Button */}
               <button
                 type="button"
                 onClick={(e) => handleToggleStar(e, incident.id)}
-                className="p-0.5 rounded text-outline hover:text-amber-400 transition-colors"
+                className={`px-1.5 py-0.5 rounded border text-[13px] flex items-center gap-1 cursor-pointer transition-all ${
+                  starredIds.has(incident.id)
+                    ? 'bg-amber-500/25 border-amber-500/60 text-amber-300 font-bold shadow-sm'
+                    : 'bg-surface-container-highest border-outline-variant text-outline hover:text-amber-300 hover:border-amber-400/50'
+                }`}
                 title="Star / Favorite incident"
               >
-                <span className={`material-symbols-outlined text-[18px] ${starredIds.has(incident.id) ? 'text-amber-400 fill-current' : ''}`}>
-                  {starredIds.has(incident.id) ? 'star' : 'star_border'}
-                </span>
+                <span>{starredIds.has(incident.id) ? '★' : '☆'}</span>
+                <span className="text-[10px] font-mono-label">{starredIds.has(incident.id) ? 'STARRED' : 'STAR'}</span>
               </button>
               <h3 className="font-body-base text-body-base font-semibold text-on-surface leading-tight truncate">
                 {incident.title}
@@ -78,7 +81,7 @@ export default function PriorityIncidentsList({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* Delete Button */}
+              {/* High-Visibility Delete Button */}
               {onDeleteIncident && (
                 <button
                   type="button"
@@ -86,10 +89,11 @@ export default function PriorityIncidentsList({
                     e.stopPropagation()
                     onDeleteIncident(incident.id)
                   }}
-                  className="p-1 rounded text-outline hover:text-red-400 hover:bg-red-950/30 transition-colors"
+                  className="px-2 py-0.5 rounded border border-red-500/30 bg-red-950/20 hover:bg-red-900/40 text-red-400 font-mono-label text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
                   title="Delete incident"
                 >
-                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                  <span>🗑️</span>
+                  <span>DELETE</span>
                 </button>
               )}
               <span className={`font-mono-label text-[10px] px-2 py-0.5 rounded font-bold uppercase shrink-0 border ${getSeverityBadgeStyle(incident.severity)}`}>

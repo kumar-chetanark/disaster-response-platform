@@ -35,6 +35,8 @@ import {
 import { platformDataService } from './services/dataService'
 
 export default function App() {
+
+
   // Session: Default CITIZEN experience
   const [session, setSession] = useState<UserSession>({ role: 'CITIZEN' })
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
@@ -84,6 +86,69 @@ export default function App() {
   
   const [isReassessed, setIsReassessed] = useState(false)
   const [resourceCoverage, setResourceCoverage] = useState('84%')
+
+  // Unseen tracking sets for dynamic badge reduction
+  const [seenAlertIds, setSeenAlertIds] = useState<Set<string>>(new Set())
+  const [seenIncidentIds, setSeenIncidentIds] = useState<Set<string>>(new Set())
+  const [seenReportIds, setSeenReportIds] = useState<Set<string>>(new Set())
+  const [seenOperationIds, setSeenOperationIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    setSeenAlertIds(platformDataService.getSeenIds('alert'))
+    setSeenIncidentIds(platformDataService.getSeenIds('incident'))
+    setSeenReportIds(platformDataService.getSeenIds('report'))
+    setSeenOperationIds(platformDataService.getSeenIds('operation'))
+  }, [])
+
+  const markAlertSeen = (altId: string) => {
+    platformDataService.markAsSeen('alert', altId)
+    setSeenAlertIds(new Set(platformDataService.getSeenIds('alert')))
+  }
+
+  const markAllAlertsSeen = () => {
+    const allIds = (alerts || []).map((a) => a.id)
+    platformDataService.markAllAsSeen('alert', allIds)
+    setSeenAlertIds(new Set(platformDataService.getSeenIds('alert')))
+  }
+
+  const markIncidentSeen = (incId: string) => {
+    platformDataService.markAsSeen('incident', incId)
+    setSeenIncidentIds(new Set(platformDataService.getSeenIds('incident')))
+  }
+
+  const markAllIncidentsSeen = () => {
+    const allIds = (incidents || []).map((i) => i.id)
+    platformDataService.markAllAsSeen('incident', allIds)
+    setSeenIncidentIds(new Set(platformDataService.getSeenIds('incident')))
+  }
+
+  const markReportSeen = (repId: string) => {
+    platformDataService.markAsSeen('report', repId)
+    setSeenReportIds(new Set(platformDataService.getSeenIds('report')))
+  }
+
+  const markAllReportsSeen = () => {
+    const allIds = (reports || []).map((r) => r.id)
+    platformDataService.markAllAsSeen('report', allIds)
+    setSeenReportIds(new Set(platformDataService.getSeenIds('report')))
+  }
+
+  const markOperationSeen = (opId: string) => {
+    platformDataService.markAsSeen('operation', opId)
+    setSeenOperationIds(new Set(platformDataService.getSeenIds('operation')))
+  }
+
+  const markAllOperationsSeen = () => {
+    const allIds = (operations || []).map((o) => o.id)
+    platformDataService.markAllAsSeen('operation', allIds)
+    setSeenOperationIds(new Set(platformDataService.getSeenIds('operation')))
+  }
+
+  const unreadAlertCount = (alerts || []).filter((a) => !seenAlertIds.has(a.id)).length
+  const unreadIncidentCount = (incidents || []).filter((i) => !seenIncidentIds.has(i.id)).length
+  const unreadReportCount = (reports || []).filter((r) => !seenReportIds.has(r.id)).length
+  const unreadOperationCount = (operations || []).filter((o) => !seenOperationIds.has(o.id)).length
+
 
   const [notification, setNotification] = useState<{
     msg: string
@@ -289,16 +354,18 @@ export default function App() {
     setIncidents(updatedIncidents)
     setLatestAssessment(submission)
 
+    const targetIncident = updatedIncidents.find((i) => i.id === submission.relatedIncidentId) || updatedIncidents[0]
+
     const newAlert: ActiveAlert = {
       id: `alt-${Date.now()}`,
       time: submission.submittedAt,
       category: 'CIVIL',
       source: `Field Assessment Mission ${submission.id}`,
       location: submission.areaSurveyed,
-      message: `[FIELD REPORT] Recon confirms ${submission.roadAccessibility} in ${submission.areaSurveyed}. Specialized extraction required.`,
+      message: `[FIELD REPORT] Recon confirms ${submission.roadAccessibility} in ${submission.areaSurveyed}. Assessment verified.`,
       severity: 'critical',
-      relatedIncidentId: incidents[0]?.id || '',
-      relatedIncidentTitle: incidents[0]?.title || 'Active Incident',
+      relatedIncidentId: targetIncident?.id || '',
+      relatedIncidentTitle: targetIncident?.title || 'Active Incident',
       isReviewedByAuthority: false,
     }
     setAlerts((prev) => [newAlert, ...prev])
@@ -398,7 +465,10 @@ export default function App() {
             incidents={incidents}
             selectedIncidentId={selectedIncidentId}
             advisories={advisories}
-            onSelectIncident={(id) => setSelectedIncidentId(id)}
+            onSelectIncident={(id) => {
+              setSelectedIncidentId(id)
+              markIncidentSeen(id)
+            }}
             onOpenAssessment={() => setCurrentTab('assessment')}
             onOpenReportPreview={async (incId) => {
               try {
@@ -431,7 +501,10 @@ export default function App() {
           <OperationsConsole
             operations={operations}
             selectedOperationId={selectedOperationId}
-            onSelectOperation={(id) => setSelectedOperationId(id)}
+            onSelectOperation={(id) => {
+              setSelectedOperationId(id)
+              markOperationSeen(id)
+            }}
             onOpenAssessment={() => setCurrentTab('assessment')}
           />
         )
@@ -455,11 +528,18 @@ export default function App() {
         const dispatchedAsset = aerialAssets.find((a) => a.status === 'DISPATCHED') || aerialAssets[0]
         return (
           <AssessmentForm
-              incidents={incidents}
-            initialIncidentTitle={incidents[0]?.title || ''}
+            incidents={incidents}
+            initialIncidentId={selectedIncidentId || incidents[0]?.id}
+            initialIncidentTitle={incidents.find((i) => i.id === selectedIncidentId)?.title || incidents[0]?.title || ''}
             initialAsset={dispatchedAsset}
             onSubmit={handleAssessmentSubmit}
-            onBackToDashboard={() => setCurrentTab('dashboard')}
+            onBackToDashboard={() => {
+              if (selectedIncidentId) {
+                setCurrentTab('incidents')
+              } else {
+                setCurrentTab('dashboard')
+              }
+            }}
           />
         )
       }
@@ -469,7 +549,13 @@ export default function App() {
           <AlertsConsole
             alerts={alerts}
             selectedAlertId={selectedAlertId}
-            onSelectAlert={(val: any) => setSelectedAlertId(typeof val === 'string' ? val : val?.id || null)}
+            onSelectAlert={(val: any) => {
+              const altId = typeof val === 'string' ? val : val?.id || null
+              if (altId) {
+                setSelectedAlertId(altId)
+                markAlertSeen(altId)
+              }
+            }}
             onNavigateToIncident={(incId: string) => {
               setSelectedIncidentId(incId)
               setCurrentTab('incidents')
@@ -489,7 +575,10 @@ export default function App() {
             reports={reports}
             incidents={incidents}
             selectedReportId={selectedReportId}
-            onSelectReport={(id) => setSelectedReportId(id)}
+            onSelectReport={(id) => {
+              setSelectedReportId(id)
+              markReportSeen(id)
+            }}
             onDownloadPDF={async (reportId: string) => {
               const rep = reports.find((r) => r.id === reportId)
               const fname = rep ? `report_${rep.id}_${(rep.type || rep.reportType || 'sitrep').toLowerCase()}.pdf` : undefined
@@ -625,6 +714,8 @@ export default function App() {
               <ActiveAlertsTicker
                 alerts={alerts}
                 onSelectAlert={(id) => {
+                  setSelectedAlertId(id)
+                  markAlertSeen(id)
                   setCurrentTab('alerts')
                 }}
                 onDeleteAlert={handleDeleteAlertGlobal}
@@ -680,7 +771,22 @@ export default function App() {
         currentTab={currentTab}
         isCollapsed={isSidebarCollapsed}
         isMobileOpen={isMobileSidebarOpen}
-        onSelectTab={setCurrentTab}
+        alertCount={unreadAlertCount}
+        incidentCount={unreadIncidentCount}
+        operationCount={unreadOperationCount}
+        reportCount={unreadReportCount}
+        onSelectTab={(tabId) => {
+          setCurrentTab(tabId)
+          if (tabId === 'alerts') {
+            markAllAlertsSeen()
+          } else if (tabId === 'incidents') {
+            markAllIncidentsSeen()
+          } else if (tabId === 'reports') {
+            markAllReportsSeen()
+          } else if (tabId === 'operations') {
+            markAllOperationsSeen()
+          }
+        }}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         onLogout={() => {
           setSession({ role: 'CITIZEN' })

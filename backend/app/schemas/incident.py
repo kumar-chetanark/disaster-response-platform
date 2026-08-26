@@ -155,6 +155,7 @@ class IncidentIntelligenceResponse(BaseModel):
     key_risks: List[Any] = []
     required_capabilities: List[Dict[str, Any]] = []
     resource_recommendations: List[Dict[str, Any]] = []
+    latest_assessment: Optional[Dict[str, Any]] = None
     operational_state: OperationalStateMetrics
     decision_support: DecisionSupportSummary
     evidence: List[Dict[str, Any]] = []

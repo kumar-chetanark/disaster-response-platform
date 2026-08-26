@@ -6,6 +6,7 @@ from app.models.incident import Incident
 from app.models.operation import Operation
 from app.models.resource import Resource
 from app.models.incident_source import IncidentSource
+from app.models.assessment import Assessment
 from app.services.confidence_service import calculate_incident_confidence
 from app.services.allocation_engine import (
     analyze_incident,
@@ -33,6 +34,33 @@ def get_incident_intelligence(db: Session, incident_id: str) -> Optional[Dict[st
         return None
 
     now = datetime.now(timezone.utc)
+
+        # 1b. Field Assessment Telemetry Ingestion
+    latest_assessment = (
+        db.query(Assessment)
+        .filter(Assessment.incident_id == inc.id)
+        .order_by(Assessment.submitted_at.desc())
+        .first()
+    )
+    assessment_data = None
+    if latest_assessment:
+        assessment_data = {
+            "id": latest_assessment.id,
+            "mode": latest_assessment.assessment_mode,
+            "mission_type": latest_assessment.mission_type,
+            "asset_name": latest_assessment.asset_name,
+            "weather": latest_assessment.weather_conditions or "Clear",
+            "area_surveyed": latest_assessment.area_surveyed,
+            "hazards_detected": latest_assessment.hazards_detected or "None flagged",
+            "structures_damaged": latest_assessment.structures_damaged_count or 0,
+            "road_accessibility": latest_assessment.road_accessibility_status or "Clear",
+            "people_observed": latest_assessment.people_observed or "None reported",
+            "recommended_resources": latest_assessment.recommended_resources or "Standard response",
+            "evacuation_status": latest_assessment.evacuation_route_status or "Clear",
+            "operator_notes": latest_assessment.operator_observations or "No additional field notes.",
+            "confidence": latest_assessment.confidence_score or 90.0,
+            "timestamp": latest_assessment.submitted_at.strftime("%I:%M %p") if latest_assessment.submitted_at else "Recent",
+        }
 
     # 1. Multi-source Confidence Telemetry
     conf_data = calculate_incident_confidence(db=db, incident=inc)
@@ -129,21 +157,43 @@ def get_incident_intelligence(db: Session, incident_id: str) -> Optional[Dict[st
                     "capability": cap,
                 })
             else:
-                # Find if an available resource exists in recommendation pool
-                matching_recs = [
-                    r for r in recommendations
-                    if str(r.get("resource_category") or "").lower() == cap
-                    and not r.get("unmet_demand")
+                # Find directly if any AVAILABLE resource in database matches this capability
+                # Find strictly AVAILABLE resources not assigned to any active mission
+                active_op_res_ids = {
+                    op.resource_id for op in db.query(Operation).filter(
+                        Operation.state.in_(["ASSIGNED", "DISPATCHED", "EN_ROUTE", "ON_SCENE", "IN_PROGRESS", "IN OPERATION", "IN TRANSIT"])
+                    ).all() if op.resource_id
+                }
+                
+                avail_resources = [
+                    r for r in db.query(Resource).filter(Resource.status == "AVAILABLE").all()
+                    if r.id not in active_op_res_ids and not r.assigned_incident_id
                 ]
-                if matching_recs:
-                    best_res = matching_recs[0]
+                
+                # Check direct or interoperable capability match first
+                matching_avail = [
+                    r for r in avail_resources
+                    if str(r.category).lower() == cap.lower() or
+                    (cap in ["land", "debris", "heavy"] and str(r.category).lower() in ["land", "rescue", "fire"]) or
+                    (cap in ["rescue", "extraction"] and str(r.category).lower() in ["rescue", "water", "land", "aerial"]) or
+                    (cap in ["water", "flood"] and str(r.category).lower() in ["water", "rescue"]) or
+                    (cap in ["medical", "trauma", "triage"] and str(r.category).lower() in ["medical", "rescue"]) or
+                    (cap in ["aerial", "recon", "survey"] and str(r.category).lower() in ["aerial", "recon"])
+                ]
+
+                # If no exact category matches but there are other general AVAILABLE unassigned resources in inventory, offer the best available squad
+                if not matching_avail and avail_resources:
+                    matching_avail = avail_resources
+
+                if matching_avail:
+                    best_unit = matching_avail[0]
                     recommended_actions.append({
                         "action": f"DEPLOY_{cap.upper()}",
                         "priority": req_prio,
-                        "reason": f"Tactical requirement '{cap}' is unmet. Recommend deploying available unit '{best_res.get('resource_name')}'.",
+                        "reason": f"Tactical requirement '{cap}' is required. Recommend deploying available unit '{best_unit.name}' ({best_unit.personnel_count or 1} personnel ready).",
                         "capability": cap,
-                        "resource_id": best_res.get("resource_id"),
-                        "resource_name": best_res.get("resource_name"),
+                        "resource_id": best_unit.id,
+                        "resource_name": best_unit.name,
                     })
                 else:
                     blocking_factors.append(
@@ -152,7 +202,7 @@ def get_incident_intelligence(db: Session, incident_id: str) -> Optional[Dict[st
                     recommended_actions.append({
                         "action": f"REQUEST_MUTUAL_AID_{cap.upper()}",
                         "priority": "CRITICAL",
-                        "reason": f"Zero local '{cap}' assets available. Request emergency mutual aid assistance or redistribute from standby hubs.",
+                        "reason": f"Zero local '{cap}' assets available in operational inventory. Request emergency mutual aid assistance.",
                         "capability": cap,
                     })
 
@@ -165,13 +215,34 @@ def get_incident_intelligence(db: Session, incident_id: str) -> Optional[Dict[st
                 "capability": None,
             })
 
-    # 7. Synthesize Situation Summary
+    # 7. Synthesize Rich, Clear & Formatted Situation Summary
     sources_summary = f"{conf_data.get('independent_source_count', 1)} independent source(s)"
+    
+    # Threat Vector Synthesis
+    threat_points = []
+    if getattr(inc, "severity", "") == "CRITICAL":
+        threat_points.append("Severe hazard to trapped residents with critical lifeline access cut off")
+    elif getattr(inc, "severity", "") == "HIGH":
+        threat_points.append("Significant infrastructure damage and elevated civilian risk")
+        
+    if inc.disaster_type == "Flood":
+        threat_points.append("Rising flood waters inundating residential ground floors")
+    elif inc.disaster_type == "Earthquake":
+        threat_points.append("Structural building instability with heavy rubble and debris")
+    elif inc.disaster_type in ["Fire", "Wildfire"]:
+        threat_points.append("Spreading active flame front and dense smoke plumes")
+    elif inc.disaster_type == "Industrial":
+        threat_points.append("Hazardous chemical vapor plume requiring exclusion perimeter")
+    else:
+        threat_points.append("Volatile crisis conditions requiring immediate on-ground stabilization")
+
+    threat_narrative = "; ".join(threat_points)
+
     situation_summary = (
-        f"{inc.title} ({inc.disaster_type}) at {inc.location_name}. "
-        f"Status: {inc_status}, Priority: {inc.priority_level} ({prio_data.get('priority_score', 0)}/100). "
-        f"Assessed with {conf_score}% confidence from {sources_summary}. "
-        f"Active response: {active_mission_count} active mission(s), {completed_count} completed."
+        f"{inc.title} is currently evaluated as a {getattr(inc, 'severity', 'HIGH')} severity {inc.disaster_type} emergency in {inc.location_name}. "
+        f"Operational priority is established at {inc.priority_level or 'Level 1'} (Priority Index: {prio_data.get('priority_score', 0)}/100) with {conf_score}% corroboration certainty from {sources_summary}. "
+        f"Primary hazards include: {threat_narrative}. "
+        f"Current field posture: {active_mission_count} mission(s) active on scene / en route, with {avail_count} specialized squad(s) available in reserve for immediate dispatch."
     )
 
     # 8. Evidence list
@@ -192,6 +263,15 @@ def get_incident_intelligence(db: Session, incident_id: str) -> Optional[Dict[st
         "incident_title": inc.title,
         "incident_status": inc_status,
         "situation_summary": situation_summary,
+        "crisis_context": {
+            "disaster_type": inc.disaster_type,
+            "severity": getattr(inc, "severity", "HIGH"),
+            "priority": inc.priority_level or "Level 1",
+            "priority_score": prio_data.get("priority_score", 0),
+            "location": inc.location_name,
+            "threat_summary": threat_narrative,
+            "corroboration": f"{conf_score}% certainty ({sources_summary})",
+        },
         "confidence": {
             "score": conf_score,
             "level": conf_level,
@@ -205,6 +285,7 @@ def get_incident_intelligence(db: Session, incident_id: str) -> Optional[Dict[st
         "key_risks": key_risks,
         "required_capabilities": requirements,
         "resource_recommendations": recommendations,
+        "latest_assessment": assessment_data,
         "operational_state": {
             "active_missions": active_mission_count,
             "assigned": assigned_count,
