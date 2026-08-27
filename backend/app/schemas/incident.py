@@ -131,6 +131,7 @@ class IncidentIntelligenceConfidence(BaseModel):
     score: int
     level: str
     independent_sources: int
+    sources_breakdown: Dict[str, int] = {}
 
 class IncidentIntelligencePriority(BaseModel):
     score: float

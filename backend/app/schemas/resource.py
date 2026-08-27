@@ -3,11 +3,18 @@ from pydantic import BaseModel, Field
 
 class ResourceCreate(BaseModel):
     name: str = Field(..., min_length=2, description="Resource unit name")
-    category: str = Field(..., description="medical, police_army, rescue, aerial, water, land, shelter, supplies")
-    status: str = Field("AVAILABLE", description="AVAILABLE, IN OPERATION, DISPATCHED, MAINTENANCE, UNAVAILABLE")
-    base_location: str = Field(..., description="Base base/hub location name")
+    type: Optional[str] = Field("Squad", description="Squad, Ambulance, UAV Drone, Helicopter, Boat, Shelter")
+    category: str = Field(..., description="rescue, medical, aerial, water, land, shelter, supplies, police_army")
+    status: str = Field("AVAILABLE", description="AVAILABLE, ASSIGNED, DISPATCHED, EN_ROUTE, ON_SCENE, UNAVAILABLE, MAINTENANCE")
+    base_location: str = Field(..., description="Base hub or district location name")
     latitude: Optional[float] = Field(None, description="Base GPS Latitude")
     longitude: Optional[float] = Field(None, description="Base GPS Longitude")
+    
+    capabilities: Optional[str] = Field(None, description="Comma-separated capabilities: Water Rescue, Trauma Care, Aerial Recon")
+    capacity: Optional[int] = Field(None, description="Transport / Evacuation capacity count")
+    operating_range: Optional[str] = Field(None, description="Operating range or flight endurance")
+    vehicle_registration: Optional[str] = Field(None, description="Vehicle ID / callsign")
+
     personnel_count: Optional[int] = Field(0, description="Number of personnel")
     equipment_details: Optional[str] = Field(None, description="Description of equipment")
     
@@ -21,7 +28,16 @@ class ResourceCreate(BaseModel):
 
 class ResourceUpdate(BaseModel):
     name: Optional[str] = None
+    type: Optional[str] = None
     status: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    capabilities: Optional[str] = None
+    capacity: Optional[int] = None
+    operating_range: Optional[str] = None
+    vehicle_registration: Optional[str] = None
+    assigned_incident_id: Optional[str] = None
+    assigned_operation_id: Optional[str] = None
     personnel_count: Optional[int] = None
     equipment_details: Optional[str] = None
     shelter_capacity: Optional[int] = None
@@ -34,11 +50,18 @@ class ResourceUpdate(BaseModel):
 class ResourceResponse(BaseModel):
     id: str
     name: str
+    type: Optional[str] = "Squad"
     category: str
     status: str
     base_location: str
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    capabilities: Optional[str] = None
+    capacity: Optional[int] = None
+    operating_range: Optional[str] = None
+    vehicle_registration: Optional[str] = None
+    assigned_incident_id: Optional[str] = None
+    assigned_operation_id: Optional[str] = None
     personnel_count: int
     equipment_details: Optional[str] = None
     distance_km: Optional[float] = None

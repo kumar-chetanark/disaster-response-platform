@@ -12,10 +12,14 @@ from app.models.shelter import Shelter
 from app.models.operation import Operation
 from app.models.assessment import Assessment
 
-def seed_database(reset: bool = False):
+def seed_database(reset: bool = False, populate_demo_resources: bool = False):
     """
-    Seed operational resources, shelters, baseline reports, and clean active incident state.
-    Incidents are created dynamically via real citizen/SMS/external submissions.
+    Seed operational resources, shelters, baseline reports.
+    
+    IMPORTANT: Demo operational resources (res-1 through res-4) are strictly OPT-IN.
+    They will ONLY be populated if explicitly passed `--populate-demo-resources` or
+    if environment variable SEED_DEMO_RESOURCES=1 is provided.
+    By default, operational resources start completely empty.
     """
     if reset:
         print("Resetting database tables...")
@@ -25,50 +29,54 @@ def seed_database(reset: bool = False):
     db: Session = SessionLocal()
     now = datetime.now(timezone.utc)
 
-    # 1. Operational Inventory: Resources (NDRF, Medical, UAV Drone, Land Excavation)
-    resources_data = [
-        {
-            "id": "res-1",
-            "name": "NDRF Swift-Water Rescue Squad 4",
-            "category": "rescue",
-            "status": "AVAILABLE",
-            "base_location": "Sector 7G Basin Substation",
-            "personnel_count": 14,
-            "equipment_details": "4x Inflatable Gemini boats, life-vests, thermal night-vision",
-        },
-        {
-            "id": "res-2",
-            "name": "Rapid Mobile Trauma Unit & Ambulance 12",
-            "category": "medical",
-            "status": "AVAILABLE",
-            "base_location": "Sector 4 Main Depot",
-            "personnel_count": 8,
-            "equipment_details": "Mobile ICU, triage trauma beds, oxygen generators",
-        },
-        {
-            "id": "res-3",
-            "name": "SkyWatch Heavy UAV Recon Drone 9",
-            "category": "aerial",
-            "status": "AVAILABLE",
-            "base_location": "Central Regional Airfield",
-            "personnel_count": 3,
-            "equipment_details": "LiDAR mapping sensor, high-zoom 4K infrared gimbal",
-        },
-        {
-            "id": "res-4",
-            "name": "Heavy Debris Road Clearance Excavator",
-            "category": "land",
-            "status": "AVAILABLE",
-            "base_location": "Sector 9 Logistics Bay",
-            "personnel_count": 4,
-            "equipment_details": "Hydraulic breaker, claw bucket, chain saws",
-        },
-    ]
+    # 1. Operational Inventory: Demo Resources (OPT-IN ONLY)
+    if populate_demo_resources or os.getenv("SEED_DEMO_RESOURCES") == "1":
+        print("Populating opt-in demo operational resources...")
+        resources_data = [
+            {
+                "id": "res-1",
+                "name": "NDRF Swift-Water Rescue Squad 4",
+                "category": "rescue",
+                "status": "AVAILABLE",
+                "base_location": "Sector 7G Basin Substation",
+                "personnel_count": 14,
+                "equipment_details": "4x Inflatable Gemini boats, life-vests, thermal night-vision",
+            },
+            {
+                "id": "res-2",
+                "name": "Rapid Mobile Trauma Unit & Ambulance 12",
+                "category": "medical",
+                "status": "AVAILABLE",
+                "base_location": "Sector 4 Main Depot",
+                "personnel_count": 8,
+                "equipment_details": "Mobile ICU, triage trauma beds, oxygen generators",
+            },
+            {
+                "id": "res-3",
+                "name": "SkyWatch Heavy UAV Recon Drone 9",
+                "category": "aerial",
+                "status": "AVAILABLE",
+                "base_location": "Central Regional Airfield",
+                "personnel_count": 3,
+                "equipment_details": "LiDAR mapping sensor, high-zoom 4K infrared gimbal",
+            },
+            {
+                "id": "res-4",
+                "name": "Heavy Debris Road Clearance Excavator",
+                "category": "land",
+                "status": "AVAILABLE",
+                "base_location": "Sector 9 Logistics Bay",
+                "personnel_count": 4,
+                "equipment_details": "Hydraulic breaker, claw bucket, chain saws",
+            },
+        ]
 
-    for res in resources_data:
-        existing = db.query(Resource).filter(Resource.id == res["id"]).first()
-        if not existing:
-            db.add(Resource(**res, created_at=now))
+        for res in resources_data:
+            existing = db.query(Resource).filter(Resource.id == res["id"]).first()
+            if not existing:
+                db.add(Resource(**res, created_at=now))
+    else:
+        print("Operational resources left unseeded (empty state by default).")
 
     # 2. Emergency Relief Shelters
     shelters_data = [
@@ -164,8 +172,9 @@ def seed_database(reset: bool = False):
 
     db.commit()
     db.close()
-    print("Database seeding completed deterministically and idempotently.")
+    print("Database seeding completed deterministically.")
 
 if __name__ == "__main__":
     reset_flag = "--reset" in sys.argv
-    seed_database(reset=reset_flag)
+    demo_flag = "--populate-demo-resources" in sys.argv
+    seed_database(reset=reset_flag, populate_demo_resources=demo_flag)

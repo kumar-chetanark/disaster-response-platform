@@ -78,7 +78,8 @@ export default function OperationsConsole({
       op.resourceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       op.operationType.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (op.destinationLocation && op.destinationLocation.toLowerCase().includes(searchQuery.toLowerCase()))
-    return matchesFilter && matchesSearch
+    const matchesStar = !starredOnly || starredIds.has(op.id)
+    return matchesFilter && matchesSearch && matchesStar
   })
 
   const selectedOp =
@@ -130,6 +131,22 @@ export default function OperationsConsole({
             placeholder="Search Operation ID, squad..."
             className="flex-1 sm:w-56"
           />
+
+          <button
+            type="button"
+            onClick={() => setStarredOnly(!starredOnly)}
+            title={starredOnly ? 'Showing starred operations only' : 'Filter by starred operations'}
+            className={`px-2.5 py-1.5 rounded border transition-colors cursor-pointer flex items-center gap-1.5 font-mono-label text-[11px] ${
+              starredOnly
+                ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 font-bold'
+                : 'bg-background border-outline-variant text-outline hover:text-on-surface'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[16px] ${starredOnly ? 'text-amber-400 fill-current' : ''}`}>
+              star
+            </span>
+            <span>Starred</span>
+          </button>
 
           <select
             value={filterState}
@@ -189,7 +206,22 @@ export default function OperationsConsole({
                   />
 
                   <div className="flex items-start justify-between gap-2 pl-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      {/* Star Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleStar(e, op.id)}
+                        className={`px-1.5 py-0.5 rounded border text-[12px] flex items-center gap-1 cursor-pointer transition-all ${
+                          starredIds.has(op.id)
+                            ? 'bg-amber-500/25 border-amber-500/60 text-amber-300 font-bold shadow-sm'
+                            : 'bg-surface-container border-outline-variant text-outline hover:text-amber-300 hover:border-amber-400/50'
+                        }`}
+                        title={starredIds.has(op.id) ? 'Starred (Click to unstar)' : 'Click to star / favorite'}
+                      >
+                        <span>{starredIds.has(op.id) ? '★' : '☆'}</span>
+                        <span className="text-[9px] font-mono-label">{starredIds.has(op.id) ? 'STARRED' : 'STAR'}</span>
+                      </button>
+
                       <span className="font-mono-label text-[11px] text-primary font-bold">
                         {op.id.toUpperCase()}
                       </span>
@@ -206,9 +238,22 @@ export default function OperationsConsole({
                       </span>
                     </div>
 
-                    <span className="font-mono-label text-[10px] text-on-surface-variant">
-                      {op.dispatchedTime}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-mono-label text-[10px] text-on-surface-variant">
+                        {op.dispatchedTime}
+                      </span>
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        disabled={deletingId === op.id}
+                        onClick={(e) => handleDeleteOperation(e, op.id)}
+                        className="px-2 py-0.5 rounded border border-red-500/30 bg-red-950/20 hover:bg-red-900/40 text-red-400 font-mono-label text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                        title="Permanently delete operation"
+                      >
+                        <span>🗑️</span>
+                        <span>{deletingId === op.id ? 'DELETING...' : 'DELETE'}</span>
+                      </button>
+                    </div>
                   </div>
 
                   <h3 className="pl-1 font-body-sm font-semibold text-[13px] text-on-surface leading-snug">

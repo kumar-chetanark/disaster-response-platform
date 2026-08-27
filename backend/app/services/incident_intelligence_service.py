@@ -276,6 +276,7 @@ def get_incident_intelligence(db: Session, incident_id: str) -> Optional[Dict[st
             "score": conf_score,
             "level": conf_level,
             "independent_sources": conf_data.get("independent_source_count", 1),
+            "sources_breakdown": {b["source_type"]: b["count"] for b in conf_data.get("breakdown", [])},
         },
         "priority": {
             "score": prio_data.get("priority_score", 0),

@@ -74,6 +74,7 @@ def calculate_incident_confidence(db: Session, incident: Incident) -> Dict[str, 
         elif stype == "GOVERNMENT":
             gov_count += 1
         elif stype == "FIELD_ASSESSMENT":
+            # Distinct field assessment surveys
             field_count += 1
         elif stype == "WEATHER":
             weather_count += 1

@@ -214,21 +214,28 @@ class PlatformDataService {
           return data.items.map((r: any) => ({
             id: r.id,
             name: r.name,
+            type: r.type || 'Squad',
             category: r.category,
             status: r.status,
             location: r.base_location || r.location,
-            personnelCount: r.personnel_count,
-            equipmentDetails: r.equipment_summary || r.specialization,
+            latitude: typeof r.latitude === 'number' ? r.latitude : (r.lat !== undefined ? Number(r.lat) : null),
+            longitude: typeof r.longitude === 'number' ? r.longitude : (r.lon !== undefined ? Number(r.lon) : null),
+            capabilities: r.capabilities,
+            capacity: r.capacity,
+            operatingRange: r.operating_range,
+            vehicleRegistration: r.vehicle_registration,
+            personnelCount: r.personnel_count || 0,
+            equipmentDetails: r.equipment_details || r.equipment_summary || r.specialization,
             assignedIncidentId: r.assigned_incident_id,
             assignedOperationId: r.assigned_operation_id,
             distanceKm: r.distance_km || 0,
             etaMinutes: r.eta_minutes || 0,
             shelterCapacity: r.shelter_capacity,
             shelterOccupied: r.shelter_occupied,
-            suppliesFoodDays: r.food_days,
-            suppliesFoodPeople: r.food_people,
-            suppliesMedicineCount: r.medicine_units,
-            suppliesClothingCount: r.blanket_units,
+            suppliesFoodDays: r.supplies_food_days || r.food_days,
+            suppliesFoodPeople: r.supplies_food_people || r.food_people,
+            suppliesMedicineCount: r.supplies_medicine_count || r.medicine_units,
+            suppliesClothingCount: r.supplies_clothing_count || r.blanket_units,
           }))
         }
       }
@@ -401,16 +408,23 @@ class PlatformDataService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: resource.name,
+          type: resource.type || 'Squad',
           category: resource.category,
+          status: resource.status || 'AVAILABLE',
           base_location: resource.location,
+          latitude: resource.latitude,
+          longitude: resource.longitude,
+          capabilities: resource.capabilities,
+          capacity: resource.capacity,
+          operating_range: resource.operatingRange,
+          vehicle_registration: resource.vehicleRegistration,
           personnel_count: resource.personnelCount,
-          equipment_summary: resource.equipmentDetails,
-          specialization: resource.equipmentDetails,
+          equipment_details: resource.equipmentDetails,
           shelter_capacity: resource.shelterCapacity,
-          food_days: resource.suppliesFoodDays,
-          food_people: resource.suppliesFoodPeople,
-          medicine_units: resource.suppliesMedicineCount,
-          blanket_units: resource.suppliesClothingCount,
+          supplies_food_days: resource.suppliesFoodDays,
+          supplies_food_people: resource.suppliesFoodPeople,
+          supplies_medicine_count: resource.suppliesMedicineCount,
+          supplies_clothing_count: resource.suppliesClothingCount,
         }),
       })
       if (res.ok) {
@@ -421,8 +435,12 @@ class PlatformDataService {
           category: data.category,
           status: data.status,
           location: data.base_location,
+          latitude: data.latitude,
+          longitude: data.longitude,
           personnelCount: data.personnel_count,
-          equipmentDetails: data.equipment_summary,
+          equipmentDetails: data.equipment_details || data.equipment_summary,
+          assignedIncidentId: data.assigned_incident_id,
+          assignedOperationId: data.assigned_operation_id,
         }
       }
     } catch (err) {
@@ -519,6 +537,22 @@ class PlatformDataService {
   }
 
   // 8. Reports
+    async createShelter(shelter: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/shelters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(shelter),
+      })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (err) {
+      console.error('[DataService] Failed to create shelter:', err)
+    }
+    return null
+  }
+
   async getReports(search?: string, reportType?: string): Promise<PlatformReport[]> {
     try {
       const params = new URLSearchParams()

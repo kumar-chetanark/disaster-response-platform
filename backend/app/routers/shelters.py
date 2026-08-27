@@ -19,6 +19,17 @@ class ShelterResponse(BaseModel):
     occupancy_pct: float
     status: str
     contact_phone: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    facility_type: Optional[str] = "Shelter"
+    available_beds: Optional[int] = 0
+    emergency_beds: Optional[int] = 0
+    icu_beds: Optional[int] = 0
+    doctors_count: Optional[int] = 0
+    nurses_count: Optional[int] = 0
+    water_litres: Optional[int] = 0
+    food_person_days: Optional[int] = 0
+    medicine_days_stock: Optional[int] = 0
     created_at: Optional[datetime] = None
 
 class ShelterCreate(BaseModel):
@@ -27,6 +38,9 @@ class ShelterCreate(BaseModel):
     total_capacity: int = 500
     current_occupancy: int = 0
     contact_phone: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    facility_type: Optional[str] = "Shelter"
 
 class ShelterUpdate(BaseModel):
     current_occupancy: Optional[int] = None
@@ -36,7 +50,7 @@ class ShelterUpdate(BaseModel):
 @router.get("", response_model=List[ShelterResponse])
 def list_shelters(db: Session = Depends(get_db)):
     """
-    List all emergency relief shelters and live occupancy availability.
+    List all emergency relief shelters, hospitals, beds, supplies, and live occupancy availability.
     """
     shelters = db.query(Shelter).all()
     results = []
@@ -48,12 +62,23 @@ def list_shelters(db: Session = Depends(get_db)):
             "id": s.id,
             "name": s.name,
             "location": s.location,
-            "total_capacity": s.total_capacity,
-            "current_occupancy": s.current_occupancy,
+            "total_capacity": s.total_capacity or 0,
+            "current_occupancy": s.current_occupancy or 0,
             "available_capacity": avail,
             "occupancy_pct": pct,
             "status": st,
             "contact_phone": s.contact_phone,
+            "latitude": s.latitude,
+            "longitude": s.longitude,
+            "facility_type": s.facility_type or ("Hospital" if "hospital" in s.name.lower() else "Shelter"),
+            "available_beds": s.available_beds or 0,
+            "emergency_beds": s.emergency_beds or 0,
+            "icu_beds": s.icu_beds or 0,
+            "doctors_count": s.doctors_count or 0,
+            "nurses_count": s.nurses_count or 0,
+            "water_litres": s.water_litres or 0,
+            "food_person_days": s.food_person_days or 0,
+            "medicine_days_stock": s.medicine_days_stock or 0,
             "created_at": s.created_at,
         })
     return results
@@ -71,6 +96,9 @@ def create_shelter(s_in: ShelterCreate, db: Session = Depends(get_db)):
         total_capacity=s_in.total_capacity,
         current_occupancy=s_in.current_occupancy,
         contact_phone=s_in.contact_phone,
+        latitude=s_in.latitude,
+        longitude=s_in.longitude,
+        facility_type=s_in.facility_type or "Shelter",
     )
     db.add(new_s)
     db.commit()
@@ -87,6 +115,17 @@ def create_shelter(s_in: ShelterCreate, db: Session = Depends(get_db)):
         "occupancy_pct": pct,
         "status": "AVAILABLE" if avail > 0 else "FULL",
         "contact_phone": new_s.contact_phone,
+        "latitude": new_s.latitude,
+        "longitude": new_s.longitude,
+        "facility_type": new_s.facility_type,
+        "available_beds": new_s.available_beds or 0,
+        "emergency_beds": new_s.emergency_beds or 0,
+        "icu_beds": new_s.icu_beds or 0,
+        "doctors_count": new_s.doctors_count or 0,
+        "nurses_count": new_s.nurses_count or 0,
+        "water_litres": new_s.water_litres or 0,
+        "food_person_days": new_s.food_person_days or 0,
+        "medicine_days_stock": new_s.medicine_days_stock or 0,
         "created_at": new_s.created_at,
     }
 
@@ -118,5 +157,16 @@ def update_shelter(shelter_id: str, s_up: ShelterUpdate, db: Session = Depends(g
         "occupancy_pct": pct,
         "status": "FULL" if avail == 0 else "NEAR_CAPACITY" if pct >= 80 else "AVAILABLE",
         "contact_phone": s.contact_phone,
+        "latitude": s.latitude,
+        "longitude": s.longitude,
+        "facility_type": s.facility_type,
+        "available_beds": s.available_beds or 0,
+        "emergency_beds": s.emergency_beds or 0,
+        "icu_beds": s.icu_beds or 0,
+        "doctors_count": s.doctors_count or 0,
+        "nurses_count": s.nurses_count or 0,
+        "water_litres": s.water_litres or 0,
+        "food_person_days": s.food_person_days or 0,
+        "medicine_days_stock": s.medicine_days_stock or 0,
         "created_at": s.created_at,
     }

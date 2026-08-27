@@ -6,36 +6,22 @@ from app.models.resource import Resource
 from app.schemas.resource import ResourceCreate, ResourceUpdate, ResourceResponse, ResourceListResponse
 from app.services.matching_service import haversine_distance_km
 
-SECTOR_COORDINATES = {
-    "sector 7g": (29.7604, -95.3698),
-    "coastal basin": (29.7604, -95.3698),
-    "coastal causeway": (29.8100, -95.4200),
-    "highway 4": (29.8100, -95.4200),
-    "sector 1": (29.9000, -95.2000),
-    "highland ridge": (29.9000, -95.2000),
-    "sector 2": (29.7200, -95.3100),
-    "riverfront": (29.7200, -95.3100),
-    "civic arena": (29.7500, -95.3600),
-}
-
-def resolve_location_coords(location_name: str, lat: Optional[float], lon: Optional[float]):
-    if lat is not None and lon is not None:
-        return lat, lon
-    clean = location_name.lower()
-    for key, coords in SECTOR_COORDINATES.items():
-        if key in clean:
-            return coords
-    return 29.7604, -95.3698
-
 def to_resource_response(res: Resource, distance_km: Optional[float] = None) -> ResourceResponse:
     return ResourceResponse(
         id=res.id,
         name=res.name,
+        type=res.type or "Squad",
         category=res.category,
         status=res.status,
         base_location=res.base_location,
         latitude=res.latitude,
         longitude=res.longitude,
+        capabilities=res.capabilities,
+        capacity=res.capacity,
+        operating_range=res.operating_range,
+        vehicle_registration=res.vehicle_registration,
+        assigned_incident_id=res.assigned_incident_id,
+        assigned_operation_id=res.assigned_operation_id,
         personnel_count=res.personnel_count or 0,
         equipment_details=res.equipment_details,
         distance_km=distance_km,
@@ -78,11 +64,16 @@ def create_resource(db: Session, res_in: ResourceCreate) -> ResourceResponse:
     res = Resource(
         id=f"res-{res_in.category[:3]}-{str(uuid.uuid4())[:4]}",
         name=res_in.name,
+        type=res_in.type or "Squad",
         category=res_in.category.lower(),
         status=res_in.status.upper(),
         base_location=res_in.base_location,
         latitude=res_in.latitude,
         longitude=res_in.longitude,
+        capabilities=res_in.capabilities,
+        capacity=res_in.capacity,
+        operating_range=res_in.operating_range,
+        vehicle_registration=res_in.vehicle_registration,
         personnel_count=res_in.personnel_count or 0,
         equipment_details=res_in.equipment_details,
         shelter_capacity=res_in.shelter_capacity,
@@ -102,14 +93,28 @@ def update_resource(db: Session, resource_id: str, res_in: ResourceUpdate) -> Op
     if not res:
         return None
 
-    if hasattr(res_in, 'latitude') and res_in.latitude is not None:
-        res.latitude = res_in.latitude
-    if hasattr(res_in, 'longitude') and res_in.longitude is not None:
-        res.longitude = res_in.longitude
     if res_in.name is not None:
         res.name = res_in.name
+    if res_in.type is not None:
+        res.type = res_in.type
     if res_in.status is not None:
         res.status = res_in.status.upper()
+    if res_in.latitude is not None:
+        res.latitude = res_in.latitude
+    if res_in.longitude is not None:
+        res.longitude = res_in.longitude
+    if res_in.capabilities is not None:
+        res.capabilities = res_in.capabilities
+    if res_in.capacity is not None:
+        res.capacity = res_in.capacity
+    if res_in.operating_range is not None:
+        res.operating_range = res_in.operating_range
+    if res_in.vehicle_registration is not None:
+        res.vehicle_registration = res_in.vehicle_registration
+    if res_in.assigned_incident_id is not None:
+        res.assigned_incident_id = res_in.assigned_incident_id
+    if res_in.assigned_operation_id is not None:
+        res.assigned_operation_id = res_in.assigned_operation_id
     if res_in.personnel_count is not None:
         res.personnel_count = res_in.personnel_count
     if res_in.equipment_details is not None:
@@ -139,7 +144,8 @@ def get_nearby_resources(
     category: Optional[str] = None,
     max_distance_km: float = 50.0,
 ) -> List[ResourceResponse]:
-    target_lat, target_lon = resolve_location_coords(location_name, latitude, longitude)
+    target_lat = latitude if latitude is not None else 23.3441
+    target_lon = longitude if longitude is not None else 85.3096
     
     query = db.query(Resource)
     if category and category.lower() != "all":
@@ -149,10 +155,12 @@ def get_nearby_resources(
     results = []
 
     for res in all_resources:
-        res_lat, res_lon = resolve_location_coords(res.base_location, None, None)
-        dist = round(haversine_distance_km(target_lat, target_lon, res_lat, res_lon), 1)
-        if dist <= max_distance_km:
-            results.append((dist, to_resource_response(res, distance_km=dist)))
+        if res.latitude is not None and res.longitude is not None:
+            dist = round(haversine_distance_km(target_lat, target_lon, res.latitude, res.longitude), 1)
+            if dist <= max_distance_km:
+                results.append((dist, to_resource_response(res, distance_km=dist)))
+        elif location_name and location_name.lower() in res.base_location.lower():
+            results.append((0.0, to_resource_response(res, distance_km=0.0)))
 
     results.sort(key=lambda x: x[0])
     return [r[1] for r in results]

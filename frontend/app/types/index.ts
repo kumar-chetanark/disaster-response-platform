@@ -205,16 +205,21 @@ export interface ResourceUnit {
   suppliesClothingCount?: number
   id: string
   name: string
+  type?: string
   category: ResourceCategory
   status: ResourceStatus
   location: string
+  latitude?: number | null
+  longitude?: number | null
+  capabilities?: string
+  capacity?: number
+  operatingRange?: string
+  vehicleRegistration?: string
   personnelCount: number
   equipmentDetails: string
   assignedIncidentId?: string
   assignedOperationId?: string
   etaMinutes?: number
-  // For Shelters
-  // For Supplies
 }
 
 // 6. ADVISORY ALLOCATION (9-Step Process)

@@ -146,8 +146,20 @@ def compute_allocation_recommendations(db: Session, incident_id: Optional[str] =
         if matching_candidates:
             scored_candidates = []
             for cand in matching_candidates:
-                dist = haversine_distance_km(inc_lat, inc_lon, 29.7604, -95.3698)
-                match_score = 95 - int(min(dist, 30)) + min(cand.personnel_count or 0, 10)
+                # Use real resource coordinates if available; otherwise calculate relative fallback
+                res_lat = cand.latitude if cand.latitude is not None else inc_lat + 0.05
+                res_lon = cand.longitude if cand.longitude is not None else inc_lon + 0.05
+                dist = haversine_distance_km(inc_lat, inc_lon, res_lat, res_lon)
+                
+                # Check capability string match
+                cap_bonus = 0
+                if cand.capabilities and req_cap.lower() in cand.capabilities.lower():
+                    cap_bonus += 10
+                
+                # Capacity bonus
+                cap_vol_bonus = min(10, int((cand.capacity or 0) / 5))
+
+                match_score = 95 - int(min(dist, 35)) + min(cand.personnel_count or 0, 8) + cap_bonus + cap_vol_bonus
                 scored_candidates.append((match_score, dist, cand))
             scored_candidates.sort(key=lambda x: x[0], reverse=True)
 

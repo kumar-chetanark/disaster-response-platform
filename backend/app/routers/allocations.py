@@ -155,19 +155,7 @@ def approve_allocation_recommendation(
     db.add(new_op)
     res.assigned_operation_id = new_op.id
 
-    # 3. Create auditable incident source event
-    audit_source = IncidentSource(
-        id=str(uuid.uuid4()),
-        incident_id=inc.id,
-        source_type="GOVERNMENT",
-        source_label=f"Deployment Authorized: {auth_name}",
-        channel_badge="GOV_DEPLOY",
-        confidence_score=99.0,
-        summary=f"Authorized deployment of {res.name} ({res.category}) under Mission #{op_id}. Objective: {new_op.mission_objective}",
-        raw_content=f"AUTHORITY: {auth_name} | BADGE: {badge} | RES_ID: {res.id} | OP_ID: {op_id}",
-        created_at=now,
-    )
-    db.add(audit_source)
+    # (Deployment tracked via Operation table without polluting independent evidence sources)
 
     # 4. Broadcast high priority alert
     alert = Alert(

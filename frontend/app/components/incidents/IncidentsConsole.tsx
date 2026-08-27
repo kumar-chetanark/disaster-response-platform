@@ -517,7 +517,16 @@ export default function IncidentsConsole({
             isMobileDetailView ? 'flex w-full' : 'hidden md:flex'
           }`}
         >
-          {selectedIncident ? (
+          {selectedIncident ? (() => {
+            const rawSources = selectedIncident.reports || []
+            const sourceCounts: Record<string, number> = {}
+            rawSources.forEach((r: any) => {
+              const stype = r.sourceType || 'SOURCE'
+              sourceCounts[stype] = (sourceCounts[stype] || 0) + 1
+            })
+            const sourceBreakdown = (intelligenceData?.confidence as any)?.sources_breakdown || sourceCounts
+
+            return (
             <>
               {/* Mobile Back to List Button */}
               <div className="md:hidden pb-1">
@@ -584,7 +593,7 @@ export default function IncidentsConsole({
                   <div className="space-y-4">
                     {/* Clear, Highly Structured Situational Assessment & Recon Module */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
-                      {/* Structured 3-Part Situational Assessment Card */}
+                      {/* Structured Situational Assessment & Corroboration Card */}
                       <div className="lg:col-span-2 p-4 bg-surface-container/70 rounded-xl border border-outline-variant/80 space-y-3.5 shadow-xs">
                         <div className="flex items-center justify-between border-b border-outline-variant/60 pb-2">
                           <div className="text-[11px] font-mono-label text-primary font-bold uppercase tracking-wider flex items-center gap-1.5">
@@ -597,150 +606,136 @@ export default function IncidentsConsole({
                         </div>
 
                         {/* Point-Wise Informational Briefing */}
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-1 gap-2 font-mono-label text-[11px]">
+                        <div className="space-y-2.5">
+                          <div className="grid grid-cols-1 gap-2.5 font-mono-label text-[11px]">
                             {/* Point 1: Crisis & Severity Evaluation */}
-                            <div className="p-2.5 bg-surface-container rounded-lg border border-outline-variant/60 flex items-start gap-2.5">
-                              <span className="material-symbols-outlined text-[16px] text-primary shrink-0 mt-0.5">crisis_alert</span>
-                              <div className="space-y-0.5 flex-1">
-                                <div className="text-[10px] text-on-surface-variant font-bold uppercase">
+                            <div className="p-3 bg-surface-container rounded-lg border border-outline-variant/60 flex items-start gap-2.5">
+                              <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">crisis_alert</span>
+                              <div className="space-y-1 flex-1">
+                                <div className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
                                   Crisis &amp; Severity Evaluation
                                 </div>
-                                <div className="text-[12px] text-on-surface font-body-sm">
+                                <div className="text-[12px] text-on-surface font-body-sm leading-relaxed">
                                   <strong className="text-primary font-bold">{selectedIncident.title}</strong> is evaluated as a <span className="text-red-400 font-bold uppercase">{selectedIncident.severity}</span> severity <strong className="text-on-surface">{selectedIncident.category}</strong> emergency in <strong className="text-on-surface">{selectedIncident.location}</strong>.
                                 </div>
                               </div>
                             </div>
 
                             {/* Point 2: Priority Level & Evidence Corroboration */}
-                            <div className="p-2.5 bg-surface-container rounded-lg border border-outline-variant/60 flex items-start gap-2.5">
-                              <span className="material-symbols-outlined text-[16px] text-cyan-400 shrink-0 mt-0.5">verified</span>
-                              <div className="space-y-0.5 flex-1">
-                                <div className="text-[10px] text-on-surface-variant font-bold uppercase">
+                            <div className="p-3 bg-surface-container rounded-lg border border-outline-variant/60 flex items-start gap-2.5">
+                              <span className="material-symbols-outlined text-[18px] text-cyan-400 shrink-0 mt-0.5">verified</span>
+                              <div className="space-y-1 flex-1">
+                                <div className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
                                   Priority Level &amp; Corroboration Certainty
                                 </div>
-                                <div className="text-[12px] text-on-surface font-body-sm">
+                                <div className="text-[12px] text-on-surface font-body-sm leading-relaxed">
                                   Operational Priority is set at <strong className="text-cyan-400 font-bold">{intelligenceData.priority?.level || selectedIncident.priorityLevel || 'Level 1'}</strong> (Priority Index: <strong className="text-on-surface">{intelligenceData.priority?.score || 46.5}/100</strong>) with <strong className="text-emerald-400">{intelligenceData.confidence.score}% evidence confidence</strong> across <strong className="text-on-surface">{totalSourcesCount} independent field source(s)</strong>.
                                 </div>
                               </div>
                             </div>
 
-                            {/* Point 3: Live Field Assessment Telemetry (Ingested from Recon Modality) */}
-                            {intelligenceData.latest_assessment ? (
-                              <div className="p-2.5 bg-surface-container rounded-lg border border-primary/40 flex items-start gap-2.5 bg-primary/5">
-                                <span className="material-symbols-outlined text-[16px] text-primary shrink-0 mt-0.5">satellite_alt</span>
-                                <div className="space-y-1 flex-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-primary font-bold uppercase">
-                                      Ingested Field Assessment Telemetry ({intelligenceData.latest_assessment.id})
-                                    </span>
-                                    <span className="text-[9px] bg-emerald-950/30 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold uppercase">
-                                      {intelligenceData.latest_assessment.mode} • {intelligenceData.latest_assessment.confidence}% CONF
-                                    </span>
-                                  </div>
-                                  <div className="text-[12px] text-on-surface font-body-sm leading-relaxed">
-                                    <span className="font-bold text-on-surface">Operative / Unit:</span> {intelligenceData.latest_assessment.asset_name} • <span className="font-bold text-on-surface">Sector:</span> {intelligenceData.latest_assessment.area_surveyed} • <span className="font-bold text-on-surface">Weather:</span> {intelligenceData.latest_assessment.weather}
-                                  </div>
-                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1 text-[11px] font-mono-label">
-                                    <div className="p-1.5 bg-surface-container rounded border border-outline-variant/60">
-                                      <span className="text-[9px] text-on-surface-variant block uppercase">Damaged Structures</span>
-                                      <span className="text-red-400 font-bold">{intelligenceData.latest_assessment.structures_damaged} unit(s)</span>
-                                    </div>
-                                    <div className="p-1.5 bg-surface-container rounded border border-outline-variant/60">
-                                      <span className="text-[9px] text-on-surface-variant block uppercase">Road / Access</span>
-                                      <span className="text-amber-400 font-bold">{intelligenceData.latest_assessment.road_accessibility}</span>
-                                    </div>
-                                    <div className="p-1.5 bg-surface-container rounded border border-outline-variant/60">
-                                      <span className="text-[9px] text-on-surface-variant block uppercase">Civilians Trapped</span>
-                                      <span className="text-primary font-bold">{intelligenceData.latest_assessment.people_observed || 'None reported'}</span>
-                                    </div>
-                                    <div className="p-1.5 bg-surface-container rounded border border-outline-variant/60">
-                                      <span className="text-[9px] text-on-surface-variant block uppercase">Evacuation Route</span>
-                                      <span className={intelligenceData.latest_assessment.evacuation_status === 'Clear' ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
-                                        {intelligenceData.latest_assessment.evacuation_status}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  {intelligenceData.latest_assessment.operator_notes && (
-                                    <div className="text-[11px] text-on-surface-variant italic pt-0.5">
-                                      "{intelligenceData.latest_assessment.operator_notes}"
-                                    </div>
-                                  )}
+                            {/* Point 3: Primary Threat Vectors & Ground Impact */}
+                            <div className="p-3 bg-surface-container rounded-lg border border-outline-variant/60 flex items-start gap-2.5">
+                              <span className="material-symbols-outlined text-[18px] text-amber-400 shrink-0 mt-0.5">warning</span>
+                              <div className="space-y-1 flex-1">
+                                <div className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+                                  Primary Hazard Vectors &amp; Ground Impact
                                 </div>
-                              </div>
-                            ) : (
-                              <div className="p-2.5 bg-surface-container rounded-lg border border-outline-variant/60 flex items-start gap-2.5">
-                                <span className="material-symbols-outlined text-[16px] text-amber-400 shrink-0 mt-0.5">warning</span>
-                                <div className="space-y-0.5 flex-1">
-                                  <div className="text-[10px] text-on-surface-variant font-bold uppercase">
-                                    Primary Hazard Vectors &amp; Civilian Risk
-                                  </div>
-                                  <div className="text-[12px] text-on-surface font-body-sm">
-                                    {String(selectedIncident.category).toLowerCase().includes('flood') || String(selectedIncident.category).toLowerCase().includes('cyclone')
-                                      ? 'Ground water inundation • Submerged transit corridors • Critical risk to trapped civilians on upper floors.'
-                                      : String(selectedIncident.category).toLowerCase().includes('fire')
-                                      ? 'Active rapid flame spread • Dense smoke plume toxicity • Immediate evacuation corridor clearance needed.'
-                                      : String(selectedIncident.category).toLowerCase().includes('building') || String(selectedIncident.category).toLowerCase().includes('landslide') || String(selectedIncident.category).toLowerCase().includes('earthquake')
-                                      ? 'Severe structural collapse hazards • Heavy debris blocking access roads • Trapped victims requiring specialized extraction.'
-                                      : 'Volatile crisis conditions • Unstable structural environment • Immediate sector triage required.'}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Point 4: Squad Readiness & Field Posture */}
-                            <div className="p-2.5 bg-surface-container rounded-lg border border-outline-variant/60 flex items-start gap-2.5">
-                              <span className="material-symbols-outlined text-[16px] text-emerald-400 shrink-0 mt-0.5">military_tech</span>
-                              <div className="space-y-0.5 flex-1">
-                                <div className="text-[10px] text-on-surface-variant font-bold uppercase">
-                                  Tactical Readiness &amp; Squad Reserve Posture
-                                </div>
-                                <div className="text-[12px] text-on-surface font-body-sm">
-                                  <strong className="text-cyan-400">{intelligenceData.operational_state?.active_missions || 0} active mission(s)</strong> deployed on scene / en route • <strong className="text-emerald-400">{intelligenceData.operational_state?.available_resources || 8} specialized response squads</strong> standing by in inventory ready for 1-click dispatch.
+                                <div className="text-[12px] text-on-surface font-body-sm leading-relaxed">
+                                  {String(selectedIncident.category).toLowerCase().includes('flood') || String(selectedIncident.category).toLowerCase().includes('cyclone')
+                                    ? 'Ground water inundation • Submerged transit corridors • Critical risk to trapped civilians on upper floors.'
+                                    : String(selectedIncident.category).toLowerCase().includes('fire')
+                                    ? 'Active rapid flame spread • Dense smoke plume toxicity • Immediate evacuation corridor clearance needed.'
+                                    : String(selectedIncident.category).toLowerCase().includes('building') || String(selectedIncident.category).toLowerCase().includes('landslide') || String(selectedIncident.category).toLowerCase().includes('earthquake')
+                                    ? 'Severe structural collapse hazards • Heavy debris blocking access roads • Trapped victims requiring specialized extraction.'
+                                    : 'Volatile crisis conditions • Unstable structural environment • Immediate sector triage required.'}
                                 </div>
                               </div>
                             </div>
                           </div>
                         </div>
 
+                        {/* Merged Multi-Channel Corroboration & Confidence Ledger */}
+                        <div className="pt-2 border-t border-outline-variant/60 space-y-2.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-cyan-400 text-[16px]">verified</span>
+                              <span className="font-mono-label text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                                Multi-Channel Corroboration &amp; Confidence Ledger
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {Object.entries(sourceBreakdown).map(([stype, cnt]) => {
+                                const normalizedType = stype.toUpperCase().replace('_', ' ')
+                                const displayLabel = normalizedType.includes('CITIZEN')
+                                  ? 'CITIZEN'
+                                  : normalizedType.includes('GOV')
+                                  ? 'GOVERNMENT'
+                                  : normalizedType.includes('RECON') || normalizedType.includes('AERIAL') || normalizedType.includes('ASSESSMENT')
+                                  ? 'FIELD ASSESSMENT'
+                                  : normalizedType.includes('WEATHER')
+                                  ? 'WEATHER / IMD'
+                                  : normalizedType.includes('NEWS')
+                                  ? 'NEWS WIRE'
+                                  : normalizedType
 
-
-                        {/* Tactical Snapshot Telemetry Badges */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-outline-variant/60 font-mono-label text-[11px]">
-                          <div className="p-2 bg-surface-container-high rounded-lg border border-outline-variant/50">
-                            <span className="text-[9px] text-on-surface-variant uppercase block font-bold">Severity</span>
-                            <span className={`font-bold text-[12px] ${
-                              selectedIncident.severity === 'CRITICAL' ? 'text-red-400' : 'text-amber-400'
-                            }`}>
-                              {selectedIncident.severity}
-                            </span>
+                                return (
+                                  <span
+                                    key={stype}
+                                    className={`font-mono-label text-[9px] px-2 py-0.5 rounded border font-bold uppercase ${
+                                      displayLabel === 'CITIZEN'
+                                        ? 'bg-primary/10 text-primary border-primary/30'
+                                        : displayLabel === 'GOVERNMENT'
+                                        ? 'bg-cyan-950/40 text-cyan-400 border-cyan-500/30'
+                                        : displayLabel === 'FIELD ASSESSMENT'
+                                        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
+                                        : 'bg-surface-container text-on-surface-variant border-outline-variant'
+                                    }`}
+                                  >
+                                    {String(cnt)} {displayLabel}
+                                  </span>
+                                )
+                              })}
+                            </div>
                           </div>
 
-                          <div className="p-2 bg-surface-container-high rounded-lg border border-outline-variant/50">
-                            <span className="text-[9px] text-on-surface-variant uppercase block font-bold">Est. Population</span>
-                            <span className="font-bold text-[12px] text-primary">
-                              {selectedIncident.affectedPopulationEst || '12,500+'}
-                            </span>
-                          </div>
-
-                          <div className="p-2 bg-surface-container-high rounded-lg border border-outline-variant/50">
-                            <span className="text-[9px] text-on-surface-variant uppercase block font-bold">Active Missions</span>
-                            <span className="font-bold text-[12px] text-cyan-400">
-                              {intelligenceData.operational_state?.active_missions || 0} Deployed
-                            </span>
-                          </div>
-
-                          <div className="p-2 bg-surface-container-high rounded-lg border border-outline-variant/50">
-                            <span className="text-[9px] text-on-surface-variant uppercase block font-bold">Ready Squads</span>
-                            <span className="font-bold text-[12px] text-emerald-400">
-                              {intelligenceData.operational_state?.available_resources || 0} Available
-                            </span>
+                          {/* Raw Telemetry & Field Source Logs */}
+                          <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+                            {selectedIncident.reports && selectedIncident.reports.length > 0 ? (
+                              selectedIncident.reports.map((rep) => (
+                                <div
+                                  key={rep.id}
+                                  className="p-2.5 bg-surface-container rounded-lg border border-outline-variant/70 space-y-1"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-mono-label text-[10px] text-primary font-bold">
+                                        {rep.sourceLabel || rep.sourceType}
+                                      </span>
+                                      <span className="font-mono-label text-[9px] bg-surface-container-high px-1.5 py-0.2 rounded border border-outline-variant text-on-surface-variant font-bold">
+                                        {rep.channelBadge || 'SOURCE'}
+                                      </span>
+                                    </div>
+                                    <span className="font-mono-label text-[10px] text-on-surface-variant">
+                                      {rep.timestamp}
+                                    </span>
+                                  </div>
+                                  <p className="font-body-sm text-[11px] text-on-surface leading-snug">
+                                    {rep.summary}
+                                  </p>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-2.5 bg-surface-container rounded-lg border border-outline-variant text-center font-mono-label text-[11px] text-on-surface-variant">
+                                Single corroborating source attached.
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
 
                       {/* Live Field Assessment & Verification Dossier */}
-                      <div className="p-4 bg-surface-container/70 rounded-xl border border-outline-variant/80 flex flex-col justify-between gap-3 shadow-xs">
+                      <div className="p-4 bg-surface-container/70 rounded-xl border border-outline-variant/80 flex flex-col justify-between gap-3.5 shadow-xs">
                         <div className="space-y-3">
                           <div className="flex items-center justify-between border-b border-outline-variant/60 pb-2">
                             <span className="text-[11px] font-mono-label text-primary uppercase font-bold flex items-center gap-1.5">
@@ -761,43 +756,96 @@ export default function IncidentsConsole({
 
                           {intelligenceData.latest_assessment ? (
                             <div className="space-y-2.5 text-[11px] font-mono-label">
-                              <div className="p-2 bg-surface-container rounded-lg border border-primary/30 space-y-1">
+                              {/* Modality & Confidence Header Banner */}
+                              <div className="p-2.5 bg-surface-container rounded-lg border border-primary/30 space-y-1.5">
                                 <div className="flex items-center justify-between text-[10px]">
-                                  <span className="text-on-surface-variant font-bold uppercase">{intelligenceData.latest_assessment.id}</span>
-                                  <span className="text-primary font-bold">{intelligenceData.latest_assessment.timestamp}</span>
+                                  <span className="text-on-surface-variant font-bold uppercase tracking-wider">
+                                    {intelligenceData.latest_assessment.id}
+                                  </span>
+                                  <span className="text-primary font-bold">
+                                    {intelligenceData.latest_assessment.timestamp}
+                                  </span>
                                 </div>
-                                <div className="text-[11px] text-on-surface font-body-sm">
-                                  <strong className="text-primary">{intelligenceData.latest_assessment.mode}</strong> ({intelligenceData.latest_assessment.asset_name})
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <span className="text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-500/40 px-2 py-0.5 rounded font-bold">
+                                    {intelligenceData.latest_assessment.mode} • {intelligenceData.latest_assessment.confidence}% CONF
+                                  </span>
                                 </div>
                               </div>
 
-                              <div className="space-y-1.5 text-on-surface-variant">
-                                <div className="flex items-center justify-between">
-                                  <span>Damaged Structures:</span>
-                                  <strong className="text-red-400 font-bold">{intelligenceData.latest_assessment.structures_damaged} unit(s)</strong>
+                              {/* Structured Field Data Table */}
+                              <div className="p-2.5 bg-surface-container rounded-lg border border-outline-variant/60 space-y-2">
+                                <div className="flex items-start justify-between gap-2 border-b border-outline-variant/40 pb-1.5">
+                                  <span className="text-on-surface-variant text-[11px] shrink-0">Place / Area:</span>
+                                  <span className="text-on-surface font-bold text-right text-[11px]">
+                                    {intelligenceData.latest_assessment.area_surveyed || selectedIncident.location || 'Active Zone'}
+                                  </span>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                  <span>Road Status:</span>
-                                  <strong className="text-amber-400 font-bold">{intelligenceData.latest_assessment.road_accessibility}</strong>
+
+                                <div className="flex items-start justify-between gap-2 border-b border-outline-variant/40 pb-1.5">
+                                  <span className="text-on-surface-variant text-[11px] shrink-0">Weather:</span>
+                                  <span className="text-cyan-400 font-bold text-right text-[11px]">
+                                    {intelligenceData.latest_assessment.weather || 'Clear'}
+                                  </span>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                  <span>People Observed:</span>
-                                  <strong className="text-primary font-bold">{intelligenceData.latest_assessment.people_observed || 'None'}</strong>
+
+                                <div className="flex items-start justify-between gap-2 border-b border-outline-variant/40 pb-1.5">
+                                  <span className="text-on-surface-variant text-[11px] shrink-0">Damaged Structures:</span>
+                                  <span className="text-red-400 font-bold text-right text-[11px]">
+                                    {intelligenceData.latest_assessment.structures_damaged} unit(s)
+                                  </span>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                  <span>Hazards Detected:</span>
-                                  <strong className="text-on-surface">{intelligenceData.latest_assessment.hazards_detected || 'None flagged'}</strong>
+
+                                <div className="flex items-start justify-between gap-2 border-b border-outline-variant/40 pb-1.5">
+                                  <span className="text-on-surface-variant text-[11px] shrink-0">Road Status:</span>
+                                  <span className="text-amber-400 font-bold text-right text-[11px]">
+                                    {intelligenceData.latest_assessment.road_accessibility}
+                                  </span>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                  <span>Rec. Resources:</span>
-                                  <strong className="text-emerald-400">{intelligenceData.latest_assessment.recommended_resources || 'Standard'}</strong>
+
+                                <div className="flex items-start justify-between gap-2 border-b border-outline-variant/40 pb-1.5">
+                                  <span className="text-on-surface-variant text-[11px] shrink-0">People Observed:</span>
+                                  <span className="text-primary font-bold text-right text-[11px]">
+                                    {intelligenceData.latest_assessment.people_observed || 'None reported'}
+                                  </span>
                                 </div>
+
+                                <div className="flex items-start justify-between gap-2 border-b border-outline-variant/40 pb-1.5">
+                                  <span className="text-on-surface-variant text-[11px] shrink-0">Hazards Detected:</span>
+                                  <span className="text-red-300 font-bold text-right text-[11px]">
+                                    {intelligenceData.latest_assessment.hazards_detected || 'None flagged'}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-start justify-between gap-2 border-b border-outline-variant/40 pb-1.5">
+                                  <span className="text-on-surface-variant text-[11px] shrink-0">Rec. Resources:</span>
+                                  <span className="text-emerald-400 font-bold text-right text-[11px]">
+                                    {intelligenceData.latest_assessment.recommended_resources || 'Standard response'}
+                                  </span>
+                                </div>
+
+                                {intelligenceData.latest_assessment.evacuation_status && (
+                                  <div className="flex items-start justify-between gap-2">
+                                    <span className="text-on-surface-variant text-[11px] shrink-0">Evacuation Route:</span>
+                                    <span className={`font-bold text-right text-[11px] ${
+                                      intelligenceData.latest_assessment.evacuation_status === 'Clear' || intelligenceData.latest_assessment.evacuation_status.includes('Clear')
+                                        ? 'text-emerald-400'
+                                        : 'text-red-400'
+                                    }`}>
+                                      {intelligenceData.latest_assessment.evacuation_status}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
 
                               {intelligenceData.latest_assessment.operator_notes && (
-                                <div className="text-[11px] font-body-sm text-on-surface-variant bg-surface-container p-2 rounded border border-outline-variant/60">
-                                  <strong className="text-on-surface block text-[10px] uppercase font-mono-label mb-0.5">Operator Notes:</strong>
-                                  "{intelligenceData.latest_assessment.operator_notes}"
+                                <div className="p-2.5 bg-surface-container rounded-lg border border-outline-variant/60 space-y-1">
+                                  <span className="text-[10px] text-on-surface-variant uppercase font-bold block">
+                                    Operator Notes:
+                                  </span>
+                                  <p className="text-[11px] font-body-sm text-on-surface italic leading-snug">
+                                    "{intelligenceData.latest_assessment.operator_notes}"
+                                  </p>
                                 </div>
                               )}
                             </div>
@@ -917,145 +965,6 @@ export default function IncidentsConsole({
 
 
               {/* 4. Evidence & Explainable Confidence Telemetry */}
-              {/* 3. Multi-Channel Corroboration & Confidence Ledger */}
-              <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-outline-variant gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
-                    <div>
-                      <h4 className="font-headline-sm text-[13px] font-bold text-on-surface">
-                        Multi-Channel Corroboration &amp; Confidence Ledger
-                      </h4>
-                      <div className="text-[10px] font-mono-label text-on-surface-variant">
-                        {totalSourcesCount} TOTAL SIGNALS • MULTI-SOURCE DEDUPLICATION
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {confidenceData ? (
-                      <span className={`font-mono-label text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
-                        confidenceData.confidence_level === 'HIGH'
-                          ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40'
-                          : confidenceData.confidence_level === 'MODERATE'
-                          ? 'bg-amber-950/30 text-amber-400 border-amber-500/40'
-                          : 'bg-red-950/30 text-red-400 border-red-500/40'
-                      }`}>
-                        {confidenceData.confidence_score}% CONFIDENCE ({confidenceData.confidence_level})
-                      </span>
-                    ) : (
-                      <span className="font-mono-label text-[10px] text-outline">
-                        {isLoadingConfidence ? 'Calculating telemetry...' : 'INSUFFICIENT EVIDENCE'}
-                      </span>
-                    )}
-
-                    <span className="font-mono-label text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded border border-primary/20 font-bold">
-                      {citizenCount} Citizen {citizenCount === 1 ? 'Report' : 'Reports'}
-                    </span>
-                    {newsCount > 0 && (
-                      <span className="font-mono-label text-[10px] px-2 py-0.5 bg-surface-container-high text-on-surface rounded border border-outline-variant">
-                        {newsCount} News
-                      </span>
-                    )}
-                    {govCount > 0 && (
-                      <span className="font-mono-label text-[10px] px-2 py-0.5 bg-emerald-950/20 text-emerald-400 rounded border border-emerald-500/30">
-                        {govCount} Govt
-                      </span>
-                    )}
-                    {weatherCount > 0 && (
-                      <span className="font-mono-label text-[10px] px-2 py-0.5 bg-sky-950/20 text-sky-400 rounded border border-sky-500/30">
-                        {weatherCount} Weather/IMD
-                      </span>
-                    )}
-                    {reconCount > 0 && (
-                      <span className="font-mono-label text-[10px] px-2 py-0.5 bg-tertiary/10 text-tertiary rounded border border-tertiary/20">
-                        {reconCount} Field Recon
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Score Breakdown Pills */}
-                {confidenceData && confidenceData.breakdown && (
-                  <div className="space-y-1.5">
-                    <div className="text-[11px] font-mono-label text-on-surface-variant font-bold uppercase">
-                      Independent Signal Verification &amp; Confidence Contribution:
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {confidenceData.breakdown.map((b: EvidenceBreakdownItem, idx: number) => (
-                        <div
-                          key={idx}
-                          className="p-2.5 bg-surface-container rounded border border-outline-variant/70 flex flex-col justify-between text-[11px]"
-                        >
-                          <div className="flex items-center justify-between font-mono-label">
-                            <span className="text-primary font-bold">{b.source_type} ({b.count})</span>
-                            <span className={b.contribution >= 0 ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
-                              {b.contribution >= 0 ? `+${b.contribution}` : b.contribution} pts
-                            </span>
-                          </div>
-                          <p className="font-body-sm text-[11px] text-on-surface-variant mt-1 leading-snug">
-                            {b.reason}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Contradictions Alert if any */}
-                {confidenceData?.contradictions && confidenceData.contradictions.length > 0 && (
-                  <div className="p-3 bg-red-950/20 border border-red-500/30 rounded space-y-1">
-                    <div className="flex items-center gap-1.5 text-red-400 font-mono-label text-[11px] font-bold">
-                      <span className="material-symbols-outlined text-[15px]">report_problem</span>
-                      {confidenceData.contradictions.length} Conflicting Evidence Item(s) Flagged
-                    </div>
-                    {confidenceData.contradictions.map((c: ContradictionItem) => (
-                      <div key={c.id} className="text-[11px] text-red-300/90 font-body-sm">
-                        • [{c.timestamp}] {c.source_label}: {c.reason} ({c.penalty} pts)
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Ingested Source Feed Log */}
-                <div className="space-y-1.5 pt-1">
-                  <div className="text-[11px] font-mono-label text-on-surface-variant font-bold uppercase">
-                    Raw Telemetry &amp; Field Source Logs:
-                  </div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
-                    {selectedIncident.reports && selectedIncident.reports.length > 0 ? (
-                      selectedIncident.reports.map((rep) => (
-                        <div
-                          key={rep.id}
-                          className="p-3 bg-surface-container rounded border border-outline-variant/80 space-y-1.5"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono-label text-[10px] text-primary font-bold">
-                                {rep.sourceLabel || rep.sourceType}
-                              </span>
-                              <span className="font-mono-label text-[9px] bg-surface-container-high px-1.5 py-0.2 rounded border border-outline-variant">
-                                {rep.channelBadge || 'SOURCE'}
-                              </span>
-                            </div>
-                            <span className="font-mono-label text-[10px] text-on-surface-variant">
-                              {rep.timestamp}
-                            </span>
-                          </div>
-                          <p className="font-body-sm text-[12px] text-on-surface leading-relaxed">
-                            {rep.summary}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-3 bg-surface-container rounded border border-outline-variant text-center font-mono-label text-[11px] text-on-surface-variant">
-                        Single corroborating source attached.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-
               {/* 4. Authority Lifecycle & Operational Actions */}
               <section className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
@@ -1128,7 +1037,8 @@ export default function IncidentsConsole({
                 </div>
               </section>
             </>
-          ) : (
+            )
+          })() : (
             <div className="p-8 text-center text-on-surface-variant font-mono-label text-[12px]">
               Select an incident from the registry to view detailed intelligence dossier.
             </div>

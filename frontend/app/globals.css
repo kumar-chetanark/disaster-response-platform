@@ -29,3 +29,20 @@
     linear-gradient(to right, rgba(66, 71, 84, 0.15) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(66, 71, 84, 0.15) 1px, transparent 1px);
 }
+
+/* Tactical Dark Mode Filter for Google / OSM Map Tiles */
+.dark-tactical-tile {
+  filter: brightness(0.92) contrast(1.1) !important;
+}
+
+/* Leaflet Map Popup Tactical Dark Styling */
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+  border-radius: 8px !important;
+}
+.leaflet-popup-content {
+  color: #f8fafc !important;
+}
