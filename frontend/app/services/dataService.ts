@@ -897,6 +897,30 @@ class PlatformDataService {
     }
   }
 
+  async authGetConfig(): Promise<{ demo_mode: boolean }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/config`, { cache: 'no-store' })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (e) {
+      // ignore
+    }
+    return { demo_mode: false }
+  }
+
+  async authDemoLogin(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/auth/demo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || 'Demo authentication disabled.')
+    }
+    return await res.json()
+  }
+
   async authLogin(username: string, password: string): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Disaster Response Platform API"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    DEMO_MODE: bool = True
     API_V1_PREFIX: str = "/api"
 
     # Database connection URL - default to absolute SQLite path in backend directory

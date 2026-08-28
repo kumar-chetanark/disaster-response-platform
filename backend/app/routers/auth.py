@@ -127,3 +127,40 @@ def logout(authorization: Optional[str] = Header(None)):
         token = authorization.replace("Bearer ", "").strip()
         ACTIVE_SESSIONS.pop(token, None)
     return {"status": "SUCCESS", "message": "Authority session successfully terminated."}
+
+from app.core.config import settings
+
+@router.get("/config")
+def get_auth_config():
+    """Returns public authentication configuration (e.g. whether DEMO_MODE is active)."""
+    return {"demo_mode": settings.DEMO_MODE}
+
+@router.post("/demo", response_model=UserSessionResponse)
+def demo_login():
+    """
+    Hackathon Demo Access Endpoint:
+    Issues a verified Level 5 Authority session for judges without requiring them to input credentials.
+    Strictly guarded by backend DEMO_MODE setting.
+    """
+    if not settings.DEMO_MODE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Demo command center access is disabled in this environment."
+        )
+
+    user = AUTHORITY_USERS["authority_admin"]
+    token = secrets.token_hex(24)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=12)
+    session_data = {
+        "token": token,
+        "username": "authority_admin",
+        "name": user["name"],
+        "badge_id": user["badge_id"],
+        "role": user["role"],
+        "authority_level": user["authority_level"],
+        "department": user["department"],
+        "expires_at": expires_at.isoformat(),
+    }
+    ACTIVE_SESSIONS[token] = session_data
+
+    return session_data
