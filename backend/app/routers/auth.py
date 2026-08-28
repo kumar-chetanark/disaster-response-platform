@@ -11,7 +11,7 @@ router = APIRouter(prefix="/auth", tags=["Authority Authentication"])
 AUTHORITY_USERS = {
     "authority_admin": {
         "password_hash": hashlib.sha256("Commander@2026!".encode()).hexdigest(),
-        "name": "Commander R. Vance",
+        "name": "Chetan Kumar",
         "badge_id": "DISASTER-CMD-01",
         "role": "AUTHORITY",
         "authority_level": 5,

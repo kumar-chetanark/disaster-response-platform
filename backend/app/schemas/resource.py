@@ -7,6 +7,7 @@ class ResourceCreate(BaseModel):
     category: str = Field(..., description="rescue, medical, aerial, water, land, shelter, supplies, police_army")
     status: str = Field("AVAILABLE", description="AVAILABLE, ASSIGNED, DISPATCHED, EN_ROUTE, ON_SCENE, UNAVAILABLE, MAINTENANCE")
     base_location: str = Field(..., description="Base hub or district location name")
+    resource_center_id: Optional[str] = Field(None, description="Assigned Resource Center ID")
     latitude: Optional[float] = Field(None, description="Base GPS Latitude")
     longitude: Optional[float] = Field(None, description="Base GPS Longitude")
     
@@ -29,6 +30,7 @@ class ResourceCreate(BaseModel):
 class ResourceUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
+    resource_center_id: Optional[str] = None
     status: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -54,6 +56,7 @@ class ResourceResponse(BaseModel):
     category: str
     status: str
     base_location: str
+    resource_center_id: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     capabilities: Optional[str] = None

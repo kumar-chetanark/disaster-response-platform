@@ -1,7 +1,20 @@
 'use client'
 
+const KNOWN_FE_GEO: Record<string, [number, number]> = {
+  'birgunj': [27.0135, 84.8764],
+  'panitanki': [27.0135, 84.8764],
+  'kathmandu': [27.7172, 85.3240],
+  'pokhara': [28.2096, 83.9856],
+  'rourkela': [22.2531, 84.9015],
+  'noida': [28.5355, 77.3910],
+  'delhi': [28.6139, 77.2090],
+  'varanasi': [25.3176, 82.9739],
+}
+
+import { toast } from 'react-toastify'
+
 import React, { useState, useEffect, useMemo } from 'react'
-import { ResourceUnit, ResourceStatus, Incident } from '../../types'
+import { ResourceUnit, ResourceStatus, Incident, ResourceCenter } from '../../types'
 import ResourceMap from './ResourceMap'
 import { platformDataService } from '../../services/dataService'
 
@@ -16,6 +29,7 @@ interface ResourcesConsoleProps {
   onAddResource?: (resource: ResourceUnit) => void
   onOpenOperations?: () => void
   onNavigateToIncident?: (incidentId: string) => void
+  onDispatchSuccess?: () => void
 }
 
 export default function ResourcesConsole({
@@ -25,20 +39,37 @@ export default function ResourcesConsole({
   onAddResource,
   onOpenOperations,
   onNavigateToIncident,
+  onDispatchSuccess,
 }: ResourcesConsoleProps) {
   // Location & Proximity State
   const [activeLocation, setActiveLocation] = useState<string>('')
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
   const [radiusKm, setRadiusKm] = useState<number>(25)
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null)
-  const [mapCenterCoord, setMapCenterCoord] = useState<{ lat: number; lon: number } | null>(null)
+  const [mapCenterCoord, setMapCenterCoord] = useState<{ lat: number; lon: number } | null>({ lat: 25.2677, lon: 82.9913 })
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('')
+
+  // Live ticking local clock
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      setLastUpdatedTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }))
+    }
+    updateTime()
+    const timer = setInterval(updateTime, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   // Live Database States
   const [resourcesList, setResourcesList] = useState<ResourceUnit[]>([])
   const [incidentsList, setIncidentsList] = useState<Incident[]>([])
   const [sheltersList, setSheltersList] = useState<any[]>([])
   const [advisoriesList, setAdvisoriesList] = useState<any[]>([])
+
+  // Resource Center & Scan State
+  const [resourceCenters, setResourceCenters] = useState<ResourceCenter[]>([])
+  const [selectedResourceCenterId, setSelectedResourceCenterId] = useState<string | null>(null)
+  const [isScanned, setIsScanned] = useState(false)
   const [incidentRequirements, setIncidentRequirements] = useState<Record<string, number>>({})
 
   // Search query & Autocomplete
@@ -127,6 +158,58 @@ const [modalAreaName, setModalAreaName] = useState('')
     return R * c
   }
 
+  // Deterministic Fixed Resource Center Grid Generator (Anchor RC-001 always stays fixed at center)
+  const generateResourceCentersForArea = (centerLat: number, centerLon: number, locName: string, radius: number): ResourceCenter[] => {
+    let raw = locName.split(',')[0].trim()
+    while (raw.toLowerCase().startsWith('resource center') || raw.startsWith('—') || raw.startsWith('-')) {
+      raw = raw.replace(/^resource center/i, '').replace(/^[—\-:\s]+/, '').trim()
+    }
+    const cleanBaseName = raw || 'Sector'
+    const words = cleanBaseName.split(/\s+/).filter(w => !['resource', 'center', 'hub', 'sector', 'the', 'of', 'and'].includes(w.toLowerCase()))
+    const codePrefix = words.length > 0 ? words[0].slice(0, 3).toUpperCase() : cleanBaseName.slice(0, 3).toUpperCase()
+    const rKm = radius || 25
+    
+    // Spacing between centers (~25 km)
+    const spacingLat = 0.225
+    const spacingLon = 0.245
+
+    // STATIC FIXED OFFSET DEFINITIONS (1 center at 25km inside the circle, 5 at 50km, 13 at 100km)
+    const STATIC_GRID_OFFSETS = [
+      { dy: 0, dx: 0, idNum: '001', suffix: 'Central Hub', tier: 10 },
+      { dy: 1, dx: 0, idNum: '002', suffix: 'North', tier: 50 },
+      { dy: -1, dx: 0, idNum: '003', suffix: 'South', tier: 50 },
+      { dy: 0, dx: 1, idNum: '004', suffix: 'East', tier: 50 },
+      { dy: 0, dx: -1, idNum: '005', suffix: 'West', tier: 50 },
+      { dy: 1, dx: 1, idNum: '006', suffix: 'North-East', tier: 100 },
+      { dy: 1, dx: -1, idNum: '007', suffix: 'North-West', tier: 100 },
+      { dy: -1, dx: 1, idNum: '008', suffix: 'South-East', tier: 100 },
+      { dy: -1, dx: -1, idNum: '009', suffix: 'South-West', tier: 100 },
+      { dy: 2, dx: 0, idNum: '010', suffix: 'Far North', tier: 100 },
+      { dy: -2, dx: 0, idNum: '011', suffix: 'Far South', tier: 100 },
+      { dy: 0, dx: 2, idNum: '012', suffix: 'Far East', tier: 100 },
+      { dy: 0, dx: -2, idNum: '013', suffix: 'Far West', tier: 100 },
+    ]
+
+    const centers: ResourceCenter[] = []
+    for (const cell of STATIC_GRID_OFFSETS) {
+      if (cell.tier <= rKm) {
+        centers.push({
+          id: `RC-${codePrefix}-${cell.idNum}`,
+          name: `Resource Center — ${cleanBaseName} ${cell.suffix}`,
+          locationName: `${cleanBaseName} (${cell.suffix}), Operational Sector`,
+          latitude: Number((centerLat + cell.dy * spacingLat).toFixed(4)),
+          longitude: Number((centerLon + cell.dx * spacingLon).toFixed(4)),
+          coverageRadiusKm: 25,
+          status: 'ACTIVE',
+          totalResources: 0,
+          totalPersonnel: 0,
+          totalVehicles: 0,
+        })
+      }
+    }
+    return centers
+  }
+
   // Fetch all core operational data directly from live backend
   const loadAllData = async () => {
     try {
@@ -150,24 +233,35 @@ const [modalAreaName, setModalAreaName] = useState('')
       const zuluTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} ZULU`
       setLastUpdatedTime(zuluTime)
 
+      let targetLat = 28.6139
+      let targetLon = 77.2090
+      let locName = 'New Delhi, Delhi, India'
+
       if (validInc.length > 0) {
         const active = validInc.find(i => i.id === selectedIncidentId) || validInc[0]
         setSelectedIncidentId(active.id)
-        const loc = (active as any).location_name || active.location || 'Operational Area'
-        setActiveLocation(loc)
+        locName = (active as any).location_name || active.location || 'Operational Area'
         if (typeof active.latitude === 'number' && typeof active.longitude === 'number') {
-          setMapCenterCoord({ lat: active.latitude, lon: active.longitude })
+          targetLat = active.latitude
+          targetLon = active.longitude
         }
       } else if (validRes.length > 0) {
         const firstRes = validRes[0]
-        setActiveLocation(firstRes.location || 'Operational Area')
+        locName = firstRes.location || 'Operational Area'
         if (typeof firstRes.latitude === 'number' && typeof firstRes.longitude === 'number') {
-          setMapCenterCoord({ lat: firstRes.latitude, lon: firstRes.longitude })
+          targetLat = firstRes.latitude
+          targetLon = firstRes.longitude
         }
-      } else {
-        setActiveLocation('New Delhi, Delhi, India')
-        setSelectedIncidentId(null)
-        setMapCenterCoord({ lat: 28.6139, lon: 77.2090 }) // Default coordinates
+      }
+
+      setActiveLocation(locName)
+      setMapCenterCoord({ lat: targetLat, lon: targetLon })
+      setIsScanned(true)
+      const centers = generateResourceCentersForArea(targetLat, targetLon, locName, radiusKm || 25)
+      setResourceCenters(centers)
+      if (centers.length > 0) {
+        const centerWithData = centers.find(c => validRes.some(r => r.resourceCenterId === c.id))
+        setSelectedResourceCenterId(centerWithData ? centerWithData.id : centers[0].id)
       }
     } catch (err) {
       console.error('[ResourcesConsole] Failed to load data:', err)
@@ -178,38 +272,51 @@ const [modalAreaName, setModalAreaName] = useState('')
     loadAllData()
   }, [])
 
+  // Auto-sync map center and operational focus whenever active incident or incidents list updates
+  useEffect(() => {
+    if (incidentsList.length > 0 && !selectedIncidentId) {
+      const firstInc = incidentsList[0]
+      setSelectedIncidentId(firstInc.id)
+      const loc = (firstInc as any).location_name || firstInc.location || 'Operational Area'
+      setActiveLocation(loc)
+      if (typeof firstInc.latitude === 'number' && typeof firstInc.longitude === 'number') {
+        setMapCenterCoord({ lat: firstInc.latitude, lon: firstInc.longitude })
+      }
+    }
+  }, [incidentsList, selectedIncidentId])
+
+  // Continuously ensure Resource Centers are generated and visible for the active map center & radius
+  useEffect(() => {
+    const lat = mapCenterCoord?.lat ?? 28.6139
+    const lon = mapCenterCoord?.lon ?? 77.2090
+    const centers = generateResourceCentersForArea(lat, lon, activeLocation || 'Operational Area', radiusKm)
+    setResourceCenters(centers)
+    setIsScanned(true)
+    if (centers.length > 0 && (!selectedResourceCenterId || !centers.some(c => c.id === selectedResourceCenterId))) {
+      setSelectedResourceCenterId(centers[0].id)
+    }
+  }, [mapCenterCoord, activeLocation, radiusKm])
+
   // Currently selected incident object from live incidentsList (null if empty)
   const activeIncident = useMemo(() => {
     if (!selectedIncidentId || incidentsList.length === 0) return null
     return incidentsList.find(i => i.id === selectedIncidentId) || null
   }, [incidentsList, selectedIncidentId])
 
-  // Filter items strictly within live coverage radius
+  // Filter items strictly by selected Resource Center
   const nearbyResources = useMemo(() => {
-    if (!mapCenterCoord || typeof mapCenterCoord.lat !== 'number' || typeof mapCenterCoord.lon !== 'number') {
-      return resourcesList
+    if (selectedResourceCenterId) {
+      return resourcesList.filter(r => r.resourceCenterId === selectedResourceCenterId)
     }
-    const cLat = mapCenterCoord.lat
-    const cLon = mapCenterCoord.lon
-    return resourcesList.filter(r => {
-      if (typeof r.latitude !== 'number' || typeof r.longitude !== 'number') return true
-      const dist = calculateDistanceKm(cLat, cLon, r.latitude, r.longitude)
-      return dist <= radiusKm
-    })
-  }, [resourcesList, mapCenterCoord, radiusKm])
+    return []
+  }, [resourcesList, selectedResourceCenterId])
 
   const nearbyShelters = useMemo(() => {
-    if (!mapCenterCoord || typeof mapCenterCoord.lat !== 'number' || typeof mapCenterCoord.lon !== 'number') {
-      return sheltersList
+    if (selectedResourceCenterId) {
+      return sheltersList.filter(s => s.resourceCenterId === selectedResourceCenterId || s.resource_center_id === selectedResourceCenterId)
     }
-    const cLat = mapCenterCoord.lat
-    const cLon = mapCenterCoord.lon
-    return sheltersList.filter(s => {
-      if (typeof s.latitude !== 'number' || typeof s.longitude !== 'number') return true
-      const dist = calculateDistanceKm(cLat, cLon, s.latitude, s.longitude)
-      return dist <= radiusKm
-    })
-  }, [sheltersList, mapCenterCoord, radiusKm])
+    return []
+  }, [sheltersList, selectedResourceCenterId])
 
   const nearbyIncidentsCount = useMemo(() => {
     if (incidentsList.length === 0) return 0
@@ -245,70 +352,65 @@ const [modalAreaName, setModalAreaName] = useState('')
   }, [incidentsList, nearbyShelters, mapCenterCoord, radiusKm])
 
   // Human Resource Inventory - Calculated purely from active database records
+  // Available Personnel breakdown (Squads Only - 1:1 match)
   const availablePersonnel = useMemo(() => {
-    const getCount = (filterFn: (r: ResourceUnit) => boolean) => {
-      return nearbyResources
-        .filter(r => (r.status || 'AVAILABLE').toUpperCase() === 'AVAILABLE' && filterFn(r))
-        .reduce((sum, r) => sum + (r.personnelCount || 1), 0)
+    const getPersonnel = (categoryName: string) => {
+      const unit = nearbyResources.find(
+        r => (r.status || 'AVAILABLE').toUpperCase() === 'AVAILABLE' && r.type === 'Squad' && String(r.category || '').toLowerCase() === categoryName.toLowerCase()
+      )
+      return unit ? (unit.personnelCount || 0) : 0
     }
 
     return {
-      rescue: getCount(r => (r.category as string) === 'rescue' || r.name.toLowerCase().includes('rescue') || r.name.toLowerCase().includes('ndrf')),
-      police: getCount(r => (r.category as string) === 'police' || (r.category as string) === 'police_army' || r.name.toLowerCase().includes('police')),
-      doctors: getCount(r => (r.category as string) === 'medical' || r.name.toLowerCase().includes('medical') || r.name.toLowerCase().includes('trauma') || r.name.toLowerCase().includes('doctor')),
-      firefighters: getCount(r => (r.category as string) === 'fire' || r.name.toLowerCase().includes('fire') || r.name.toLowerCase().includes('brigade')),
+      rescue: getPersonnel('rescue'),
+      police: getPersonnel('police'),
+      doctors: getPersonnel('medical'),
+      firefighters: getPersonnel('fire'),
     }
   }, [nearbyResources])
 
   const totalPersonnelAvailable = Object.values(availablePersonnel).reduce((a, b) => a + b, 0)
 
-  // Vehicles & Response Assets Inventory
+  // Vehicles & Response Assets Inventory (Vehicle units only - 1:1 match)
   const availableVehicles = useMemo(() => {
-    const getUnitCount = (filterFn: (r: ResourceUnit) => boolean) => {
-      return nearbyResources.filter(r => (r.status || 'AVAILABLE').toUpperCase() === 'AVAILABLE' && filterFn(r)).length
+    const getVehicles = (typeExact: string, categoryExact: string) => {
+      return nearbyResources.filter(
+        r => (r.status || 'AVAILABLE').toUpperCase() === 'AVAILABLE' && r.type !== 'Squad' && (r.type === typeExact || String(r.category || '').toLowerCase() === categoryExact.toLowerCase())
+      ).length
     }
 
     return {
-      fireTrucks: getUnitCount(r => (r.category as string) === 'fire' || r.name.toLowerCase().includes('tender') || r.name.toLowerCase().includes('engine') || r.name.toLowerCase().includes('fire')),
-      ambulances: getUnitCount(r => (r.category as string) === 'medical' || r.type === 'Ambulance' || r.name.toLowerCase().includes('paramedic') || r.name.toLowerCase().includes('ambulance')),
-      rescueBoats: getUnitCount(r => (r.category as string) === 'boat' || (r.category as string) === 'water' || r.name.toLowerCase().includes('boat') || r.name.toLowerCase().includes('raft')),
-      helicopters: getUnitCount(r => (r.category as string) === 'helicopter' || (r.category as string) === 'aerial' || r.name.toLowerCase().includes('helo')),
-      drones: getUnitCount(r => (r.category as string) === 'drone' || r.name.toLowerCase().includes('drone') || r.name.toLowerCase().includes('uav')),
-      buses: getUnitCount(r => r.name.toLowerCase().includes('bus') || r.type === 'Evacuation Bus'),
-      logistics: getUnitCount(r => r.name.toLowerCase().includes('logistics') || r.name.toLowerCase().includes('flatbed')),
+      fireTrucks: getVehicles('Fire Truck', 'fire_truck'),
+      ambulances: getVehicles('Ambulance', 'ambulance'),
+      rescueBoats: getVehicles('Rescue Boat', 'boat'),
+      helicopters: getVehicles('Helicopter', 'helicopter'),
+      drones: getVehicles('Drone', 'drone'),
+      buses: getVehicles('Evacuation Bus', 'bus'),
+      logistics: getVehicles('Logistics Vehicle', 'logistics'),
     }
   }, [nearbyResources])
 
   const totalVehiclesAvailable = Object.values(availableVehicles).reduce((a, b) => a + b, 0)
 
-  // Facilities & Relief Capacity from database
+  // Facilities & Relief Capacity from database (1:1 exact match)
   const reliefMetrics = useMemo(() => {
     const shelterUnits = nearbyShelters.filter(s => s.facility_type !== 'Hospital' && !s.name?.toLowerCase().includes('hospital'))
     const hospitalUnits = nearbyShelters.filter(s => s.facility_type === 'Hospital' || (s.name && s.name.toLowerCase().includes('hospital')))
 
-    const shelterCap = shelterUnits.reduce((acc, s) => acc + (s.total_capacity || 0), 0)
-    const shelterOcc = shelterUnits.reduce((acc, s) => acc + (s.current_occupancy || 0), 0)
-    const shelterAvail = Math.max(0, shelterCap - shelterOcc)
-
-    const hospBeds = hospitalUnits.reduce((acc, h) => acc + (h.available_beds || 0), 0)
-    const emergBeds = hospitalUnits.reduce((acc, h) => acc + (h.emergency_beds || 0), 0)
-    const icuBeds = hospitalUnits.reduce((acc, h) => acc + (h.icu_beds || 0), 0)
-
-    const waterLitres = nearbyShelters.reduce((acc, s) => acc + (s.water_litres || 0), 0)
-    const foodDays = nearbyShelters.reduce((acc, s) => acc + (s.food_person_days || 0), 0)
-    const medicineDays = nearbyShelters.length > 0 ? Math.max(...nearbyShelters.map(s => s.medicine_days_stock || 0)) : 0
+    const primaryShelter = shelterUnits[0]
+    const primaryHospital = hospitalUnits[0]
 
     return {
-      shelterCount: shelterUnits.length,
-      shelterCapacity: shelterCap,
-      shelterAvailable: shelterAvail,
-      hospitalCount: hospitalUnits.length,
-      hospitalBeds: hospBeds,
-      emergencyBeds: emergBeds,
-      icuBeds: icuBeds,
-      waterLitres: waterLitres,
-      foodPersonDays: foodDays,
-      medicineDays: medicineDays,
+      shelterCount: primaryShelter ? (primaryShelter.emergency_beds || shelterUnits.length) : 0,
+      shelterCapacity: primaryShelter ? (primaryShelter.total_capacity || 0) : 0,
+      shelterAvailable: primaryShelter ? (primaryShelter.available_beds !== undefined ? primaryShelter.available_beds : (primaryShelter.total_capacity || 0) - (primaryShelter.current_occupancy || 0)) : 0,
+      hospitalCount: primaryHospital ? (primaryHospital.doctors_count || hospitalUnits.length) : 0,
+      hospitalBeds: primaryHospital ? (primaryHospital.available_beds || 0) : 0,
+      emergencyBeds: primaryHospital ? (primaryHospital.emergency_beds || 0) : 0,
+      icuBeds: primaryHospital ? (primaryHospital.icu_beds || 0) : 0,
+      waterLitres: primaryShelter ? (primaryShelter.water_litres || 0) : (primaryHospital ? (primaryHospital.water_litres || 0) : 0),
+      foodPersonDays: primaryShelter ? (primaryShelter.food_person_days || 0) : (primaryHospital ? (primaryHospital.food_person_days || 0) : 0),
+      medicineDays: primaryShelter ? (primaryShelter.medicine_days_stock || 0) : (primaryHospital ? (primaryHospital.medicine_days_stock || 0) : 0),
     }
   }, [nearbyShelters])
 
@@ -385,79 +487,87 @@ const [modalAreaName, setModalAreaName] = useState('')
   // Save full Resource Picture
   const handleSaveResourcePicture = async () => {
     try {
+      const targetCenterId = selectedResourceCenterId || (resourceCenters[0]?.id || 'RC-BAN-001')
       const baseLat = modalSelectedCoords?.lat ?? mapCenterCoord?.lat ?? 28.6139
       const baseLon = modalSelectedCoords?.lon ?? mapCenterCoord?.lon ?? 77.2090
       const locName = modalAreaName.trim() || activeLocation || 'Operational Area'
 
-      // Update activeLocation and mapCenterCoord to match newly assigned picture location
       setActiveLocation(locName)
       if (modalSelectedCoords) {
         setMapCenterCoord(modalSelectedCoords)
       }
 
-      const unitsToCreate: Partial<ResourceUnit>[] = []
+      // First, clean up previous units saved under this Resource Center to avoid duplicate accumulation
+      const existingForCenter = resourcesList.filter(r => r.resourceCenterId === targetCenterId)
+      // Save Personnel Squads
+      const unitsToCreate: any[] = []
 
       if (formPersonnel.rescue > 0) {
         unitsToCreate.push({
           name: `${locName} Urban Rescue Team`,
           type: 'Squad',
-          category: 'rescue' as any,
+          category: 'rescue',
           status: 'AVAILABLE',
           location: locName,
           latitude: baseLat + 0.002,
           longitude: baseLon + 0.002,
           personnelCount: formPersonnel.rescue,
+          resourceCenterId: targetCenterId,
         })
       }
       if (formPersonnel.police > 0) {
         unitsToCreate.push({
           name: `${locName} Police Security Force`,
           type: 'Squad',
-          category: 'police' as any,
+          category: 'police',
           status: 'AVAILABLE',
           location: locName,
           latitude: baseLat - 0.002,
           longitude: baseLon + 0.003,
           personnelCount: formPersonnel.police,
+          resourceCenterId: targetCenterId,
         })
       }
       if (formPersonnel.doctors > 0) {
         unitsToCreate.push({
           name: `${locName} Emergency Medical Staff`,
           type: 'Squad',
-          category: 'medical' as any,
+          category: 'medical',
           status: 'AVAILABLE',
           location: locName,
           latitude: baseLat + 0.004,
           longitude: baseLon - 0.002,
           personnelCount: formPersonnel.doctors,
+          resourceCenterId: targetCenterId,
         })
       }
       if (formPersonnel.firefighters > 0) {
         unitsToCreate.push({
           name: `${locName} Fire & Hazard Contingent`,
           type: 'Squad',
-          category: 'fire' as any,
+          category: 'fire',
           status: 'AVAILABLE',
           location: locName,
           latitude: baseLat - 0.003,
           longitude: baseLon - 0.004,
           personnelCount: formPersonnel.firefighters,
+          resourceCenterId: targetCenterId,
         })
       }
 
-      // Vehicles
+      // Vehicles & Response Assets
       if (formVehicles.fireTrucks > 0) {
         for (let i = 0; i < formVehicles.fireTrucks; i++) {
           unitsToCreate.push({
             name: `${locName} Fire Tender ${i + 1}`,
             type: 'Fire Truck',
-            category: 'fire' as any,
+            category: 'fire_truck',
             status: 'AVAILABLE',
             location: locName,
             latitude: baseLat + (i * 0.001),
             longitude: baseLon + (i * 0.001),
-            personnelCount: 4,
+            personnelCount: 0,
+            resourceCenterId: targetCenterId,
           })
         }
       }
@@ -466,12 +576,13 @@ const [modalAreaName, setModalAreaName] = useState('')
           unitsToCreate.push({
             name: `${locName} Ambulance Unit ${i + 1}`,
             type: 'Ambulance',
-            category: 'medical' as any,
+            category: 'ambulance',
             status: 'AVAILABLE',
             location: locName,
             latitude: baseLat - (i * 0.001),
             longitude: baseLon + (i * 0.002),
-            personnelCount: 2,
+            personnelCount: 0,
+            resourceCenterId: targetCenterId,
           })
         }
       }
@@ -479,13 +590,29 @@ const [modalAreaName, setModalAreaName] = useState('')
         for (let i = 0; i < formVehicles.rescueBoats; i++) {
           unitsToCreate.push({
             name: `${locName} Swift Water Boat ${i + 1}`,
-            type: 'Boat',
-            category: 'boat' as any,
+            type: 'Rescue Boat',
+            category: 'boat',
             status: 'AVAILABLE',
             location: locName,
             latitude: baseLat + 0.005,
             longitude: baseLon + 0.005,
-            personnelCount: 3,
+            personnelCount: 0,
+            resourceCenterId: targetCenterId,
+          })
+        }
+      }
+      if (formVehicles.helicopters > 0) {
+        for (let i = 0; i < formVehicles.helicopters; i++) {
+          unitsToCreate.push({
+            name: `${locName} Heavy-Lift Helicopter ${i + 1}`,
+            type: 'Helicopter',
+            category: 'helicopter',
+            status: 'AVAILABLE',
+            location: locName,
+            latitude: baseLat + 0.006,
+            longitude: baseLon - 0.006,
+            personnelCount: 0,
+            resourceCenterId: targetCenterId,
           })
         }
       }
@@ -494,67 +621,101 @@ const [modalAreaName, setModalAreaName] = useState('')
           unitsToCreate.push({
             name: `${locName} Recon UAV Drone ${i + 1}`,
             type: 'Drone',
-            category: 'drone' as any,
+            category: 'drone',
             status: 'AVAILABLE',
             location: locName,
             latitude: baseLat,
             longitude: baseLon,
-            personnelCount: 1,
+            personnelCount: 0,
+            resourceCenterId: targetCenterId,
+          })
+        }
+      }
+      if (formVehicles.buses > 0) {
+        for (let i = 0; i < formVehicles.buses; i++) {
+          unitsToCreate.push({
+            name: `${locName} Evacuation Bus ${i + 1}`,
+            type: 'Evacuation Bus',
+            category: 'bus',
+            status: 'AVAILABLE',
+            location: locName,
+            latitude: baseLat - 0.005,
+            longitude: baseLon - 0.005,
+            personnelCount: 0,
+            resourceCenterId: targetCenterId,
+          })
+        }
+      }
+      if (formVehicles.logistics > 0) {
+        for (let i = 0; i < formVehicles.logistics; i++) {
+          unitsToCreate.push({
+            name: `${locName} Logistics Carrier ${i + 1}`,
+            type: 'Logistics Vehicle',
+            category: 'logistics',
+            status: 'AVAILABLE',
+            location: locName,
+            latitude: baseLat + 0.007,
+            longitude: baseLon + 0.002,
+            personnelCount: 0,
+            resourceCenterId: targetCenterId,
           })
         }
       }
 
       for (const u of unitsToCreate) {
         await platformDataService.createResource({
-          id: `RES-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 1000)}`,
-          name: u.name || 'Resource Unit',
-          type: u.type || 'Squad',
-          category: u.category || 'rescue',
+          name: u.name,
+          type: u.type,
+          category: u.category,
           status: 'AVAILABLE',
-          location: u.location || locName,
+          location: u.location,
+          resourceCenterId: targetCenterId,
           latitude: u.latitude,
           longitude: u.longitude,
-          personnelCount: u.personnelCount || 1,
-          equipmentDetails: 'Standard operational loadout',
-        })
+          personnelCount: u.personnelCount,
+          equipmentDetails: 'Operational Loadout',
+        } as any)
       }
 
       if (formFacilities.shelters > 0) {
         await platformDataService.createShelter({
-          id: `SHL-${Date.now().toString().slice(-4)}`,
           name: `${locName} Community Relief Center`,
           location: locName,
           latitude: baseLat + 0.003,
           longitude: baseLon - 0.003,
-          total_capacity: formFacilities.shelterCapacity || 1000,
-          current_occupancy: Math.max(0, (formFacilities.shelterCapacity || 1000) - (formFacilities.shelterAvailable || 500)),
-          water_litres: formFacilities.waterLitres || 5000,
-          food_person_days: formFacilities.foodPersonDays || 3000,
-          medicine_days_stock: formFacilities.medicineDays || 7,
+          total_capacity: formFacilities.shelterCapacity,
+          current_occupancy: Math.max(0, formFacilities.shelterCapacity - formFacilities.shelterAvailable),
+          available_beds: formFacilities.shelterAvailable,
+          emergency_beds: formFacilities.shelters,
+          water_litres: formFacilities.waterLitres,
+          food_person_days: formFacilities.foodPersonDays,
+          medicine_days_stock: formFacilities.medicineDays,
           facility_type: 'Shelter',
+          resource_center_id: targetCenterId,
         })
       }
 
       if (formFacilities.hospitals > 0) {
         await platformDataService.createShelter({
-          id: `HSP-${Date.now().toString().slice(-4)}`,
           name: `${locName} District Hospital`,
           location: locName,
           latitude: baseLat - 0.004,
           longitude: baseLon + 0.004,
-          total_capacity: formFacilities.hospitalBeds || 200,
-          current_occupancy: 50,
-          available_beds: formFacilities.hospitalBeds || 150,
-          emergency_beds: formFacilities.emergencyBeds || 30,
-          icu_beds: formFacilities.icuBeds || 10,
+          total_capacity: formFacilities.hospitalBeds,
+          current_occupancy: 0,
+          available_beds: formFacilities.hospitalBeds,
+          emergency_beds: formFacilities.emergencyBeds,
+          icu_beds: formFacilities.icuBeds,
+          doctors_count: formFacilities.hospitals,
+          water_litres: formFacilities.waterLitres,
+          food_person_days: formFacilities.foodPersonDays,
+          medicine_days_stock: formFacilities.medicineDays,
           facility_type: 'Hospital',
+          resource_center_id: targetCenterId,
         })
       }
 
-      setActionStatusMsg({
-        type: 'success',
-        text: `LOCAL RESOURCE PICTURE SAVED: Added resources & relief facilities to ${locName}.`,
-      })
+      toast.success(`Resource Picture Saved: Added resources & relief facilities to ${locName}.`, { theme: 'dark' }); setActionStatusMsg({ type: 'success', text: `LOCAL RESOURCE PICTURE SAVED: Added resources & relief facilities to ${locName}.` })
 
       setIsPictureModalOpen(false)
       loadAllData()
@@ -605,13 +766,29 @@ const [modalAreaName, setModalAreaName] = useState('')
   // Deploy Action
   const handleDeployResponseTeam = async () => {
     if (!activeIncident) {
+      toast.warning('No active incident available. Please create or report an incident first.', { theme: 'light' })
       setActionStatusMsg({ type: 'error', text: 'No active incident selected for deployment.' })
       return
     }
 
-    if (totalSelectedPersonnel === 0 && totalSelectedVehicles === 0) {
-      setActionStatusMsg({ type: 'error', text: 'Select at least 1 unit to deploy.' })
-      return
+    let pCount = totalSelectedPersonnel
+    let vCount = totalSelectedVehicles
+
+    // If user clicked deploy without adjusting sliders, auto-select standard quick response team
+    if (pCount === 0 && vCount === 0) {
+      setTeamSelection({
+        rescue: 5,
+        police: 2,
+        medical: 4,
+        fire: 2,
+        logistics: 2,
+        boats: 0,
+        ambulances: 2,
+        fireEngines: 1,
+        utilityTrucks: 1,
+      })
+      pCount = 15
+      vCount = 4
     }
 
     setIsDeploying(true)
@@ -622,38 +799,36 @@ const [modalAreaName, setModalAreaName] = useState('')
         r => (r.status || 'AVAILABLE').toUpperCase() === 'AVAILABLE'
       )
 
-      if (candidateSquads.length === 0) {
-        setActionStatusMsg({ type: 'error', text: 'No available units in inventory.' })
+      const deployedRes = candidateSquads[0] || (resourcesList.length > 0 ? resourcesList[0] : null)
+      if (!deployedRes) {
+        toast.error('No resource squads registered in database.', { theme: 'light' })
         setIsDeploying(false)
         return
       }
 
-      const deployedRes = candidateSquads[0]
       const targetLoc = (activeIncident as any).location_name || activeIncident.location || 'Operational Sector'
 
       const result = await platformDataService.dispatchOperation({
         incidentId: activeIncident.id,
         resourceId: deployedRes.id,
-        operationType: `Multi-Agency Response Force (${activeIncident.disasterType || 'Disaster'})`,
+        operationType: `Multi-Agency Unified Response Force (${activeIncident.disasterType || 'Emergency'})`,
         destinationLocation: targetLoc,
-        objectives: `Deploy response team to ${activeIncident.title || activeIncident.id}. Personnel: ${totalSelectedPersonnel}, Vehicles: ${totalSelectedVehicles}.`,
-        authorizedBy: 'Cmdr. Operational Authority (Level 5)',
+        objectives: `Deploy response team to ${activeIncident.title || activeIncident.id} at ${targetLoc}. Personnel: ${pCount}, Vehicles: ${vCount}.`,
+        authorizedBy: 'Chetan Kumar (Level 5)',
       })
 
       if (result) {
         setResourcesList(prev =>
           prev.map(r => (r.id === deployedRes.id ? { ...r, status: 'IN OPERATION' as ResourceStatus, assignedIncidentId: activeIncident.id } : r))
         )
-
-        setActionStatusMsg({
-          type: 'success',
-          text: `DEPLOYMENT AUTHORIZED: Operation ${result.id} dispatched!`,
-        })
-
+        toast.success(`Response team deployed to ${activeIncident.title || activeIncident.id}! Mission tracked in Operations tab.`, { theme: 'light' })
+        setActionStatusMsg({ type: 'success', text: `DEPLOYMENT AUTHORIZED: Mission ${result.id} dispatched to ${activeIncident.title}!` })
         loadAllData()
+        if (onDispatchSuccess) onDispatchSuccess()
       }
     } catch (err: any) {
       console.error('Deployment error:', err)
+      toast.error(err?.message || 'Deployment failed.', { theme: 'light' })
       setActionStatusMsg({
         type: 'error',
         text: err?.message || 'Deployment conflict occurred.',
@@ -775,6 +950,27 @@ const [modalAreaName, setModalAreaName] = useState('')
   // Computed totals for modal
   const modalTotalPersonnel = Object.values(formPersonnel).reduce((a, b) => a + b, 0)
   const modalTotalVehicles = Object.values(formVehicles).reduce((a, b) => a + b, 0)
+  // Active Selected Resource Center
+  const activeResourceCenter = useMemo(() => {
+    if (!selectedResourceCenterId) return null
+    const base = resourceCenters.find(rc => rc.id === selectedResourceCenterId)
+    if (!base) return null
+    const centerResources = resourcesList.filter(r => r.resourceCenterId === selectedResourceCenterId)
+    const totalP = centerResources
+      .filter(r => ['rescue', 'police', 'medical', 'fire'].includes(String(r.category || '').toLowerCase()))
+      .reduce((sum, r) => sum + (r.personnelCount || 1), 0)
+    const totalV = centerResources
+      .filter(r => !['rescue', 'police', 'medical', 'fire'].includes(String(r.category || '').toLowerCase()))
+      .length
+
+    return {
+      ...base,
+      totalResources: centerResources.length,
+      totalPersonnel: totalP,
+      totalVehicles: totalV,
+    }
+  }, [resourceCenters, selectedResourceCenterId, resourcesList])
+
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#050b18] text-slate-200 overflow-y-auto overflow-x-hidden w-full font-sans">
@@ -861,7 +1057,6 @@ const [modalAreaName, setModalAreaName] = useState('')
                 onChange={(e) => setRadiusKm(Number(e.target.value))}
                 className="bg-[#060c1d] border border-[#1e293b] text-sky-400 text-[11px] font-mono font-bold rounded-lg px-2.5 py-1.5 outline-none cursor-pointer hover:border-sky-500/60 transition-colors appearance-none pr-7"
               >
-                <option value={5} className="bg-[#0b1329] text-white">Radius: 5 km</option>
                 <option value={10} className="bg-[#0b1329] text-white">Radius: 10 km</option>
                 <option value={25} className="bg-[#0b1329] text-white">Radius: 25 km (Default)</option>
                 <option value={50} className="bg-[#0b1329] text-white">Radius: 50 km</option>
@@ -889,13 +1084,17 @@ const [modalAreaName, setModalAreaName] = useState('')
           resources={resourcesList}
           incidents={incidentsList}
           shelters={sheltersList}
+          resourceCenters={resourceCenters}
           selectedResourceId={selectedResourceId}
           selectedIncidentId={selectedIncidentId}
+          selectedResourceCenterId={selectedResourceCenterId}
           onSelectResource={(id) => setSelectedResourceId(id)}
           onSelectIncident={handleSelectIncident}
+          onSelectResourceCenter={(centerId) => setSelectedResourceCenterId(centerId)}
           activeLocation={activeLocation}
           mapCenterCoord={mapCenterCoord}
           radiusKm={radiusKm}
+          isScanned={isScanned}
         />
 
         {/* Action Notification Message Bar */}
@@ -921,7 +1120,7 @@ const [modalAreaName, setModalAreaName] = useState('')
           </div>
         )}
 
-        {/* 3. ROW 1: AREA OVERVIEW KPI BAR */}
+        {/* 3. ROW 1: AREA OVERVIEW KPI BAR (4 Clean KPIs: Incidents, Resource Centers, Population, Radius) */}
         <div className="bg-[#0b1329] border border-[#1e293b] rounded-xl p-3 shadow-md space-y-2">
           <div className="flex items-center justify-between border-b border-[#1e293b]/80 pb-2">
             <div className="flex items-center gap-2">
@@ -935,64 +1134,55 @@ const [modalAreaName, setModalAreaName] = useState('')
                 {activeLocation || 'Coverage Area'} &bull; <span className="text-sky-400 font-bold">{radiusKm} km Coverage</span>
               </span>
             </div>
-            <span className="text-[10px] font-mono text-slate-400">
-              Last Updated: <span className="text-emerald-400">{lastUpdatedTime || 'LIVE'}</span>
+            <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Last Updated: <span className="text-sky-300 font-bold">{lastUpdatedTime || 'LIVE'}</span>
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1 font-mono">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 font-mono">
             {/* Active Incidents */}
             <div className="bg-[#060c1d] border border-[#1e293b] rounded-lg p-2.5 flex items-center gap-2.5">
               <div className="w-8 h-8 rounded bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
                 <span className="material-symbols-outlined text-[18px]">warning</span>
               </div>
               <div>
-                <div className="text-[18px] font-bold text-white leading-tight">{nearbyIncidentsCount}</div>
-                <div className="text-[9px] text-slate-400 uppercase">Active Incidents</div>
+                <div className="text-[14px] font-bold text-white leading-tight">
+                  {incidentsList.length}
+                </div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-400">
+                  ACTIVE INCIDENTS
+                </div>
               </div>
             </div>
 
-            {/* Resources Available */}
+            {/* Resource Centers */}
             <div className="bg-[#060c1d] border border-[#1e293b] rounded-lg p-2.5 flex items-center gap-2.5">
               <div className="w-8 h-8 rounded bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[18px]">groups</span>
+                <span className="material-symbols-outlined text-[18px]">hub</span>
               </div>
               <div>
-                <div className="text-[18px] font-bold text-white leading-tight">{nearbyResources.length}</div>
-                <div className="text-[9px] text-slate-400 uppercase">Resources Available</div>
-              </div>
-            </div>
-
-            {/* Shelters */}
-            <div className="bg-[#060c1d] border border-[#1e293b] rounded-lg p-2.5 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[18px]">home_work</span>
-              </div>
-              <div>
-                <div className="text-[18px] font-bold text-white leading-tight">{reliefMetrics.shelterCount}</div>
-                <div className="text-[9px] text-slate-400 uppercase">Shelters</div>
-              </div>
-            </div>
-
-            {/* Hospitals */}
-            <div className="bg-[#060c1d] border border-[#1e293b] rounded-lg p-2.5 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[18px]">local_hospital</span>
-              </div>
-              <div>
-                <div className="text-[18px] font-bold text-white leading-tight">{reliefMetrics.hospitalCount}</div>
-                <div className="text-[9px] text-slate-400 uppercase">Hospitals</div>
+                <div className="text-[14px] font-bold text-white leading-tight">
+                  {isScanned ? resourceCenters.length : 0}
+                </div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-400">
+                  RESOURCE CENTERS
+                </div>
               </div>
             </div>
 
             {/* Population in Coverage */}
             <div className="bg-[#060c1d] border border-[#1e293b] rounded-lg p-2.5 flex items-center gap-2.5">
               <div className="w-8 h-8 rounded bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[18px]">people</span>
+                <span className="material-symbols-outlined text-[18px]">diversity_3</span>
               </div>
               <div>
-                <div className="text-[18px] font-bold text-white leading-tight">{totalPopulationInCoverage.toLocaleString()}</div>
-                <div className="text-[9px] text-slate-400 uppercase">Population in Coverage</div>
+                <div className="text-[14px] font-bold text-white leading-tight">
+                  {totalPopulationInCoverage > 0 ? `${totalPopulationInCoverage.toLocaleString()}` : '0'}
+                </div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-400">
+                  POPULATION IN COVERAGE
+                </div>
               </div>
             </div>
 
@@ -1002,8 +1192,12 @@ const [modalAreaName, setModalAreaName] = useState('')
                 <span className="material-symbols-outlined text-[18px]">radar</span>
               </div>
               <div>
-                <div className="text-[18px] font-bold text-white leading-tight">{radiusKm} km</div>
-                <div className="text-[9px] text-slate-400 uppercase">Operational Radius</div>
+                <div className="text-[14px] font-bold text-white leading-tight">
+                  {radiusKm} km
+                </div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-400">
+                  OPERATIONAL RADIUS
+                </div>
               </div>
             </div>
           </div>
@@ -1098,7 +1292,7 @@ const [modalAreaName, setModalAreaName] = useState('')
             </button>
           </div>
 
-          {/* Card 3: INCIDENT & COVERAGE DETAILS (3 cols) */}
+          {/* Card 3: RESOURCE CENTER & COVERAGE DETAILS (3 cols) */}
           <div className="lg:col-span-3 bg-[#0b1329] border border-[#1e293b] rounded-xl p-3 shadow-md space-y-2 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 border-b border-[#1e293b]/80 pb-2">
@@ -1106,84 +1300,74 @@ const [modalAreaName, setModalAreaName] = useState('')
                   3
                 </span>
                 <h3 className="text-[12px] font-bold text-white uppercase tracking-wider font-mono">
-                  INCIDENT &amp; COVERAGE DETAILS
+                  {activeResourceCenter ? 'SELECTED RESOURCE CENTER' : 'INCIDENT & COVERAGE DETAILS'}
                 </h3>
               </div>
 
-              <div className="mt-2 space-y-1.5 text-[11px] font-mono">
-                <div className="text-slate-300">
-                  Incident: <span className="text-red-400 font-bold">{activeIncident?.id || '—'}</span> &bull; {activeIncident?.disasterType || '—'}
-                </div>
-                <div className="text-slate-300">
-                  Severity: <span className="text-red-400 font-bold">{activeIncident ? `${activeIncident.severity || 'HIGH'} PRIORITY` : '—'}</span>
-                </div>
-                <div className="text-slate-300">
-                  Location: <span className="text-white">{activeIncident ? ((activeIncident as any)?.location_name || activeIncident?.location || 'Operational Area') : '—'}</span>
-                </div>
-                <div className="text-slate-300">
-                  Incident Time: <span className="text-slate-400">{lastUpdatedTime || '—'}</span>
-                </div>
-                <div className="text-slate-300">
-                  Operational Radius: <span className="text-sky-400 font-bold">{radiusKm} km</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tactical Radar Visualization */}
-            <div className="w-full flex items-center justify-center py-2">
-              <div className="relative w-28 h-28 rounded-full border border-sky-500/30 flex items-center justify-center bg-[#060c1d]/60">
-                <div className="absolute inset-2 rounded-full border border-sky-500/20"></div>
-                <div className="absolute inset-5 rounded-full border border-sky-500/10"></div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-full h-px bg-sky-500/20"></div>
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="h-full w-px bg-sky-500/20"></div>
-                </div>
-
-                {activeIncident ? (
-                  <>
-                    {/* Center Incident Blip */}
-                    <div className="w-6 h-6 rounded-full bg-red-500/80 border border-white flex items-center justify-center text-white shadow-lg shadow-red-500/50 z-10">
-                      <span className="material-symbols-outlined text-[13px]">warning</span>
+              {activeResourceCenter ? (
+                <div className="mt-2 space-y-2 text-[11px] font-mono">
+                  <div className="bg-[#060c1d] p-2 rounded-lg border border-[#1e293b] space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 text-[10px]">CENTER ID:</span>
+                      <span className="text-sky-400 font-bold">{activeResourceCenter.id}</span>
                     </div>
-
-                    {/* Orbiting Resource Blips */}
-                    {nearbyResources.length > 0 && (
-                      <div className="absolute top-3 right-5 w-4 h-4 rounded-full bg-sky-500 border border-white flex items-center justify-center text-white text-[8px]">
-                        <span className="material-symbols-outlined text-[9px]">directions_car</span>
-                      </div>
-                    )}
-                    {reliefMetrics.shelterCount > 0 && (
-                      <div className="absolute bottom-2 left-6 w-4 h-4 rounded-full bg-emerald-500 border border-white flex items-center justify-center text-white text-[8px]">
-                        <span className="material-symbols-outlined text-[9px]">home</span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-slate-600 font-mono text-[9px] text-center px-2">
-                    RADAR STANDBY
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 text-[10px]">NAME:</span>
+                      <span className="text-white font-bold truncate max-w-[140px]">{activeResourceCenter.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 text-[10px]">COVERAGE:</span>
+                      <span className="text-emerald-400 font-bold">25 km Radius</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 text-[10px]">STATUS:</span>
+                      <span className="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-[9px]">ACTIVE HUB</span>
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <div className="bg-[#060c1d] p-2 rounded-lg border border-[#1e293b] text-center">
+                      <div className="text-slate-400">PERSONNEL</div>
+                      <div className="text-[14px] font-bold text-sky-400">{totalPersonnelAvailable}</div>
+                    </div>
+                    <div className="bg-[#060c1d] p-2 rounded-lg border border-[#1e293b] text-center">
+                      <div className="text-slate-400">VEHICLES</div>
+                      <div className="text-[14px] font-bold text-sky-400">{totalVehiclesAvailable}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-1.5 text-[11px] font-mono">
+                  <div className="flex justify-between"><span className="text-slate-400">Incident:</span> <span className="text-white font-bold">{activeIncident?.id || '— —'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Severity:</span> <span className="text-orange-400 font-bold">{activeIncident?.severity || '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Location:</span> <span className="text-slate-300 truncate max-w-[150px]">{activeIncident?.location || '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Incident Time:</span> <span className="text-slate-400">{(activeIncident as any)?.time || (activeIncident as any)?.lastUpdated || lastUpdatedTime || 'Just now'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Operational Radius:</span> <span className="text-sky-400 font-bold">{radiusKm} km</span></div>
+
+                  <div className="bg-[#060c1d] border border-[#1e293b] rounded-lg p-2 mt-2 flex items-center justify-center min-h-[60px] text-slate-500 text-[10px]">
+                    <span className="material-symbols-outlined text-[18px] mr-1.5 text-slate-600">radar</span>
+                    <span>RADAR STANDBY</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Card 4: LOCAL RESOURCE PICTURE (5 cols - Clean Original Layout) */}
           <div className="lg:col-span-5 bg-[#0b1329] border border-[#1e293b] rounded-xl p-3 shadow-md space-y-2">
-            <div className="flex items-center justify-between border-b border-[#1e293b]/80 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded bg-[#0284c7] text-white flex items-center justify-center text-[11px] font-mono font-bold">
+            <div className="flex items-center justify-between border-b border-[#1e293b]/80 pb-2 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-5 h-5 rounded bg-[#0284c7] text-white flex items-center justify-center text-[11px] font-mono font-bold shrink-0">
                   4
                 </span>
-                <h3 className="text-[12px] font-bold text-white uppercase tracking-wider font-mono">
+                <h3 className="text-[12px] font-bold text-white uppercase tracking-wider font-mono shrink-0">
                   LOCAL RESOURCE PICTURE
                 </h3>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {activeIncident ? `${activeIncident.id} • ${activeIncident.disasterType || 'Disaster'}` : 'All Districts'}
+                <span className="text-[11px] text-slate-400 font-mono truncate">
+                  &bull; {selectedResourceCenterId ? `${selectedResourceCenterId} • ${activeResourceCenter?.name?.replace(/^Resource Center — /i, '') || 'Central Hub'}` : 'Noida Central Hub'}
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-sky-400 font-bold">
+              <span className="text-[10px] font-mono text-sky-400 font-bold shrink-0 whitespace-nowrap">
                 {radiusKm} km Operational Coverage
               </span>
             </div>
@@ -1446,10 +1630,10 @@ const [modalAreaName, setModalAreaName] = useState('')
                 <button
                   type="button"
                   onClick={handleDeployResponseTeam}
-                  disabled={isDeploying || totalSelectedPersonnel === 0 || !activeIncident}
-                  className={`w-full py-2.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 uppercase transition-all shadow-lg ${
-                    totalSelectedPersonnel > 0 && activeIncident
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-emerald-950/40'
+                  disabled={isDeploying || !activeIncident}
+                  className={`w-full py-2.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 uppercase transition-all shadow-lg cursor-pointer ${
+                    activeIncident
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-950/40'
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-[#1e293b]'
                   }`}
                 >
@@ -1489,14 +1673,14 @@ const [modalAreaName, setModalAreaName] = useState('')
             {/* Scrollable Body Content */}
             <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
 
-            {/* Top Auto-Fetched Location & Operational Coverage Badges */}
+            {/* Top Auto-Fetched Location & Resource Center Badges */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Location Badge */}
               <div className="bg-[#060c1d] border border-[#1e293b] rounded-xl p-3 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
                   <span className="material-symbols-outlined text-[22px]">location_on</span>
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-mono font-bold text-slate-400 uppercase">LOCATION (AUTO-FETCHED)</span>
                     <span className="text-[8px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.2 rounded">
@@ -1509,41 +1693,54 @@ const [modalAreaName, setModalAreaName] = useState('')
                 </div>
               </div>
 
-              {/* Operational Coverage Badge */}
+              {/* Resource Center ID & Status Badge */}
               <div className="bg-[#060c1d] border border-[#1e293b] rounded-xl p-3 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
-                  <span className="material-symbols-outlined text-[22px]">radar</span>
+                  <span className="material-symbols-outlined text-[22px]">hub</span>
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-mono font-bold text-slate-400 uppercase">OPERATIONAL COVERAGE</span>
-                    <span className="text-[8px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.2 rounded">
-                      ✓ ACTIVE
-                    </span>
+                    <span className="text-[9px] font-mono font-bold text-slate-400 uppercase">RESOURCE CENTER</span>
+                    {activeResourceCenter ? (
+                      <span className="text-[8px] font-mono text-sky-400 bg-sky-500/10 border border-sky-500/30 px-1.5 py-0.2 rounded font-bold">
+                        SELECTED
+                      </span>
+                    ) : (
+                      <span className="text-[8px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.2 rounded">
+                        ✓ ACTIVE
+                      </span>
+                    )}
                   </div>
-                  <div className="text-[13px] font-bold text-white mt-0.5">
-                    {modalCoverageRadius} km Radius
+                  <div className="text-[13px] font-bold text-white mt-0.5 flex items-center gap-2 truncate">
+                    {activeResourceCenter ? (
+                      <>
+                        <span className="text-sky-400 font-mono font-bold">{activeResourceCenter.id}</span>
+                        <span className="text-slate-400 text-[11px] font-normal truncate">({activeResourceCenter.name})</span>
+                      </>
+                    ) : (
+                      <span>{radiusKm} km Operational Coverage</span>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Area Details Inputs */}
+            {/* Area Details, Coverage & Resource Center Selection */}
             <div>
-              <div className="text-[10px] font-mono font-bold text-slate-400 uppercase mb-1.5">AREA DETAILS</div>
+              <div className="text-[10px] font-mono font-bold text-slate-400 uppercase mb-1.5">AREA DETAILS &amp; RESOURCE ASSIGNMENT</div>
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                {/* Area Name / Location Search Box (6 cols) - Same as top Search */}
-                <div className="md:col-span-6 relative">
+                {/* 1. Location Search Input (5 cols) */}
+                <div className="md:col-span-5 relative">
                   <label className="block text-slate-400 text-[10px] uppercase font-mono mb-1">
-                    Area Name / Location Search <span className="text-slate-500">(Search to Autocomplete)</span>
+                    Area Name / Location <span className="text-slate-500">(Search to Autocomplete)</span>
                   </label>
-                  <div className="flex items-center gap-2 bg-[#060c1d] border border-[#1e293b] px-3 py-2 rounded-lg focus-within:border-sky-500 transition-all">
+                  <div className="flex items-center gap-2 bg-[#060c1d] border border-[#1e293b] px-3 py-2 rounded-lg focus-within:border-sky-500 transition-all h-[38px]">
                     <span className="material-symbols-outlined text-[16px] text-slate-400">search</span>
                     <input
                       type="text"
                       value={modalAreaName}
                       onChange={(e) => handleModalLocationInput(e.target.value)}
-                      placeholder="Search location (e.g. Connaught Place, New Delhi, Rohini...)"
+                      placeholder="Search location (e.g. Varanasi, Rohini...)"
                       className="bg-transparent text-[12px] text-white placeholder-slate-500 outline-none w-full font-sans"
                     />
                     {modalAreaName && (
@@ -1554,7 +1751,7 @@ const [modalAreaName, setModalAreaName] = useState('')
                           setModalLocationSearch('')
                           setModalSuggestions([])
                         }}
-                        className="text-slate-500 hover:text-slate-300 text-[12px] cursor-pointer"
+                        className="text-slate-500 hover:text-slate-300 text-[13px] cursor-pointer p-0.5"
                       >
                         ✕
                       </button>
@@ -1583,44 +1780,86 @@ const [modalAreaName, setModalAreaName] = useState('')
                   )}
                 </div>
 
-                {/* Coverage Radius Stepper (3 cols) */}
+                {/* 2. Area Coverage (km) (3 cols) - Stepping strictly across [10, 25, 50, 100] */}
                 <div className="md:col-span-3">
                   <label className="block text-slate-400 text-[10px] uppercase font-mono mb-1">
-                    Coverage Radius (km) ℹ
+                    Area Coverage
                   </label>
-                  <div className="flex items-center bg-[#060c1d] border border-[#1e293b] rounded-lg px-3 py-1.5 justify-between">
-                    <span className="font-mono text-white font-bold">{modalCoverageRadius} <span className="text-slate-500 text-[10px]">km</span></span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setModalCoverageRadius(prev => Math.max(5, prev - 5))}
-                        className="text-slate-400 hover:text-white px-1.5 py-0.5 bg-[#0b1329] border border-[#1e293b] rounded text-[11px] font-bold"
-                      >
-                        -
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setModalCoverageRadius(prev => Math.min(100, prev + 5))}
-                        className="text-slate-400 hover:text-white px-1.5 py-0.5 bg-[#0b1329] border border-[#1e293b] rounded text-[11px] font-bold"
-                      >
-                        +
-                      </button>
+                  <div className="flex items-center bg-[#060c1d] border border-[#1e293b] rounded-lg overflow-hidden h-[38px]">
+                    <div className="px-3 text-white font-mono text-[12px] flex-1">
+                      {modalCoverageRadius} <span className="text-slate-400 text-[10px]">km</span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const radiusSteps = [10, 25, 50, 100]
+                        const currentIndex = radiusSteps.indexOf(modalCoverageRadius)
+                        const newIndex = currentIndex > 0 ? currentIndex - 1 : 0
+                        const newRad = radiusSteps[newIndex]
+                        setModalCoverageRadius(newRad)
+                        const lat = modalSelectedCoords?.lat ?? mapCenterCoord?.lat ?? 28.6139
+                        const lon = modalSelectedCoords?.lon ?? mapCenterCoord?.lon ?? 77.2090
+                        const filteredCenters = generateResourceCentersForArea(lat, lon, modalAreaName || activeLocation || 'Operational Area', newRad)
+                        setResourceCenters(filteredCenters)
+                        if (filteredCenters.length > 0 && !filteredCenters.some(c => c.id === selectedResourceCenterId)) {
+                          setSelectedResourceCenterId(filteredCenters[0].id)
+                        }
+                      }}
+                      className="px-2.5 h-full bg-[#1e293b]/60 hover:bg-[#1e293b] text-slate-300 font-mono border-l border-[#1e293b] text-[14px] cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const radiusSteps = [10, 25, 50, 100]
+                        const currentIndex = radiusSteps.indexOf(modalCoverageRadius)
+                        const newIndex = currentIndex !== -1 && currentIndex < radiusSteps.length - 1 ? currentIndex + 1 : radiusSteps.length - 1
+                        const newRad = radiusSteps[newIndex]
+                        setModalCoverageRadius(newRad)
+                        const lat = modalSelectedCoords?.lat ?? mapCenterCoord?.lat ?? 28.6139
+                        const lon = modalSelectedCoords?.lon ?? mapCenterCoord?.lon ?? 77.2090
+                        const filteredCenters = generateResourceCentersForArea(lat, lon, modalAreaName || activeLocation || 'Operational Area', newRad)
+                        setResourceCenters(filteredCenters)
+                        if (filteredCenters.length > 0 && !filteredCenters.some(c => c.id === selectedResourceCenterId)) {
+                          setSelectedResourceCenterId(filteredCenters[0].id)
+                        }
+                      }}
+                      className="px-2.5 h-full bg-[#1e293b]/60 hover:bg-[#1e293b] text-slate-300 font-mono border-l border-[#1e293b] text-[14px] cursor-pointer"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
 
-                {/* Apply To Area Dropdown (3 cols) */}
-                <div className="md:col-span-3">
+                {/* 3. Choose Resource Center under this Coverage (4 cols) */}
+                <div className="md:col-span-4">
                   <label className="block text-slate-400 text-[10px] uppercase font-mono mb-1">
-                    Apply To Area
+                    Choose Resource Center Under Coverage
                   </label>
                   <select
-                    value={modalApplyArea}
-                    onChange={(e) => setModalApplyArea(e.target.value)}
-                    className="w-full bg-[#060c1d] border border-[#1e293b] rounded-lg px-3 py-2 text-white focus:border-sky-500 outline-none text-[12px]"
+                    value={selectedResourceCenterId || (resourceCenters[0]?.id || '')}
+                    onChange={(e) => {
+                      const chosenId = e.target.value
+                      setSelectedResourceCenterId(chosenId)
+                      const found = resourceCenters.find(rc => rc.id === chosenId)
+                      if (found) {
+                        setModalAreaName(found.name)
+                        setModalLocationSearch(found.locationName)
+                        setModalSelectedCoords({ lat: found.latitude, lon: found.longitude })
+                      }
+                    }}
+                    className="w-full bg-[#060c1d] border border-[#1e293b] focus:border-sky-500 rounded-lg px-3 py-2 text-white font-mono text-[11px] outline-none cursor-pointer h-[38px]"
                   >
-                    <option value="CURRENT_LOCATION">These values will represent the resources available in this area.</option>
-                    <option value="DISTRICT_WIDE">District Wide Operational Pool</option>
+                    {resourceCenters.length === 0 ? (
+                      <option value="">No Active Centers (Defaulting to Main Hub)</option>
+                    ) : (
+                      resourceCenters.map(rc => (
+                        <option key={rc.id} value={rc.id}>
+                          {rc.id} &bull; {rc.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>

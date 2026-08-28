@@ -12,9 +12,12 @@ export default function CitizenLandingPage({
   onReportSubmitted,
   onNavigateToAuthorityLogin,
 }: CitizenLandingPageProps) {
-  // Form State
+  // Form State - Specific Location Structure
   const [whatHappened, setWhatHappened] = useState('Flood')
   const [location, setLocation] = useState('')
+  const [landmarkStreet, setLandmarkStreet] = useState('')
+  const [cityDistrict, setCityDistrict] = useState('')
+  const [pincodeState, setPincodeState] = useState('')
   const [description, setDescription] = useState('')
   const [citizenName, setCitizenName] = useState('')
   const [contactInfo, setContactInfo] = useState('')
@@ -39,16 +42,52 @@ export default function CitizenLandingPage({
     if (isSubmitting) return
     setErrorMessage(null)
 
-    // Front-end Pre-Validation
+    // AI Intake & Semantic Quality Pre-Check
     const cleanLocation = location.trim()
     const cleanDescription = description.trim()
 
-    if (!cleanLocation || cleanLocation.length < 2) {
-      setErrorMessage('Please enter a valid location or landmark (at least 2 characters).')
+    // Helper: Detect random key smashing / lack of valid word structure
+    const isGibberish = (str: string) => {
+      if (str.length < 3) return true
+      // 6+ consecutive consonants
+      if (/[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{6,}/.test(str)) return true
+      // Repetitive character mashing (e.g. aaaaaa)
+      if (/(.)\1{4,}/.test(str)) return true
+      // Vowel ratio check for words >= 4 letters
+      const words = str.split(/\s+/).filter(w => w.length >= 4)
+      if (words.length > 0) {
+        let invalid = 0
+        for (const w of words) {
+          const vowels = (w.match(/[aeiouAEIOU]/g) || []).length
+          const letters = (w.match(/[a-zA-Z]/g) || []).length
+          if (letters >= 4 && vowels === 0) invalid++
+          else if (letters >= 6 && (vowels / letters) < 0.15) invalid++
+        }
+        if (invalid / words.length >= 0.5) return true
+      }
+      return false
+    }
+
+    // Require at least a specific location with a city/landmark (minimum 6 characters)
+    if (!cleanLocation || cleanLocation.length < 6 || isGibberish(cleanLocation)) {
+      setErrorMessage('Specific Location Required: Please provide a specific location with landmark/area and city (e.g. "NIT Rourkela, Odisha" or "Sector 62, Noida"). Random characters are rejected.')
       return
     }
-    if (!cleanDescription || cleanDescription.length < 10) {
-      setErrorMessage('Please provide a meaningful description of the situation (at least 10 characters).')
+
+    // Require both landmark/area and city components (e.g. separated by comma or space)
+    const locationParts = cleanLocation.split(/[,\s]+/).filter(Boolean)
+    if (locationParts.length < 2) {
+      setErrorMessage('More Specific Address Required: Please include both the specific landmark/area and the city name (e.g. "NIT Campus, Rourkela").')
+      return
+    }
+
+    if (!cleanDescription || cleanDescription.length < 12 || isGibberish(cleanDescription)) {
+      setErrorMessage('AI Situation Verification: Please describe the emergency using real words explaining what is happening and the assistance needed. Random characters are rejected.')
+      return
+    }
+
+    if (contactInfo.trim() && (contactInfo.trim() === '1234567890' || contactInfo.trim() === '0000000000')) {
+      setErrorMessage('Please enter a legitimate emergency phone number or leave the field blank.')
       return
     }
 

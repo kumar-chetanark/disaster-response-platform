@@ -22,6 +22,7 @@ class ShelterResponse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     facility_type: Optional[str] = "Shelter"
+    resource_center_id: Optional[str] = None
     available_beds: Optional[int] = 0
     emergency_beds: Optional[int] = 0
     icu_beds: Optional[int] = 0
@@ -41,6 +42,7 @@ class ShelterCreate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     facility_type: Optional[str] = "Shelter"
+    resource_center_id: Optional[str] = None
 
 class ShelterUpdate(BaseModel):
     current_occupancy: Optional[int] = None
@@ -71,6 +73,7 @@ def list_shelters(db: Session = Depends(get_db)):
             "latitude": s.latitude,
             "longitude": s.longitude,
             "facility_type": s.facility_type or ("Hospital" if "hospital" in s.name.lower() else "Shelter"),
+            "resource_center_id": s.resource_center_id,
             "available_beds": s.available_beds or 0,
             "emergency_beds": s.emergency_beds or 0,
             "icu_beds": s.icu_beds or 0,
@@ -99,6 +102,7 @@ def create_shelter(s_in: ShelterCreate, db: Session = Depends(get_db)):
         latitude=s_in.latitude,
         longitude=s_in.longitude,
         facility_type=s_in.facility_type or "Shelter",
+        resource_center_id=s_in.resource_center_id,
     )
     db.add(new_s)
     db.commit()
@@ -118,6 +122,7 @@ def create_shelter(s_in: ShelterCreate, db: Session = Depends(get_db)):
         "latitude": new_s.latitude,
         "longitude": new_s.longitude,
         "facility_type": new_s.facility_type,
+        "resource_center_id": new_s.resource_center_id,
         "available_beds": new_s.available_beds or 0,
         "emergency_beds": new_s.emergency_beds or 0,
         "icu_beds": new_s.icu_beds or 0,

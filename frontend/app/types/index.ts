@@ -196,6 +196,7 @@ export type ResourceStatus =
   | 'DEPLOYED'
 
 export interface ResourceUnit {
+  resourceCenterId?: string
   distanceKm?: number
   shelterCapacity?: number
   shelterOccupied?: number
@@ -571,4 +572,21 @@ export interface IncidentGeospatialContext {
   resources: GeospatialResource[]
   operations: GeospatialOperation[]
   map_summary: GeospatialMapSummary
+}
+
+
+// RESOURCE CENTER DOMAIN TYPE
+export interface ResourceCenter {
+  id: string
+  name: string
+  locationName: string
+  latitude: number
+  longitude: number
+  coverageRadiusKm: number
+  status: 'ACTIVE' | 'STANDBY' | 'INACTIVE'
+  district?: string
+  state?: string
+  totalResources?: number
+  totalPersonnel?: number
+  totalVehicles?: number
 }

@@ -1,16 +1,34 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 
 interface TopHeaderProps {
   isSidebarCollapsed?: boolean
   onToggleSidebar?: () => void
+  onLogout?: () => void
+  userRole?: string
 }
 
 export default function TopHeader({
   isSidebarCollapsed = false,
   onToggleSidebar,
+  onLogout,
+  userRole = 'AUTHORITY',
 }: TopHeaderProps) {
+  const [timeStr, setTimeStr] = useState<string>('')
+  const [dateStr, setDateStr] = useState<string>('')
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }))
+      setDateStr(now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }))
+    }
+    updateTime()
+    const interval = setInterval(updateTime, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   return (
     <header className="h-header-height fixed top-0 left-0 right-0 bg-surface-container border-b border-outline-variant flex items-center justify-between px-4 sm:px-6 z-50">
       {/* Brand, Hamburger Toggle & Node Status */}
@@ -41,30 +59,45 @@ export default function TopHeader({
         </div>
       </div>
 
-      {/* Authority Profile & Timestamp */}
+      {/* Authority Profile, Real-Time Clock & Logout Button */}
       <div className="flex items-center gap-3 sm:gap-4">
-        <div className="hidden md:flex flex-col text-right">
-          <span className="font-mono-label text-[11px] text-primary font-bold">
-            10:42:15 ZULU
-          </span>
-          <span className="font-body-sm text-[10px] text-on-surface-variant">
-            Sector 7 Command Hub
-          </span>
-        </div>
+        {timeStr && (
+          <div className="hidden md:flex flex-col text-right font-mono">
+            <span className="text-[12px] text-sky-400 font-bold tracking-wider">
+              {timeStr}
+            </span>
+            <span className="text-[10px] text-slate-400">
+              {dateStr}
+            </span>
+          </div>
+        )}
 
-        <div className="flex items-center gap-2 pl-3 border-l border-outline-variant">
-          <div className="w-8 h-8 rounded-full bg-surface-container-highest border border-primary/40 flex items-center justify-center text-primary font-bold text-[12px]">
-            JV
+        <div className="flex items-center gap-2.5 pl-3 border-l border-outline-variant">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0284c7] to-[#0369a1] border border-sky-400/40 flex items-center justify-center text-white font-bold text-[12px] shadow-sm">
+            CK
           </div>
           <div className="hidden lg:flex flex-col">
             <span className="font-body-sm text-[12px] font-bold text-on-surface leading-tight">
-              Cmdr. J. Vance
+              Chetan Kumar
             </span>
-            <span className="font-mono-label text-[10px] text-emerald-400">
+            <span className="font-mono-label text-[10px] text-emerald-400 font-semibold">
               Authority Level 5
             </span>
           </div>
         </div>
+
+        {/* LOGOUT BUTTON */}
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/40 hover:bg-red-900/60 border border-red-500/40 hover:border-red-500 text-red-300 hover:text-white font-mono text-[11px] font-bold uppercase rounded-lg transition-all shadow cursor-pointer ml-1"
+            title="Log out of Operational Authority Session"
+          >
+            <span className="material-symbols-outlined text-[16px] text-red-400">logout</span>
+            <span className="hidden sm:inline">LOG OUT</span>
+          </button>
+        )}
       </div>
     </header>
   )

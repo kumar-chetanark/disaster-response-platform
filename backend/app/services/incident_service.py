@@ -92,6 +92,8 @@ def get_incidents_list(
                     "weatherReports": weather_count,
                     "fieldAssessments": field_count,
                 },
+                latitude=inc.latitude,
+                longitude=inc.longitude,
             )
         )
 
@@ -299,10 +301,10 @@ def get_incident_detail(db: Session, incident_id: str) -> Optional[IncidentDetai
     )
 
 VALID_LIFECYCLE_TRANSITIONS = {
-    "PENDING": {"ACTIVE", "MONITORING"},
+    "PENDING": {"ACTIVE", "MONITORING", "RESOLVED"},
     "ACTIVE": {"MONITORING", "RESOLVED"},
     "MONITORING": {"ACTIVE", "RESOLVED"},
-    "RESOLVED": set(),  # Terminal state
+    "RESOLVED": {"ACTIVE", "MONITORING"},  # Allow authority command to reopen/reactivate incident
 }
 
 def update_incident_status(

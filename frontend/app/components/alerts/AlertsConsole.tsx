@@ -1,5 +1,6 @@
 'use client'
 
+import { showConfirmDialog } from '../common/ConfirmDialog'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { ActiveAlert } from '../../types'
 import SearchInput from '../common/SearchInput'
@@ -49,9 +50,13 @@ export default function AlertsConsole({
 
   const handleDeleteAlert = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    if (!window.confirm(`Are you sure you want to delete Alert ${id}? It will be permanently removed from the disaster broadcast registry and dashboard ticker.`)) {
-      return
-    }
+    const confirmed = await showConfirmDialog({
+      title: `DISMISS ALERT ${id.toUpperCase()}`,
+      message: `Are you sure you want to delete Alert ${id}? It will be permanently removed from the disaster broadcast registry and dashboard ticker.`,
+      confirmLabel: 'DELETE ALERT',
+      type: 'danger',
+    })
+    if (!confirmed) return
     setDeletingId(id)
     try {
       const ok = await platformDataService.deleteAlert(id)

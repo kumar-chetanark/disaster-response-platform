@@ -15,7 +15,8 @@ class Shelter(Base):
     
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    facility_type = Column(String(50), default="Shelter") # 'Shelter' or 'Hospital'
+    facility_type = Column(String(50), default="Shelter")
+    resource_center_id = Column(String(50), nullable=True, index=True) # 'Shelter' or 'Hospital'
     
     available_beds = Column(Integer, default=100)
     emergency_beds = Column(Integer, default=30)

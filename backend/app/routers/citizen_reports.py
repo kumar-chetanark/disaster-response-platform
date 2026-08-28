@@ -20,6 +20,12 @@ def submit_citizen_report(
     """
     try:
         return process_citizen_report(db=db, report_in=report_in)
+    except ValueError as ve:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve)
+        )
     except Exception as e:
         db.rollback()
         raise HTTPException(

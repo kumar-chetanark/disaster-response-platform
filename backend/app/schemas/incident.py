@@ -89,6 +89,8 @@ class IncidentListItemSchema(BaseModel):
     time_reported: str
     total_sources_count: int
     source_counts: Dict[str, int]
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class IncidentDetailSchema(IncidentListItemSchema):
     description: Optional[str] = None

@@ -218,6 +218,7 @@ class PlatformDataService {
             category: r.category,
             status: r.status,
             location: r.base_location || r.location,
+            resourceCenterId: r.resource_center_id || r.resourceCenterId,
             latitude: typeof r.latitude === 'number' ? r.latitude : (r.lat !== undefined ? Number(r.lat) : null),
             longitude: typeof r.longitude === 'number' ? r.longitude : (r.lon !== undefined ? Number(r.lon) : null),
             capabilities: r.capabilities,
@@ -343,7 +344,7 @@ class PlatformDataService {
     objectives?: string
   }): Promise<OperationRecord | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/operations/dispatch`, {
+      const res = await fetch(`${API_BASE_URL}/api/operations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -351,8 +352,9 @@ class PlatformDataService {
           resource_id: payload.resourceId,
           operation_type: payload.operationType,
           destination_location: payload.destinationLocation,
-          authorized_by: payload.authorizedBy || 'Commander Vance',
-          objectives: payload.objectives || 'Execute field emergency operation',
+          authorized_by: payload.authorizedBy || 'Chetan Kumar (Level 5)',
+          mission_objective: payload.objectives || 'Execute field emergency operation',
+          status: 'ASSIGNED',
         }),
       })
       if (res.ok) {
@@ -412,6 +414,7 @@ class PlatformDataService {
           category: resource.category,
           status: resource.status || 'AVAILABLE',
           base_location: resource.location,
+          resource_center_id: resource.resourceCenterId,
           latitude: resource.latitude,
           longitude: resource.longitude,
           capabilities: resource.capabilities,
@@ -503,18 +506,31 @@ class PlatformDataService {
   // 6. Aerial / Field Recon Assets
   async getAerialAssets(): Promise<AerialAsset[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/resources?category=drone`, { cache: 'no-store' })
+      const res = await fetch(`${API_BASE_URL}/api/resources`, { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         if (data && Array.isArray(data.items)) {
-          return data.items.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            type: 'drone',
-            status: item.status === 'AVAILABLE' ? 'AVAILABLE' : 'IN USE',
-            batteryOrFuel: '95%',
-            operatorTeam: 'Central Recon Unit',
-          }))
+          const aerialItems = data.items.filter((r: any) => 
+            r.type === 'Drone' || r.type === 'Helicopter' || 
+            r.category === 'drone' || r.category === 'helicopter' || 
+            (r.name && (r.name.toLowerCase().includes('drone') || r.name.toLowerCase().includes('helicopter') || r.name.toLowerCase().includes('uav')))
+          )
+          if (aerialItems.length > 0) {
+            return aerialItems.map((item: any) => {
+              const cleanName = item.name
+                .replace(/^Resource Center\s*[—\-:]*\s*[A-Za-z\s]+Hub\s*/i, '')
+                .replace(/^[A-Za-z\s]+Hub\s*/i, '')
+                .trim()
+              return {
+                id: item.id,
+                name: cleanName || item.name,
+                type: item.type === 'Helicopter' || item.category === 'helicopter' ? 'helicopter' : 'drone',
+                status: item.status === 'AVAILABLE' ? 'AVAILABLE' : (item.status === 'IN OPERATION' ? 'DISPATCHED' : 'IN USE'),
+                batteryOrFuel: item.type === 'Helicopter' ? '88%' : '95%',
+                operatorTeam: item.type === 'Helicopter' ? 'Air Wing Division' : 'Tactical Drone Recon Force',
+              }
+            })
+          }
         }
       }
     } catch (err) {
@@ -528,7 +544,14 @@ class PlatformDataService {
     try {
       const res = await fetch(`${API_BASE_URL}/api/shelters`, { cache: 'no-store' })
       if (res.ok) {
-        return await res.json()
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          return data.map((s: any) => ({
+            ...s,
+            resourceCenterId: s.resource_center_id || s.resourceCenterId,
+          }))
+        }
+        return data
       }
     } catch (err) {
       console.error('[DataService] Failed to fetch /api/shelters:', err)
@@ -542,10 +565,17 @@ class PlatformDataService {
       const res = await fetch(`${API_BASE_URL}/api/shelters`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(shelter),
+        body: JSON.stringify({
+          ...shelter,
+          resource_center_id: shelter.resource_center_id || shelter.resourceCenterId,
+        }),
       })
       if (res.ok) {
-        return await res.json()
+        const data = await res.json()
+        return {
+          ...data,
+          resourceCenterId: data.resource_center_id || data.resourceCenterId,
+        }
       }
     } catch (err) {
       console.error('[DataService] Failed to create shelter:', err)

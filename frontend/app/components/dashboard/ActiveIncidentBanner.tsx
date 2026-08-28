@@ -84,36 +84,42 @@ export default function ActiveIncidentBanner({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-8 bg-surface px-6 py-4 rounded border border-outline-variant shrink-0 font-mono-label">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 bg-[#060c1d] px-5 py-3.5 rounded-xl border border-[#1e293b] shrink-0 font-mono text-[11px]">
         <div className="flex flex-col">
-          <span className="text-on-surface-variant text-[10px] uppercase tracking-wider mb-1">
+          <span className="text-slate-400 text-[10px] uppercase tracking-wider mb-1 font-semibold">
             Affected Pop.
           </span>
-          <span className="font-headline-md text-error font-bold leading-tight">{incident.affectedPopulationEst || incident.affectedPopulation || 'N/A'}</span>
-        </div>
-
-        <div className="flex flex-col">
-          <span className="text-on-surface-variant text-[10px] uppercase tracking-wider mb-1">
-            Affected Area
-          </span>
-          <span className="font-headline-md text-on-surface font-bold leading-tight">
-            {incident.affectedAreaSqKm || 50} <span className="text-[12px] font-normal text-on-surface-variant">sq km</span>
+          <span className="text-[16px] text-red-400 font-bold leading-tight">
+            {incident.affectedPopulationEst || incident.affectedPopulation || (incident as any).affected_population || 'N/A'}
           </span>
         </div>
 
         <div className="flex flex-col">
-          <span className="text-on-surface-variant text-[10px] uppercase tracking-wider mb-1">
+          <span className="text-slate-400 text-[10px] uppercase tracking-wider mb-1 font-semibold">
+            Operational Zone
+          </span>
+          <span className="text-[16px] text-white font-bold leading-tight">
+            {incident.affectedAreaSqKm || 25} <span className="text-[11px] font-normal text-slate-400">km radius</span>
+          </span>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="text-slate-400 text-[10px] uppercase tracking-wider mb-1 font-semibold">
             Priority Level
           </span>
-          <span className="font-headline-md text-error font-bold leading-tight">{incident.priorityLevel || 'Level 1'}</span>
+          <span className="text-[16px] text-red-400 font-bold leading-tight">
+            {incident.priorityLevel || 'Level 1'}
+          </span>
         </div>
 
         <div className="flex flex-col">
-          <span className="text-on-surface-variant text-[10px] uppercase tracking-wider mb-1">
-            Resource Cov.
+          <span className="text-slate-400 text-[10px] uppercase tracking-wider mb-1 font-semibold">
+            Resource Status
           </span>
           <div className="flex items-baseline gap-2">
-            <span className="font-headline-md text-tertiary font-bold leading-tight">{incident.resourceCoverage || '60%'}</span>
+            <span className="text-[16px] text-sky-400 font-bold leading-tight">
+              {incident.resourceCoverage || (incident.status === 'ACTIVE' ? '100% Deployed' : 'Allocated Hub')}
+            </span>
           </div>
         </div>
       </div>

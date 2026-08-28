@@ -16,6 +16,7 @@ class Resource(Base):
     category = Column(String, nullable=False, index=True)  # rescue, medical, aerial, water, land, shelter, supplies, police_army
     status = Column(String, default="AVAILABLE", index=True)  # AVAILABLE, ASSIGNED, DISPATCHED, EN_ROUTE, ON_SCENE, UNAVAILABLE, MAINTENANCE
     base_location = Column(String, nullable=False)
+    resource_center_id = Column(String, nullable=True, index=True)
     
     # Precise GPS Positioning for Map & Proximity Dispatch
     latitude = Column(Float, nullable=True)

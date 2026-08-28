@@ -38,7 +38,13 @@ export default function ResourceAllocationCard({
 
       {/* Advisories */}
       <div className="space-y-3">
-        {advisories.map((advisory) => {
+        {advisories.length === 0 ? (
+          <div className="p-4 bg-surface rounded-lg border border-outline-variant text-center font-mono text-[11px] text-slate-400 flex items-center justify-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span>
+            <span>Zero pending resource deficits or unallocated requests. Fleet status optimal.</span>
+          </div>
+        ) : (
+          advisories.map((advisory) => {
           const isApproved = advisory.status === 'APPROVED'
           const isRejected = advisory.status === 'REJECTED'
 
@@ -141,7 +147,7 @@ export default function ResourceAllocationCard({
               </div>
             </div>
           )
-        })}
+        }))}
       </div>
 
       {/* Review Drawer */}

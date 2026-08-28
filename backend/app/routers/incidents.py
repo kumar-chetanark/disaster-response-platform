@@ -349,8 +349,8 @@ def delete_incident(
     db: Session = Depends(get_db),
 ):
     """
-    Permanently deletes an incident from the disaster registry with cascade cleanup
-    of citizen reports, incident sources, linked alerts, operations, and associated intelligence.
+    Permanently deletes an incident (regardless of status: PENDING, ACTIVE, MONITORING, or RESOLVED)
+    with total cascade cleanup across operations, assessments, alerts, reports, sources, and citizen reports.
     """
     from app.models.incident import Incident
     from app.models.citizen_report import CitizenReport
@@ -358,6 +358,9 @@ def delete_incident(
     from app.models.alert import Alert
     from app.models.operation import Operation
     from app.models.resource import Resource
+    from app.models.assessment import Assessment
+    from app.models.report import Report
+    from app.models.resource_allocation import ResourceAllocation
 
     inc = db.query(Incident).filter(Incident.id == incident_id).first()
     if not inc:
@@ -366,7 +369,14 @@ def delete_incident(
             detail=f"Incident with ID '{incident_id}' not found.",
         )
 
-    # Free up any attached resources
+    # 1. Release all assigned resources
+    resources = db.query(Resource).filter(Resource.assigned_incident_id == incident_id).all()
+    for r in resources:
+        r.status = "AVAILABLE"
+        r.assigned_incident_id = None
+        r.assigned_operation_id = None
+
+    # 2. Delete linked operations
     operations = db.query(Operation).filter(Operation.incident_id == incident_id).all()
     for op in operations:
         if op.resource_id:
@@ -377,13 +387,21 @@ def delete_incident(
                 res.assigned_operation_id = None
         db.delete(op)
 
-    # Delete linked alerts, citizen reports, and sources
+    # 3. Clean up linked resource allocations, assessments, reports, alerts, sources, citizen reports
+    db.query(ResourceAllocation).filter(ResourceAllocation.incident_id == incident_id).delete(synchronize_session=False)
+    db.query(Assessment).filter(Assessment.incident_id == incident_id).delete(synchronize_session=False)
     db.query(Alert).filter(Alert.incident_id == incident_id).delete(synchronize_session=False)
     db.query(CitizenReport).filter(CitizenReport.incident_id == incident_id).delete(synchronize_session=False)
     db.query(IncidentSource).filter(IncidentSource.incident_id == incident_id).delete(synchronize_session=False)
 
-    # Delete incident
+    # 4. Nullify or dissociate reports
+    linked_reports = db.query(Report).filter(Report.incident_id == incident_id).all()
+    for rep in linked_reports:
+        rep.incident_id = None
+
+    # 5. Delete the canonical incident itself
     db.delete(inc)
     db.commit()
 
-    return {"status": "SUCCESS", "message": f"Incident '{incident_id}' and all associated records deleted successfully."}
+    return {"status": "SUCCESS", "message": f"Incident '{incident_id}' ({inc.status}) and all associated records deleted successfully."}
+

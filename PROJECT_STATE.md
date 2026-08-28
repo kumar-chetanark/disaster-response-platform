@@ -1,52 +1,50 @@
-# Project State — Disaster Response Platform (PS-05)
+# Project State — Disaster Response Platform (PS-06)
 
-## 1. Actual System Status & Current Limitations
+## 1. Actual System Status & Current State
 
 > [!IMPORTANT]
-> **Accurate Reality Check**:
-> - **Map Status**: Uses a static/contextual leaflet preview (`ContextualMapPreview.tsx`). Full multi-layer real-time GIS clustering with live vehicle telemetry is **not yet connected/fully operational**.
-> - **Resources Status**: Currently loads seed/preset inventory data from the database. Live GPS vehicle telemetry and automated real-time tracking are **preset/static**, not streaming live sensor feeds.
-> - **Field Assessment & Intelligence**: Live FastAPI database integration for submitting assessments, recalculating priority scores, and assigning squads is **functional**.
+> **System Architecture & Key Milestones**:
+> - **Operational State**: Fully dynamic incident, resource, operation, assessment, alert, and report management backed by FastAPI and SQLite.
+> - **Authority Session & Profile**: Commander authority identity unified under **Chetan Kumar (Level 5)** across login, session persistence, incident dossiers, and report authors.
+> - **Real-Time Temporal Engine**: Dynamic 12-hour ticking local clock and live calendar widgets integrated throughout Top Header, Resources, and Incidents consoles (removing static Zulu/Sector 7 placeholders).
+> - **Anti-Gibberish AI Intake Protocol**: Multi-layer semantic validation on citizen reporting for location landmark/city integrity, situation coherence, and valid contact checks.
+> - **Hierarchical Geographic Geocoder**: Multi-tier geocoding fallback (Known DB -> OpenStreetMap Nominatim -> Photon) for exact coordinates across global and regional locations (e.g. Birgunj, Nepal; Rourkela, India).
 
 ---
 
 ## 2. Implemented & Verified Features
 
-### A. Incidents & Intelligence Console (`IncidentsConsole.tsx`)
-- **Point-Wise Situational Assessment**: Formatted crisis briefing breaking down severity, corroboration confidence score, hazard vectors, and reserve squads.
-- **Field Assessment Findings Ingestion**: Displays latest submitted recon survey metrics (Damaged structures, Road accessibility, Trapped civilians, Evacuation routes, Operator notes).
-- **Tactical Squad Deployment Directives**: Matches required capabilities with available inventory and creates deployment records with server-side double-allocation protection (`409 Conflict`).
+### A. Dynamic Dashboard & Tactical Command Radar
+- **Active Incident Live Telemetry Banner**: Binds dynamically to active crisis parameters (`affected_population`, geocoded coordinates, severity, operational zone radius). Shows clean monitoring standby state when empty.
+- **Full-Width Tactical Radar Map**: Expanded full-width GIS contextual preview centered on live geocoded coordinates.
+- **Synchronized Cascade Deletion**: Deleting an incident instantly purges its linked alerts and Resource Allocation Advisories, resetting the dashboard state optimistically.
 
-### B. Field Assessment Module (`AerialAssessmentForm.tsx`)
-- Multi-modality selection (Drone UAV, Helicopter, Ground Recon, Boat).
-- Standard numeric typing inputs for damaged structure counts.
-- Dynamic road accessibility and evacuation status logging.
-- Submits directly to `POST /api/assessments` and triggers `POST /api/assessments/{id}/submit` to recalculate priority.
+### B. Citizen Emergency Reporting & AI Intake Validation
+- **Structured Address Form**: Specific landmark/street and city inputs with real-time semantic anti-spam and anti-gibberish verification.
+- **GPS Auto-Geocoding**: Hierarchical city and landmark coordinate resolution on intake.
+- **Incident Corroboration**: Automatically attaches corroborating evidence to matching active canonical incidents or creates a `PENDING` incident record.
 
-### C. Operational Reports & PDF Generation (`ReportsConsole.tsx` & Backend Engine)
-- View and generate situation reports (SITREPs).
-- Server-side binary PDF generation via ReportLab with tables and command authorization blocks.
-- In-browser preview modal and direct PDF download.
+### C. Resource Allocation & Deployment Engine
+- **Single Consolidated Operation per Incident**: Dispatching response teams from the Resources console consolidates multiple squad dispatches under ONE unified mission track in the Operations tab.
+- **Area Coverage Management**: Local Resource Picture with squads (Rescue, Police, Medical, Fire) and assets (Ambulances, Boats, Helicopters, Drones, Evacuation Buses).
+- **Double-Allocation Guard**: Backend enforcement prevents assigning already deployed units (`HTTP 409 Conflict`).
 
-### D. Tactical Resources & Operations (`ResourcesConsole.tsx` & `OperationsConsole.tsx`)
-- Preset inventory listing with status filters (`AVAILABLE`, `ASSIGNED`, `MAINTENANCE`).
-- Manual status updates and squad deployment tracking.
-- Active mission lifecycle state tracker (`ASSIGNED` ➔ `DISPATCHED` ➔ `EN_ROUTE` ➔ `ON_SCENE` ➔ `COMPLETED`).
+### D. Incidents & Intelligence Console
+- **Lifecycle Management**: Supports transitioning between `PENDING`, `ACTIVE`, `MONITORING`, and `RESOLVED` states.
+- **Universal Deletion**: Allows deleting incidents in any status (including `RESOLVED`) with cascade cleanup across foreign keys.
+- **Instant SITREP Generation**: One-click dossier generation compiling incident data into formal Situation Reports.
 
-### E. Early Warning Alerts (`AlertsConsole.tsx`)
-- Alert feed with severity indicators.
-- Automatic sidebar badge dismissal when clicking tabs.
-
----
-
-## 3. Technology Stack
-- **Frontend**: Next.js 14, React 18, Tailwind CSS, TypeScript, Material Symbols, React-Leaflet.
-- **Backend**: FastAPI, SQLAlchemy 2.0 ORM, SQLite DB (`disaster_response_dev.db`), Pydantic v2.
-- **PDF Engine**: ReportLab.
+### E. Custom UI & Design System
+- **Unified Glassmorphic Confirmation Modal**: Replaced all native browser dialogs with promise-based custom modals.
+- **Custom Toast Notifications**: White card layout, circular icons, and progress bars anchored at top-right.
+- **Branded Application Favicon**: Cyber-shield vector logo deployed across all web app manifest and favicon endpoints.
 
 ---
 
-## 4. Current Gaps & Next Planned Work
-1. **Operational Map Overhaul**: Fix Leaflet container rendering, marker positioning, and live incident/resource pin layers.
-2. **Dynamic / Real-Time Resource Feed**: Move beyond preset inventory to live status updates and interactive asset creation/editing.
-3. **Citizen Distress Portal**: Connect frontend distress intake form directly to the backend deduplication queue.
+## 3. Verified Backend Endpoints
+- `POST /api/citizen-reports`: AI-validated citizen emergency intake.
+- `GET /api/incidents`, `DELETE /api/incidents/{id}`, `PATCH /api/incidents/{id}/status`: Incident lifecycle management.
+- `POST /api/operations`, `GET /api/operations`, `PATCH /api/operations/{id}/status`: Consolidated operational mission tracking.
+- `GET /api/allocations/recommendations`: Real-time capability-aware resource allocation advisory.
+- `GET /api/resources`, `POST /api/resources`: Squad and vehicle asset inventory.
+- `GET /api/reports`, `POST /api/reports`: Incident SITREP dossier generation and PDF exports.

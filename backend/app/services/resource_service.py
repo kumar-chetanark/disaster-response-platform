@@ -14,6 +14,7 @@ def to_resource_response(res: Resource, distance_km: Optional[float] = None) -> 
         category=res.category,
         status=res.status,
         base_location=res.base_location,
+        resource_center_id=res.resource_center_id,
         latitude=res.latitude,
         longitude=res.longitude,
         capabilities=res.capabilities,
@@ -68,6 +69,7 @@ def create_resource(db: Session, res_in: ResourceCreate) -> ResourceResponse:
         category=res_in.category.lower(),
         status=res_in.status.upper(),
         base_location=res_in.base_location,
+        resource_center_id=res_in.resource_center_id,
         latitude=res_in.latitude,
         longitude=res_in.longitude,
         capabilities=res_in.capabilities,
@@ -97,6 +99,8 @@ def update_resource(db: Session, resource_id: str, res_in: ResourceUpdate) -> Op
         res.name = res_in.name
     if res_in.type is not None:
         res.type = res_in.type
+    if res_in.resource_center_id is not None:
+        res.resource_center_id = res_in.resource_center_id
     if res_in.status is not None:
         res.status = res_in.status.upper()
     if res_in.latitude is not None:

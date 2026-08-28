@@ -1,5 +1,8 @@
 'use client'
 
+import ConfirmDialogProvider, { showConfirmDialog } from './components/common/ConfirmDialog'
+import { ToastContainer, toast } from 'react-toastify'
+
 import React, { useState, useEffect } from 'react'
 import TopHeader from './components/dashboard/TopHeader'
 import Sidebar from './components/dashboard/Sidebar'
@@ -37,24 +40,37 @@ import { platformDataService } from './services/dataService'
 export default function App() {
 
 
-  // Session: Default CITIZEN experience
+  // Session: Default CITIZEN experience (Hydration safe)
   const [session, setSession] = useState<UserSession>({ role: 'CITIZEN' })
+  const [isClientReady, setIsClientReady] = useState(false)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
 
   // Auto-verify and restore authority session from localStorage on startup
   useEffect(() => {
+    setIsClientReady(true)
     async function restoreSession() {
       try {
+        const storedUser = localStorage.getItem('authority_session_user')
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser)
+          setSession(parsed)
+        }
         const token = localStorage.getItem('authority_session_token')
         if (token) {
-          const res = await platformDataService.authVerify(token)
-          if (res && res.authenticated && res.user) {
-            setSession({
-              role: 'AUTHORITY',
-              userName: res.user.name,
-              badgeId: res.user.badge_id,
-              authorityLevel: res.user.authority_level,
-            })
+          try {
+            const res = await platformDataService.authVerify(token)
+            if (res && res.authenticated && res.user) {
+              const updatedSession = {
+                role: 'AUTHORITY' as const,
+                userName: res.user.name,
+                badgeId: res.user.badge_id,
+                authorityLevel: res.user.authority_level,
+              }
+              setSession(updatedSession)
+              localStorage.setItem('authority_session_user', JSON.stringify(updatedSession))
+            }
+          } catch {
+            // Retain local authority session even if network re-auth is pending
           }
         }
       } catch (err) {
@@ -173,6 +189,16 @@ export default function App() {
         platformDataService.getReports(),
       ])
       setIncidents(inc)
+      const validIncidentIds = new Set(inc.map(i => i.id))
+      const validIncidentTitles = new Set(inc.map(i => i.title.toLowerCase()))
+      
+      const filteredAdv = adv.filter(a => {
+        const advIncId = (a as any).incident_id || (a as any).incidentId || (a as any).targetIncidentId
+        if (advIncId && validIncidentIds.has(advIncId)) return true
+        if (a.targetIncident && validIncidentTitles.has(a.targetIncident.toLowerCase())) return true
+        return false
+      })
+      setAdvisories(filteredAdv)
       setAlerts(alt)
       setOperations(ops)
       setResources(res)
@@ -186,32 +212,66 @@ export default function App() {
 
   // Global Real-Time Deletion Handlers with synchronised app state updates
   const handleDeleteIncidentGlobal = async (incId: string) => {
-    if (!window.confirm(`Permanently delete Incident ${incId}? All linked alerts and operational records will be removed from the platform.`)) {
-      return
-    }
+    const confirmed = await showConfirmDialog({
+      title: `DELETE INCIDENT ${incId.toUpperCase()}`,
+      message: `Are you sure you want to permanently delete Incident ${incId}? This action cannot be undone and will clean up all associated alerts, operations, and advisories across the platform.`,
+      confirmLabel: 'PERMANENTLY DELETE',
+      type: 'danger',
+    })
+    if (!confirmed) return
+
+    // Instant optimistic UI cleanup across all entities
+    const remainingIncidents = incidents.filter((i) => i.id !== incId)
+    const validRemainingIds = new Set(remainingIncidents.map(i => i.id))
+    const validRemainingTitles = new Set(remainingIncidents.map(i => i.title.toLowerCase()))
+
+    setIncidents(remainingIncidents)
+    setAlerts((prev) => prev.filter((a: any) => a.incident_id !== incId && a.incidentId !== incId))
+    setAdvisories((prev) => prev.filter((a: any) => {
+      const targetId = a.incident_id || a.incidentId || a.targetIncidentId
+      if (targetId && (targetId === incId || !validRemainingIds.has(targetId))) return false
+      if (a.targetIncident && !validRemainingTitles.has(a.targetIncident.toLowerCase())) return false
+      return true
+    }))
+    if (selectedIncidentId === incId) setSelectedIncidentId(null)
+
     try {
       const ok = await platformDataService.deleteIncident(incId)
       if (ok) {
-        showNotification(`Incident ${incId} permanently deleted.`, 'info')
-        const [updatedIncidents, updatedAlerts, updatedOps] = await Promise.all([
-          platformDataService.getIncidents(),
-          platformDataService.getAlerts(),
-          platformDataService.getOperations(),
-        ])
-        setIncidents(updatedIncidents)
-        setAlerts(updatedAlerts)
-        setOperations(updatedOps)
-        if (selectedIncidentId === incId) setSelectedIncidentId(null)
+        showNotification(`Incident ${incId} permanently deleted.`, 'success')
       }
+      // Re-fetch clean backend state
+      const [updatedInc, updatedAlt, updatedOps, updatedAdv] = await Promise.all([
+        platformDataService.getIncidents(),
+        platformDataService.getAlerts(),
+        platformDataService.getOperations(),
+        platformDataService.getAdvisories(),
+      ])
+      setIncidents(updatedInc)
+      setAlerts(updatedAlt)
+      setOperations(updatedOps)
+      
+      const cleanIds = new Set(updatedInc.map(i => i.id))
+      const cleanTitles = new Set(updatedInc.map(i => i.title.toLowerCase()))
+      setAdvisories(updatedAdv.filter(a => {
+        const targetId = (a as any).incident_id || (a as any).incidentId || (a as any).targetIncidentId
+        if (targetId && cleanIds.has(targetId)) return true
+        if (a.targetIncident && cleanTitles.has(a.targetIncident.toLowerCase())) return true
+        return false
+      }))
     } catch (err: any) {
       showNotification(err.message || 'Failed to delete incident.', 'warning')
     }
   }
 
   const handleDeleteAlertGlobal = async (altId: string) => {
-    if (!window.confirm(`Permanently delete Alert ${altId}? It will be removed from the broadcast registry and dashboard ticker.`)) {
-      return
-    }
+    const confirmed = await showConfirmDialog({
+      title: `DELETE ALERT ${altId.toUpperCase()}`,
+      message: `Permanently delete Alert ${altId}? It will be removed from the broadcast registry and dashboard ticker.`,
+      confirmLabel: 'DELETE ALERT',
+      type: 'danger',
+    })
+    if (!confirmed) return
     try {
       const ok = await platformDataService.deleteAlert(altId)
       if (ok) {
@@ -225,9 +285,13 @@ export default function App() {
   }
 
   const handleDeleteReportGlobal = async (repId: string) => {
-    if (!window.confirm(`Permanently delete Report ${repId}?`)) {
-      return
-    }
+    const confirmed = await showConfirmDialog({
+      title: `DELETE REPORT ${repId.toUpperCase()}`,
+      message: `Permanently delete Report ${repId}? This cannot be undone.`,
+      confirmLabel: 'DELETE REPORT',
+      type: 'danger',
+    })
+    if (!confirmed) return
     try {
       const ok = await platformDataService.deleteReport(repId)
       if (ok) {
@@ -275,7 +339,7 @@ export default function App() {
       state: 'DISPATCHED',
       dispatchedTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       estimatedCompletion: '~20 min',
-      authorizedBy: session.userName || 'Cmdr. J. Vance',
+      authorizedBy: session.userName || 'Chetan Kumar',
       missionObjective: adv.reason,
       fieldUpdates: [
         `${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: Authority approval granted. Resource unit dispatched.`,
@@ -333,7 +397,7 @@ export default function App() {
       state: 'DISPATCHED',
       dispatchedTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       estimatedCompletion: '~30 min',
-      authorizedBy: session.userName || 'Cmdr. J. Vance',
+      authorizedBy: session.userName || 'Chetan Kumar',
       missionObjective: 'Perform comprehensive multi-hazard reconnaissance and verify road accessibility.',
       fieldUpdates: [
         `${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: Field assessment team dispatched. Telemetry live.`,
@@ -452,6 +516,19 @@ export default function App() {
             showNotification(`Authenticated as ${s.userName} (Authority Level ${s.authorityLevel}). Welcome to Command Platform.`, 'success')
           }}
         />
+        <ConfirmDialogProvider />
+        <ToastContainer
+          position="top-right"
+          autoClose={4000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </>
     )
   }
@@ -469,6 +546,7 @@ export default function App() {
               setSelectedIncidentId(id)
               markIncidentSeen(id)
             }}
+            onDeleteIncident={handleDeleteIncidentGlobal}
             onOpenAssessment={() => setCurrentTab('assessment')}
             onOpenReportPreview={async (incId) => {
               try {
@@ -477,7 +555,7 @@ export default function App() {
                   title: `SITREP — ${targetInc?.title || 'Incident Dossier'} (${targetInc?.location || 'Operational Area'})`,
                   report_type: 'Situation Report',
                   incident_id: incId,
-                  author: session.userName || 'Commander R. Vance',
+                  author: session.userName || 'Chetan Kumar',
                   status: 'OFFICIAL',
                   summary: `Comprehensive operational situation dossier for ${targetInc?.title || incId}. Priority: ${targetInc?.priorityLevel || targetInc?.severity || 'HIGH'}. Status: ${targetInc?.status || 'PENDING'}.`,
                 })
@@ -519,6 +597,23 @@ export default function App() {
             onModifyAdvisory={handleModifyAdvisory}
             onUpdateResourceStatus={handleUpdateResourceStatus}
             onAddResource={handleAddResource}
+            onOpenOperations={() => setCurrentTab('operations')}
+            onNavigateToIncident={(id) => {
+              setSelectedIncidentId(id)
+              setCurrentTab('incidents')
+            }}
+            onDispatchSuccess={async () => {
+              try {
+                const [updatedOps, updatedRes] = await Promise.all([
+                  platformDataService.getOperations(),
+                  platformDataService.getResources(),
+                ])
+                setOperations(updatedOps)
+                setResources(updatedRes)
+              } catch (e) {
+                console.error(e)
+              }
+            }}
           />
         )
 
@@ -731,22 +826,23 @@ export default function App() {
               onModify={handleModifyAdvisory}
             />
 
-            {/* 4. Bottom Grid: Contextual Map & Aerial Dispatch Panel */}
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
+            {/* 4. Full-Width Expanded Tactical GIS Map */}
+            <section className="w-full min-w-0">
               <ContextualMapPreview incidents={incidents} resources={resources} selectedIncidentId={selectedIncidentId} onSelectIncident={(id) => setSelectedIncidentId(id)} />
-
-              <AerialDispatchPanel
-                assets={aerialAssets}
-                latestAssessment={latestAssessment}
-                onDispatch={handleDispatchAerial}
-                onOpenAssessmentForm={() => setCurrentTab('assessment')}
-              />
             </section>
 
             <div className="h-6 shrink-0" aria-hidden="true" />
           </main>
         )
     }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('authority_session_token')
+    localStorage.removeItem('authority_session_user')
+    setSession({ role: 'CITIZEN' })
+    setCurrentTab('dashboard')
+    showNotification('Logged out successfully. Returned to Citizen Portal view.', 'info')
   }
 
   const handleToggleSidebar = () => {
@@ -760,10 +856,12 @@ export default function App() {
 
   return (
     <div className="bg-background text-on-background font-body-base antialiased h-screen overflow-hidden flex w-full">
-      {/* 1. Top Header with Hamburger Control */}
+      {/* 1. Top Header with Hamburger Control & Logout */}
       <TopHeader
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={handleToggleSidebar}
+        onLogout={session.role === 'AUTHORITY' ? handleLogout : undefined}
+        userRole={session.role}
       />
 
       {/* 2. Responsive Persistent Navigation Sidebar */}
@@ -803,6 +901,21 @@ export default function App() {
       >
         {renderAuthorityContent()}
       </div>
+
+      {/* Global Modals & Toast Container */}
+      <ConfirmDialogProvider />
+      <ToastContainer
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   )
 }

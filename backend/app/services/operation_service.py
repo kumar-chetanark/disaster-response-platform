@@ -109,7 +109,7 @@ def create_operation_dispatch(
             detail=f"Resource '{resource.name}' is already deployed to active mission '{active_op.id}' for incident '{active_op.incident_id}'."
         )
 
-    auth_name = (authority_user.get("name") if authority_user else None) or op_in.authorized_by or "Commander R. Vance"
+    auth_name = (authority_user.get("name") if authority_user else None) or op_in.authorized_by or "Chetan Kumar"
     badge_id = (authority_user.get("badge_id") if authority_user else None) or "DISASTER-CMD-01"
 
     # 3. Create Operation record

@@ -1,5 +1,6 @@
 'use client'
 
+import { showConfirmDialog } from '../common/ConfirmDialog'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { PlatformReport, Incident } from '../../types'
 import SearchInput from '../common/SearchInput'
@@ -50,9 +51,13 @@ export default function ReportsConsole({
 
   const handleDeleteReport = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    if (!window.confirm(`Are you sure you want to permanently delete Report ${id}? This action will remove the SITREP and PDF dossier from the database.`)) {
-      return
-    }
+    const confirmed = await showConfirmDialog({
+      title: `DELETE REPORT ${id.toUpperCase()}`,
+      message: `Are you sure you want to permanently delete Report ${id}? This action will remove the SITREP and PDF dossier from the database.`,
+      confirmLabel: 'PERMANENTLY DELETE',
+      type: 'danger',
+    })
+    if (!confirmed) return
     setDeletingId(id)
     try {
       const ok = await platformDataService.deleteReport(id)
@@ -427,9 +432,42 @@ export default function ReportsConsole({
                   </span>
                 </div>
 
-                <p className="font-body-base text-[13px] text-on-surface bg-surface-container p-3.5 rounded border border-outline-variant leading-relaxed">
-                  {selectedReport.summary}
-                </p>
+                {/* Formatted Clean Structured Incident Summary */}
+                {selectedReport.summary.includes('INCIDENT OPERATIONAL REPORT') || selectedReport.summary.includes('Incident ID:') ? (
+                  <div className="space-y-3 bg-[#060c1d] p-4 rounded-lg border border-[#1e293b] font-mono text-[12px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                      {selectedReport.summary
+                        .split('\n')
+                        .filter(l => l.trim().startsWith('-'))
+                        .map((line, idx) => {
+                          const clean = line.replace(/^-\s*/, '')
+                          const [k, ...v] = clean.split(':')
+                          const val = v.join(':').trim()
+                          return (
+                            <div key={idx} className="bg-[#0b1329] border border-[#1e293b] rounded-lg p-2.5 flex flex-col justify-between">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">{k.trim()}</span>
+                              <span className={`text-[12px] font-bold mt-1 ${k.toLowerCase().includes('severity') ? 'text-red-400' : k.toLowerCase().includes('status') ? 'text-amber-400' : k.toLowerCase().includes('location') ? 'text-sky-300' : 'text-white'}`}>
+                                {val || 'N/A'}
+                              </span>
+                            </div>
+                          )
+                        })}
+                    </div>
+                    {/* Raw Operational Description */}
+                    {selectedReport.summary.includes('Description:') && (
+                      <div className="bg-[#0b1329] border border-[#1e293b] rounded-lg p-3 mt-2">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-1">FIELD SITUATION & OBSERVATIONS</div>
+                        <div className="text-[12px] text-slate-200 font-normal leading-relaxed">
+                          {selectedReport.summary.split('Description:')[1]?.trim() || selectedReport.summary}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="font-mono text-[12px] text-slate-200 bg-[#060c1d] p-4 rounded-lg border border-[#1e293b] leading-relaxed whitespace-pre-wrap">
+                    {selectedReport.summary}
+                  </div>
+                )}
 
                 {selectedReport.tags && selectedReport.tags.length > 0 && (
                   <div className="flex items-center gap-1.5 pt-1 flex-wrap">
@@ -490,7 +528,7 @@ export default function ReportsConsole({
       {/* PDF Document Preview Modal */}
       {previewModalOpen && selectedReport && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface-container border border-outline-variant rounded-xl max-w-2xl w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+          <div className="bg-surface-container border border-outline-variant rounded-xl max-w-3xl w-full p-5 space-y-3 shadow-2xl animate-in zoom-in-95 max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-outline-variant shrink-0">
               <div>
                 <span className="font-mono-label text-[10px] text-primary font-bold uppercase">
@@ -517,17 +555,48 @@ export default function ReportsConsole({
               </div>
 
               <div>
-                <h4 className="font-bold text-primary mb-1">1. Executive Summary</h4>
-                <p className="leading-relaxed bg-surface-container p-3 rounded">{selectedReport.summary}</p>
+                <h4 className="font-bold text-primary mb-1.5 font-mono text-[11px] uppercase tracking-wider">1. Executive Summary & Structured Dossier</h4>
+                {selectedReport.summary.includes('INCIDENT OPERATIONAL REPORT') || selectedReport.summary.includes('Incident ID:') ? (
+                  <div className="space-y-2 bg-[#060c1d] p-3 rounded-lg border border-[#1e293b] font-mono text-[11px]">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+                      {selectedReport.summary
+                        .split('\n')
+                        .filter(l => l.trim().startsWith('-') && !l.toLowerCase().includes('description:'))
+                        .map((line, idx) => {
+                          const clean = line.replace(/^-\s*/, '')
+                          const [k, ...v] = clean.split(':')
+                          const val = v.join(':').trim()
+                          return (
+                            <div key={idx} className="bg-[#0b1329] border border-[#1e293b] rounded p-1.5 flex flex-col justify-between">
+                              <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold truncate">{k.trim()}</span>
+                              <span className={`text-[11px] font-bold mt-0.5 truncate ${k.toLowerCase().includes('severity') ? 'text-red-400' : k.toLowerCase().includes('status') ? 'text-amber-400' : k.toLowerCase().includes('location') ? 'text-sky-300' : 'text-white'}`}>
+                                {val || 'N/A'}
+                              </span>
+                            </div>
+                          )
+                        })}
+                    </div>
+                    {selectedReport.summary.includes('Description:') && (
+                      <div className="bg-[#0b1329] border border-[#1e293b] rounded p-2 mt-1">
+                        <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mb-0.5">FIELD SITUATION & OBSERVATIONS</div>
+                        <div className="text-[11px] text-slate-200 font-normal leading-normal">
+                          {selectedReport.summary.split('Description:')[1]?.trim() || selectedReport.summary}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="leading-relaxed bg-[#060c1d] p-3 rounded border border-[#1e293b] font-mono text-[11px] text-slate-200 whitespace-pre-wrap">
+                    {selectedReport.summary}
+                  </div>
+                )}
               </div>
 
               <div>
-                <h4 className="font-bold text-primary mb-1">2. Canonical Incident Reference</h4>
-                <p className="leading-relaxed bg-surface-container p-3 rounded">
-                  Linked Incident: <b>{selectedReport.incidentTitle || selectedReport.incidentId || 'Central Command Network'}</b>
-                  <br />
-                  Multi-channel corroborating ledgers, field reconnaissance drone surveys, and authority dispatches attached to official binary PDF release.
-                </p>
+                <h4 className="font-bold text-primary mb-1 font-mono text-[11px] uppercase tracking-wider">2. Canonical Incident Reference</h4>
+                <div className="bg-[#060c1d] border border-[#1e293b] p-2.5 rounded-lg text-[11px] text-slate-300 font-mono">
+                  Linked Incident: <b className="text-white">{selectedReport.incidentTitle || selectedReport.incidentId || 'Central Command Network'}</b> &bull; Attached to official authority binary PDF release.
+                </div>
               </div>
             </div>
 

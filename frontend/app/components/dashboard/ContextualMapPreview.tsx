@@ -36,9 +36,9 @@ export default function ContextualMapPreview({
       if (!mapContainerRef.current) return
 
       if (!mapInstanceRef.current) {
-        // Initial center on default region
-        const centerLat = incidents.length > 0 && incidents[0].latitude ? incidents[0].latitude : 29.7604
-        const centerLon = incidents.length > 0 && incidents[0].longitude ? incidents[0].longitude : -95.3698
+        // Initial center on New Delhi
+        const centerLat = incidents.length > 0 && incidents[0].latitude ? incidents[0].latitude : 28.6139
+        const centerLon = incidents.length > 0 && incidents[0].longitude ? incidents[0].longitude : 77.2090
 
         const map = L.map(mapContainerRef.current, {
           center: [centerLat, centerLon],
@@ -89,8 +89,8 @@ export default function ContextualMapPreview({
       const validCoords: [number, number][] = []
 
       incidents.forEach((inc) => {
-        const lat = inc.latitude || 29.7604
-        const lon = inc.longitude || -95.3698
+        const lat = inc.latitude || 28.6139
+        const lon = inc.longitude || 77.2090
         validCoords.push([lat, lon])
 
         const isSelected = inc.id === selectedIncidentId
@@ -202,7 +202,7 @@ export default function ContextualMapPreview({
   }, [isLeafletReady, incidents, selectedIncidentId, onSelectIncident])
 
   return (
-    <div className="bg-surface border border-outline-variant rounded-lg flex flex-col overflow-hidden relative h-64 shadow-inner">
+    <div className="bg-surface border border-outline-variant rounded-xl flex flex-col overflow-hidden relative h-[440px] shadow-lg w-full">
       {/* Top Header Status Overlay */}
       <div className="absolute top-2 left-2 z-400 bg-surface/90 border border-outline-variant px-2.5 py-1 rounded backdrop-blur text-[10px] font-mono-label text-on-surface flex items-center gap-2 shadow-sm">
         <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>

@@ -1,7 +1,10 @@
 'use client'
 
+import { toast } from 'react-toastify'
+
 import React, { useState, useEffect, useRef } from 'react'
 import { Incident, IncidentConfidenceTelemetry, EvidenceBreakdownItem, ContradictionItem, IncidentRequirementsResponse, IncidentCapabilityRequirement, OperationRecord, LiveOperationalTelemetry, ResourceTelemetryState, IncidentIntelligenceTelemetry, DecisionActionItem, IncidentGeospatialContext, GeospatialResource, GeospatialOperation } from '../../types'
+import { showConfirmDialog } from '../common/ConfirmDialog'
 import SearchInput from '../common/SearchInput'
 import DetailsHeader from '../common/DetailsHeader'
 import { platformDataService } from '../../services/dataService'
@@ -11,6 +14,7 @@ interface IncidentsConsoleProps {
   selectedIncidentId?: string | null
   advisories?: any[]
   onSelectIncident?: (id: string) => void
+  onDeleteIncident?: (id: string) => void
   onOpenAssessment?: () => void
   onOpenOperations?: (opId?: string) => void
   onOpenReportPreview?: (reportId?: string) => void
@@ -21,6 +25,7 @@ export default function IncidentsConsole({
   selectedIncidentId: initialSelectedId = null,
   advisories = [],
   onSelectIncident,
+  onDeleteIncident,
   onOpenAssessment,
   onOpenOperations,
   onOpenReportPreview,
@@ -50,19 +55,32 @@ export default function IncidentsConsole({
 
   const handleDeleteIncident = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    if (!window.confirm(`Are you sure you want to permanently delete Incident ${id}? This action cannot be undone and will clean up all associated alerts and logs across the platform.`)) {
+    if (onDeleteIncident) {
+      await onDeleteIncident(id)
+      setIncidentsList((prev) => prev.filter((i) => i.id !== id))
+      if (selectedIncidentId === id) {
+        setSelectedIncidentId(null)
+        setSelectedIncidentDetail(null)
+      }
       return
     }
+
+    const confirmed = await showConfirmDialog({
+      title: `DELETE INCIDENT ${id.toUpperCase()}`,
+      message: `Are you sure you want to permanently delete Incident ${id}? This action cannot be undone and will clean up all associated alerts and logs across the platform.`,
+      confirmLabel: 'PERMANENTLY DELETE',
+      type: 'danger',
+    })
+    if (!confirmed) return
     setDeletingId(id)
     try {
-      const ok = await platformDataService.deleteIncident(id)
-      if (ok) {
-        setIncidentsList((prev) => prev.filter((i) => i.id !== id))
-        if (selectedIncidentId === id) {
-          setSelectedIncidentId(null)
-          setSelectedIncidentDetail(null)
-        }
+      await platformDataService.deleteIncident(id)
+      setIncidentsList((prev) => prev.filter((i) => i.id !== id))
+      if (selectedIncidentId === id) {
+        setSelectedIncidentId(null)
+        setSelectedIncidentDetail(null)
       }
+      toast.success(`Incident ${id} deleted successfully.`, { theme: 'light' })
     } catch (err) {
       console.error('Delete incident failed:', err)
     } finally {
@@ -73,6 +91,10 @@ export default function IncidentsConsole({
 
   // Real backend live state & in-memory dossier cache to eliminate switching latency
   const [incidentsList, setIncidentsList] = useState<Incident[]>(initialIncidents)
+
+  useEffect(() => {
+    setIncidentsList(initialIncidents)
+  }, [initialIncidents])
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(initialSelectedId || null)
   const [selectedIncidentDetail, setSelectedIncidentDetail] = useState<Incident | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
@@ -147,28 +169,26 @@ export default function IncidentsConsole({
     if (!selectedIncident || isGeneratingReport) return
     setIsGeneratingReport(true)
     setReportSuccessMsg(null)
+    setStatusActionError(null)
+
     try {
-      if (onOpenReportPreview) {
-        onOpenReportPreview(selectedIncident.id)
-      } else {
-        const newReport = await platformDataService.createReport({
-          title: `SITREP — ${selectedIncident.title} (${selectedIncident.location})`,
-          report_type: 'Situation Report',
-          incident_id: selectedIncident.id,
-          author: 'Commander R. Vance',
-          status: 'OFFICIAL',
-          summary: `Comprehensive operational situation dossier for ${selectedIncident.title}. Priority Level: ${selectedIncident.priorityLevel || selectedIncident.severity}. Status: ${selectedIncident.status}. Estimated affected population: ${selectedIncident.affectedPopulationEst || 0}.`,
-        })
-        if (newReport) {
-          setReportSuccessMsg(`Dossier SITREP generated successfully (ID: ${newReport.id}).`)
-          if (typeof window !== 'undefined') {
-            window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/reports/${newReport.id}/download`, '_blank')
-          }
-        }
+      const inc = selectedIncident
+      const newReport = await platformDataService.createReport({
+        title: `Incident SITREP — ${inc.title} [${inc.id.toUpperCase()}]`,
+        report_type: 'SITREP' as any,
+        incident_id: inc.id,
+        author: 'Command Operations Authority',
+        status: 'COMPLETED' as any,
+        summary: `INCIDENT OPERATIONAL REPORT\n- Incident ID: ${inc.id}\n- Title: ${inc.title}\n- Location: ${inc.location || 'Noida, Uttar Pradesh'}\n- Disaster Type: ${(inc.type || 'Disaster').toUpperCase()}\n- Severity: ${inc.severity}\n- Priority Level: ${inc.priorityLevel || 'Level 1'}\n- Status: ${inc.status}\n- Affected Population: ${inc.affectedPopulationEst || 45}\n- Last Updated: ${inc.lastUpdated || 'Just now'}\n- Description: ${inc.impact || inc.title}`,
+        metrics_summary: `Severity: ${inc.severity} | Status: ${inc.status} | Population: ${inc.affectedPopulationEst || 45}`,
+        tags: `${inc.type || 'disaster'}, ${inc.severity}, ${inc.status}, SITREP`,
+      })
+      if (newReport) {
+        toast.success(`Official SITREP report generated (ID: ${newReport.id}) and published to Reports tab.`, { theme: 'dark' }); setReportSuccessMsg(`Official SITREP report generated (ID: ${newReport.id}) and published to Reports tab.`)
       }
     } catch (err: any) {
-      console.error('Error generating dossier report:', err)
-      setStatusActionError(err.message || 'Failed to generate SITREP report.')
+      console.error('Error generating report:', err)
+      setStatusActionError(err?.message || 'Failed to generate incident report.')
     } finally {
       setIsGeneratingReport(false)
     }
@@ -184,10 +204,12 @@ export default function IncidentsConsole({
         setSelectedIncidentDetail(updated)
         dossierCache.current[updated.id] = updated
         setIncidentsList((prev) => prev.map((inc) => (inc.id === updated.id ? updated : inc)))
+        toast.success(`Incident status transitioned to ${targetStatus}.`, { theme: 'light' })
       }
     } catch (err: any) {
       console.error('Failed to transition incident status:', err)
       setStatusActionError(err.message || 'Status transition failed')
+      toast.error(err.message || 'Status transition failed', { theme: 'light' })
     } finally {
       setIsUpdatingStatus(false)
     }
@@ -552,8 +574,21 @@ export default function IncidentsConsole({
                   { label: 'Location', value: selectedIncident.location, icon: 'location_on' },
                   { label: 'Disaster Type', value: (selectedIncident.type || 'Disaster').toUpperCase() },
                   { label: 'Priority Level', value: selectedIncident.priorityLevel || 'Level 1', highlight: true },
-                  { label: 'Affected Population', value: selectedIncident.affectedPopulationEst || 'Estimated ~12,500' },
+                  { label: 'Affected Population', value: selectedIncident.affectedPopulationEst || '45' },
                 ]}
+                extraAction={
+                  <button
+                    type="button"
+                    onClick={handleGenerateDossierReport}
+                    disabled={isGeneratingReport}
+                    className="px-3.5 py-1.5 bg-[#0284c7] hover:bg-[#0369a1] text-white text-[12px] font-bold font-mono uppercase rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">
+                      {isGeneratingReport ? 'hourglass_top' : 'description'}
+                    </span>
+                    {isGeneratingReport ? 'GENERATING...' : 'GENERATE REPORT'}
+                  </button>
+                }
               />
 
               {/* 2. Automated Incident Intelligence & Decision Support */}

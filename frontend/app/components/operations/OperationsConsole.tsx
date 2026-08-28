@@ -1,5 +1,6 @@
 'use client'
 
+import { showConfirmDialog } from '../common/ConfirmDialog'
 import React, { useState, useEffect } from 'react'
 import { OperationRecord } from '../../types'
 import SearchInput from '../common/SearchInput'
@@ -40,9 +41,13 @@ export default function OperationsConsole({
 
   const handleDeleteOperation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    if (!window.confirm(`Are you sure you want to permanently delete Operation ${id}? This will cancel the mission and free up any attached resources.`)) {
-      return
-    }
+    const confirmed = await showConfirmDialog({
+      title: `ABORT OPERATION ${id.toUpperCase()}`,
+      message: `Are you sure you want to permanently delete Operation ${id}? This will cancel the mission and free up any attached resources back to inventory.`,
+      confirmLabel: 'ABORT & DELETE',
+      type: 'danger',
+    })
+    if (!confirmed) return
     setDeletingId(id)
     try {
       const ok = await platformDataService.deleteOperation(id)

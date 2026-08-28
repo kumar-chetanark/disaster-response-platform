@@ -40,6 +40,7 @@ def get_operation_detail(
     return op
 
 @router.post("", response_model=OperationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/dispatch", response_model=OperationResponse, status_code=status.HTTP_201_CREATED)
 def dispatch_operation(
     op_in: OperationCreate,
     db: Session = Depends(get_db),

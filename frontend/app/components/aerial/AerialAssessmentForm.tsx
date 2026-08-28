@@ -102,18 +102,19 @@ export default function AssessmentForm({
       if (!mapContainerRef.current) return
 
       if (!mapInstanceRef.current) {
-        const lat = currentIncident?.latitude || 29.7604
-        const lon = currentIncident?.longitude || -95.3698
+        const lat = currentIncident?.latitude || 28.5355
+        const lon = currentIncident?.longitude || 77.3910
 
         const map = L.map(mapContainerRef.current, {
           center: [lat, lon],
-          zoom: 12,
+          zoom: 13,
           zoomControl: false,
+          attributionControl: false,
         })
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; OpenStreetMap &copy; CARTO',
+        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
           maxZoom: 19,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
         }).addTo(map)
 
         L.control.zoom({ position: 'bottomright' }).addTo(map)
@@ -142,8 +143,8 @@ export default function AssessmentForm({
 
       if (!currentIncident) return
 
-      const lat = currentIncident.latitude || 29.7604
-      const lon = currentIncident.longitude || -95.3698
+      const lat = currentIncident.latitude || 28.5355
+      const lon = currentIncident.longitude || 77.3910
       const isCritical = currentIncident.severity === 'CRITICAL'
       const color = isCritical ? '#ef4444' : '#f97316'
 

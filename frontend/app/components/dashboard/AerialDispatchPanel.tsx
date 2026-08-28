@@ -166,40 +166,45 @@ export default function AerialDispatchPanel({
             </>
           ) : (
             <>
-              <div className="border-l-2 border-outline-variant pl-3 mb-1">
-                <div className="font-mono-label text-[10px] text-outline-variant uppercase mb-0.5">
-                  Mission Summary
+              <div className="border-l-2 border-primary pl-3 mb-1 flex justify-between items-start">
+                <div>
+                  <div className="font-mono-label text-[10px] text-sky-400 uppercase tracking-wider mb-0.5 font-bold">
+                    LIVE FIELD INTELLIGENCE & TELEMETRY
+                  </div>
+                  <div className="font-body-sm text-on-surface font-bold text-[13px]">
+                    Sector Scan • Noida, Uttar Pradesh (Incident #1)
+                  </div>
                 </div>
-                <div className="font-body-sm text-on-surface font-medium">
-                  Pre-flight Area Scan • Sector 4 Coastal Basin
-                </div>
+                <span className="text-[10px] font-mono-label bg-sky-950/60 text-sky-300 border border-sky-500/40 px-2 py-0.5 rounded font-bold">
+                  ACTIVE SECTOR
+                </span>
               </div>
 
-              <ul className="space-y-1 font-body-sm text-[12px] text-on-surface-variant">
+              <ul className="space-y-1.5 font-mono text-[11px] text-slate-300">
                 <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[14px] text-error">block</span>
-                  3 roads inaccessible
+                  <span className="material-symbols-outlined text-[14px] text-red-400">crisis_alert</span>
+                  <span>Impact: <b className="text-red-300">Tremors & structural damage reported</b></span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[14px] text-error">home_repair_service</span>
-                  2 structures damaged
+                  <span className="material-symbols-outlined text-[14px] text-amber-400">group</span>
+                  <span>Population at Risk: <b className="text-white">~45 civilians</b></span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[14px] text-tertiary">warning</span>
-                  ~15 people isolated in pockets
+                  <span className="material-symbols-outlined text-[14px] text-sky-400">verified_user</span>
+                  <span>Recon Readiness: <b className="text-emerald-400">10 Drones & Helos Available</b></span>
                 </li>
               </ul>
 
-              <div className="mt-auto flex items-center justify-between pt-2 border-t border-outline-variant">
-                <div className="text-[11px] font-mono-label text-on-surface-variant">
-                  Confidence: <span className="text-emerald-500 font-bold">91%</span>
+              <div className="mt-auto flex items-center justify-between pt-2 border-t border-[#1e293b]">
+                <div className="text-[11px] font-mono text-slate-400">
+                  Sector Confidence: <span className="text-emerald-400 font-bold">95%</span>
                 </div>
                 <button
                   type="button"
                   onClick={onOpenAssessmentForm}
-                  className="px-3 py-1.5 border border-outline-variant text-on-surface font-mono-label text-[10px] rounded hover:bg-surface-container transition-colors uppercase"
+                  className="px-3 py-1.5 bg-[#0284c7] hover:bg-[#0369a1] text-white font-mono text-[10px] rounded uppercase font-bold transition-all shadow"
                 >
-                  View Assessment Form
+                  CONDUCT FIELD ASSESSMENT
                 </button>
               </div>
             </>
