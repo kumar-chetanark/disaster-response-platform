@@ -1,48 +1,57 @@
-# Project State — Disaster Response Platform (PS-06)
+# Project State — Disaster Response Platform (PS-07)
 
 ## 1. Actual System Status & Current State
 
 > [!IMPORTANT]
-> **System Architecture & Key Milestones**:
-> - **Operational State**: Fully dynamic incident, resource, operation, assessment, alert, and report management backed by FastAPI and SQLite.
-> - **Authority Session & Profile**: Commander authority identity unified under **Chetan Kumar (Level 5)** across login, session persistence, incident dossiers, and report authors.
-> - **Real-Time Temporal Engine**: Dynamic 12-hour ticking local clock and live calendar widgets integrated throughout Top Header, Resources, and Incidents consoles (removing static Zulu/Sector 7 placeholders).
-> - **Anti-Gibberish AI Intake Protocol**: Multi-layer semantic validation on citizen reporting for location landmark/city integrity, situation coherence, and valid contact checks.
-> - **Hierarchical Geographic Geocoder**: Multi-tier geocoding fallback (Known DB -> OpenStreetMap Nominatim -> Photon) for exact coordinates across global and regional locations (e.g. Birgunj, Nepal; Rourkela, India).
+> **Complete Integrated Disaster Response & Worldwide Intelligence Architecture**:
+> - **Operational State**: Live, fully dynamic disaster intelligence and response platform backed by FastAPI and SQLite.
+> - **Worldwide Intelligence Pipeline (GDACS)**: Real-time global early-warning ingestion pipeline continuously fetching worldwide disaster events from GDACS (Global Disaster Alert and Coordination System) via structured GeoJSON and 24h RSS feeds.
+> - **Deduplication Engine**: Composite index deduplication by `(source, external_id)` with non-destructive state updates and double-conversion protection (`HTTP 409 Conflict`).
+> - **Tactical GIS Radar & Heatmap**: Full-width interactive map featuring severity-driven hazard circles (Red = Critical, Orange = High, Green = Medium, Blue = Global), interactive popups, auto-scroll `[VIEW ON MAP]` actions, and synced legend controls.
+> - **Citizen Emergency & AI Intake**: Real-time semantic anti-gibberish pre-screening, structured address validation, and automatic geocoding.
+> - **Authority Workflow & Zero Auto-Dispatch**: Global external intelligence feeds require explicit Commander Review before conversion to canonical incidents. Absolute zero automated squads or vehicle allocations occur without authority approval.
 
 ---
 
 ## 2. Implemented & Verified Features
 
-### A. Dynamic Dashboard & Tactical Command Radar
-- **Active Incident Live Telemetry Banner**: Binds dynamically to active crisis parameters (`affected_population`, geocoded coordinates, severity, operational zone radius). Shows clean monitoring standby state when empty.
-- **Full-Width Tactical Radar Map**: Expanded full-width GIS contextual preview centered on live geocoded coordinates.
-- **Synchronized Cascade Deletion**: Deleting an incident instantly purges its linked alerts and Resource Allocation Advisories, resetting the dashboard state optimistically.
+### A. Worldwide Disaster Intelligence System (GDACS Ingestion)
+- **Extensible Source Adapter**: `BaseExternalDisasterAdapter` with `GDACSAdapter` parsing disaster categories (`EARTHQUAKE`, `FLOOD`, `TROPICAL_CYCLONE`, `VOLCANIC_ACTIVITY`, `WILDFIRE`, `DROUGHT`, `STORM`, `TSUNAMI`, `LANDSLIDE`).
+- **5-Minute Ingestion Worker**: Async background task in FastAPI `lifespan` with fault isolation (external source outages never crash the platform).
+- **Ingestion Health API**: `GET /api/external-alerts/ingestion-status` and on-demand `POST /api/external-alerts/ingest` manual sync triggers.
+- **Alerts & Intelligence Console (`AlertsConsole.tsx`)**:
+  - `EXTERNAL DISASTER INTELLIGENCE (GDACS)` sub-tab with live sync badge and filtering by event type, severity, and status.
+  - `CITIZEN & SENSOR ALERTS` sub-tab with interactive clickable cards opening detailed crisis dossiers.
+  - **Global Disaster Dossier Modal**: Structured breakdown of exact location, coordinates, severity level, impacted population estimates, situation briefing, and official GDACS permalinks.
+  - **Authority Actions**: `[MARK REVIEWED]`, `[REJECT]`, `[VIEW ON MAP]`, and `[CREATE INCIDENT]`.
 
-### B. Citizen Emergency Reporting & AI Intake Validation
-- **Structured Address Form**: Specific landmark/street and city inputs with real-time semantic anti-spam and anti-gibberish verification.
-- **GPS Auto-Geocoding**: Hierarchical city and landmark coordinate resolution on intake.
-- **Incident Corroboration**: Automatically attaches corroborating evidence to matching active canonical incidents or creates a `PENDING` incident record.
+### B. Dynamic Dashboard & Tactical Radar Map (`ContextualMapPreview.tsx`)
+- **Severity-Driven Hazard Circles**: Dynamic visual radius rendering:
+  - 🔴 **Red (`#ef4444`)**: Critical severity / Red alerts (`75km` radius)
+  - 🟠 **Orange (`#ea580c`)**: High severity / Orange alerts
+  - 🟢 **Green (`#10b981`)**: Medium severity / Green alerts
+  - 🔷 **Tactical Blue (`#0284c7`)**: Global GDACS `G` markers
+- **Auto-Scroll to Tactical Map**: Clicking `[MAP]` on any alert smoothly navigates and scrolls the viewport directly to the map section with animated coordinate centering (`flyTo`).
+- **Tactical Layer Controls**: Synchronized filter toggles (`ALL`, `INCIDENTS`, `GLOBALS`) with exact matching visual glyphs.
 
-### C. Resource Allocation & Deployment Engine
-- **Single Consolidated Operation per Incident**: Dispatching response teams from the Resources console consolidates multiple squad dispatches under ONE unified mission track in the Operations tab.
-- **Area Coverage Management**: Local Resource Picture with squads (Rescue, Police, Medical, Fire) and assets (Ambulances, Boats, Helicopters, Drones, Evacuation Buses).
-- **Double-Allocation Guard**: Backend enforcement prevents assigning already deployed units (`HTTP 409 Conflict`).
+### C. Incidents & Authority Command Platform
+- **Point-Wise Situational Assessment**: Real-time evaluation of hazard vectors, corroboration confidence, damaged structures, and road access.
+- **Universal Deletion**: Allows deleting incidents in any status (`RESOLVED`, `ACTIVE`, `MONITORING`, `PENDING`) with cascade foreign key cleanup.
+- **Field Recon Surveys (`AerialAssessmentForm.tsx`)**: Direct reconnaissance submission and instant priority level recalculation.
+- **Situation Reports (SITREPs)**: One-click generation and binary PDF exports with command authorization blocks.
 
-### D. Incidents & Intelligence Console
-- **Lifecycle Management**: Supports transitioning between `PENDING`, `ACTIVE`, `MONITORING`, and `RESOLVED` states.
-- **Universal Deletion**: Allows deleting incidents in any status (including `RESOLVED`) with cascade cleanup across foreign keys.
-- **Instant SITREP Generation**: One-click dossier generation compiling incident data into formal Situation Reports.
-
-### E. Custom UI & Design System
-- **Unified Glassmorphic Confirmation Modal**: Replaced all native browser dialogs with promise-based custom modals.
-- **Custom Toast Notifications**: White card layout, circular icons, and progress bars anchored at top-right.
-- **Branded Application Favicon**: Cyber-shield vector logo deployed across all web app manifest and favicon endpoints.
+### D. Resources & Tactical Operations
+- **Single Consolidated Operation per Incident**: All response squad and vehicle dispatches for a given crisis are consolidated under a single operational track in the Operations tab.
+- **Area Overview Metrics**: Live 12-hour ticking local clock and dynamic **Population in Coverage** calculation based on active disaster zones and regional shelter capacities within the chosen operational radius.
+- **Double-Allocation Guard**: Prevents conflicting squad assignments (`HTTP 409 Conflict`).
 
 ---
 
 ## 3. Verified Backend Endpoints
-- `POST /api/citizen-reports`: AI-validated citizen emergency intake.
+- `GET /api/external-alerts`, `GET /api/external-alerts/{id}`: Global disaster intelligence feeds.
+- `POST /api/external-alerts/{id}/status`, `POST /api/external-alerts/{id}/convert-to-incident`: Authority review and canonical incident conversion.
+- `GET /api/external-alerts/ingestion-status`, `POST /api/external-alerts/ingest`: GDACS sync status and manual sync trigger.
+- `POST /api/citizen-reports`: AI-validated citizen emergency reporting.
 - `GET /api/incidents`, `DELETE /api/incidents/{id}`, `PATCH /api/incidents/{id}/status`: Incident lifecycle management.
 - `POST /api/operations`, `GET /api/operations`, `PATCH /api/operations/{id}/status`: Consolidated operational mission tracking.
 - `GET /api/allocations/recommendations`: Real-time capability-aware resource allocation advisory.

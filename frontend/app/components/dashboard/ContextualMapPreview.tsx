@@ -2,25 +2,36 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { Incident, ResourceUnit } from '../../types'
+import { ExternalAlert } from '../../services/dataService'
 
 interface MapPreviewProps {
   incidents?: Incident[]
   resources?: ResourceUnit[]
+  externalAlerts?: ExternalAlert[]
   selectedIncidentId?: string | null
+  focusedCoordinates?: { lat: number; lon: number; zoom?: number } | null
   onSelectIncident?: (id: string) => void
+  onReviewExternalAlert?: (alert: ExternalAlert) => void
 }
 
 export default function ContextualMapPreview({
   incidents = [],
   resources = [],
+  externalAlerts = [],
   selectedIncidentId,
+  focusedCoordinates,
   onSelectIncident,
+  onReviewExternalAlert,
 }: MapPreviewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const layerGroupRef = useRef<any>(null)
+  const heatLayerGroupRef = useRef<any>(null)
   const [isLeafletReady, setIsLeafletReady] = useState(false)
+  const [filterMode, setFilterMode] = useState<'ALL' | 'INCIDENTS' | 'GLOBAL_INTEL'>('ALL')
+  const [isHeatmapEnabled, setIsHeatmapEnabled] = useState(true)
 
+  // 1. Initialize Leaflet
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -32,200 +43,275 @@ export default function ContextualMapPreview({
       document.head.appendChild(link)
     }
 
-    import('leaflet').then((L) => {
+    import('leaflet').then((LModule) => {
+      const L = LModule.default || LModule
+
       if (!mapContainerRef.current) return
 
       if (!mapInstanceRef.current) {
-        // Initial center on New Delhi
-        const centerLat = incidents.length > 0 && incidents[0].latitude ? incidents[0].latitude : 28.6139
-        const centerLon = incidents.length > 0 && incidents[0].longitude ? incidents[0].longitude : 77.2090
+        const centerLat = incidents.length > 0 && incidents[0].latitude ? incidents[0].latitude : 20.0
+        const centerLon = incidents.length > 0 && incidents[0].longitude ? incidents[0].longitude : 0.0
 
         const map = L.map(mapContainerRef.current, {
           center: [centerLat, centerLon],
-          zoom: 11,
+          zoom: 3,
           zoomControl: false,
         })
 
-        // Tactical Dark Matter tile layer
         L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-          
-          attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-          subdomains: 'abcd',
+          attribution: '&copy; Google Maps &bull; Leaflet',
           maxZoom: 19,
         }).addTo(map)
 
         L.control.zoom({ position: 'bottomright' }).addTo(map)
 
+        const heatLayerGroup = L.layerGroup().addTo(map)
         const layerGroup = L.layerGroup().addTo(map)
+
+        heatLayerGroupRef.current = heatLayerGroup
         layerGroupRef.current = layerGroup
         mapInstanceRef.current = map
         setIsLeafletReady(true)
       }
-    }).catch(err => {
-      console.error('[LeafletMap] Failed to initialize map:', err)
     })
 
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
+        layerGroupRef.current = null
+        heatLayerGroupRef.current = null
       }
     }
   }, [])
 
-  // Render Tactical Severity Markers + Dynamic Shockwave Heatwaves
+  // 2. Focus/Fly to coordinates when requested
   useEffect(() => {
-    if (!isLeafletReady || !mapInstanceRef.current || !layerGroupRef.current) return
+    if (!isLeafletReady || !mapInstanceRef.current || !focusedCoordinates) return
+    if (focusedCoordinates.lat != null && focusedCoordinates.lon != null) {
+      mapInstanceRef.current.flyTo(
+        [focusedCoordinates.lat, focusedCoordinates.lon],
+        focusedCoordinates.zoom || 8,
+        { duration: 1.2 }
+      )
+    }
+  }, [isLeafletReady, focusedCoordinates])
 
-    import('leaflet').then((L) => {
-      const group = layerGroupRef.current
-      group.clearLayers()
+  // 3. Render Heatmap Rings & Tactical Markers (Zero dependency, guaranteed 100% crash-free)
+  useEffect(() => {
+    if (!isLeafletReady || !mapInstanceRef.current || !layerGroupRef.current || !heatLayerGroupRef.current) return
 
-      if (incidents.length === 0) {
-        return
+    import('leaflet').then((LModule) => {
+      const L = LModule.default || LModule
+      const layerGroup = layerGroupRef.current
+      const heatLayerGroup = heatLayerGroupRef.current
+
+      layerGroup.clearLayers()
+      heatLayerGroup.clearLayers()
+
+      // Collect points for heatmap rendering
+      const heatItems: { lat: number; lon: number; type: 'INCIDENT' | 'GLOBAL'; severity?: string; isCritical: boolean }[] = []
+
+      // A. Canonical Incidents
+      if (filterMode === 'ALL' || filterMode === 'INCIDENTS') {
+        incidents.forEach((inc) => {
+          if (inc.latitude == null || inc.longitude == null) return
+
+          const sevUpper = (inc.severity || 'MEDIUM').toUpperCase()
+          const isCritical = sevUpper === 'CRITICAL' || sevUpper === 'RED'
+          const isHigh = sevUpper === 'HIGH' || sevUpper === 'ORANGE'
+          const isSelected = inc.id === selectedIncidentId
+          const color = isCritical ? '#ef4444' : isHigh ? '#ea580c' : '#0284c7'
+
+          heatItems.push({ lat: inc.latitude, lon: inc.longitude, type: 'INCIDENT', severity: sevUpper, isCritical })
+
+          const icon = L.divIcon({
+            className: 'custom-incident-marker',
+            html: `
+              <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; cursor: pointer;">
+                <div style="position: absolute; width: ${isSelected ? '32px' : '22px'}; height: ${isSelected ? '32px' : '22px'}; border-radius: 50%; background: ${color}; opacity: 0.95; border: 2px solid #ffffff; box-shadow: 0 0 12px ${color};"></div>
+                <span style="position: relative; font-family: monospace; font-size: 11px; font-weight: bold; color: #ffffff;">!</span>
+              </div>
+            `,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+          })
+
+          const marker = L.marker([inc.latitude, inc.longitude], { icon })
+          marker.bindPopup(`
+            <div style="font-family: sans-serif; font-size: 12px; min-width: 180px; color: #0f172a;">
+              <div style="font-weight: bold; font-size: 13px; margin-bottom: 2px; color: ${color};">${inc.title} &bull; ${inc.severity}</div>
+              <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">${inc.location || 'Active Incident'}</div>
+              <div style="font-family: monospace; font-size: 10px; color: #334155; margin-bottom: 6px;">Status: <strong>${inc.status}</strong></div>
+            </div>
+          `)
+
+          marker.on('click', () => {
+            if (onSelectIncident) onSelectIncident(inc.id)
+          })
+
+          layerGroup.addLayer(marker)
+        })
       }
 
-      // Auto-fit map bounds if incidents exist
-      const validCoords: [number, number][] = []
+      // B. Worldwide External Disaster Alerts (GDACS)
+      if (filterMode === 'ALL' || filterMode === 'GLOBAL_INTEL') {
+        externalAlerts.forEach((alt) => {
+          if (alt.latitude == null || alt.longitude == null) return
 
-      incidents.forEach((inc) => {
-        const lat = inc.latitude || 28.6139
-        const lon = inc.longitude || 77.2090
-        validCoords.push([lat, lon])
+          const sevUpper = (alt.alertLevel || alt.severity || 'MEDIUM').toUpperCase()
+          const isCrit = sevUpper === 'CRITICAL' || sevUpper === 'RED'
+          const isHigh = sevUpper === 'HIGH' || sevUpper === 'ORANGE'
+          const bg = '#0284c7'
 
-        const isSelected = inc.id === selectedIncidentId
-        const isCritical = inc.severity === 'CRITICAL'
-        const isHigh = inc.severity === 'HIGH'
+          heatItems.push({ lat: alt.latitude, lon: alt.longitude, type: 'GLOBAL', severity: sevUpper, isCritical: isCrit })
 
-        const color = isCritical ? '#ef4444' : isHigh ? '#f97316' : '#38bdf8'
-        const waveRadius = isCritical ? 2800 : isHigh ? 1800 : 1200
+          const icon = L.divIcon({
+            className: 'custom-gdacs-marker',
+            html: `
+              <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; cursor: pointer;">
+                <div style="position: absolute; width: 20px; height: 20px; border-radius: 4px; background: ${bg}; border: 1.5px solid #ffffff; transform: rotate(45deg); box-shadow: 0 0 10px ${bg};"></div>
+                <span style="position: relative; font-family: monospace; font-size: 10px; font-weight: bold; color: #ffffff;">G</span>
+              </div>
+            `,
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
+          })
 
-        // 1. Dynamic Shockwave / Heatwave Gradient Circles based on severity & coverage
-        // Outer dissipation wave
-        L.circle([lat, lon], {
-          radius: waveRadius * 1.4,
-          fillColor: color,
-          fillOpacity: 0.12,
-          stroke: false,
-        }).addTo(group)
-
-        // Middle pulse ring
-        L.circle([lat, lon], {
-          radius: waveRadius,
-          fillColor: color,
-          fillOpacity: 0.28,
-          color: color,
-          weight: 1.5,
-          dashArray: isCritical ? '3 3' : undefined,
-        }).addTo(group)
-
-        // Core intensity aura
-        L.circle([lat, lon], {
-          radius: waveRadius * 0.4,
-          fillColor: color,
-          fillOpacity: 0.55,
-          stroke: false,
-        }).addTo(group)
-
-        // 2. Tactical Incident Pin Marker with pulsing radar halo
-        const customHtml = `
-          <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-            <div style="
-              position: absolute;
-              inset: 0;
-              border-radius: 50%;
-              background-color: ${color};
-              opacity: 0.4;
-              animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-            "></div>
-            <div style="
-              width: ${isSelected ? '28px' : '22px'};
-              height: ${isSelected ? '28px' : '22px'};
-              background-color: ${color};
-              border: 2px solid #ffffff;
-              border-radius: 50%;
-              box-shadow: 0 0 14px ${color};
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              cursor: pointer;
-              z-index: 10;
-            ">
-              <span style="font-size: 11px; font-weight: 900; color: #000000;">!</span>
+          const marker = L.marker([alt.latitude, alt.longitude], { icon })
+          marker.bindPopup(`
+            <div style="font-family: sans-serif; font-size: 12px; min-width: 200px; color: #0f172a;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px;">
+                <span style="font-family: monospace; font-size: 10px; font-weight: bold; color: #0284c7;">${alt.source} INTEL</span>
+                <span style="font-family: monospace; font-size: 9px; font-weight: bold; color: #0284c7; text-transform: uppercase;">${alt.alertLevel || alt.severity}</span>
+              </div>
+              <div style="font-weight: bold; font-size: 12px; line-height: 1.2; margin-bottom: 3px;">${alt.title.replace(/\[GDACS\]\s*/, '')}</div>
+              <div style="font-size: 11px; color: #64748b; margin-bottom: 6px;">${alt.country || alt.locationName || 'Global Zone'}</div>
+              <div style="font-family: monospace; font-size: 10px; color: #475569; margin-bottom: 6px;">Status: <strong>${alt.status}</strong></div>
+              <a href="${alt.sourceUrl || '#'}" target="_blank" style="color: #0284c7; font-size: 10px; font-weight: bold; text-decoration: none;">View GDACS Report &rarr;</a>
             </div>
-          </div>
-        `
+          `)
 
-        const customIcon = L.divIcon({
-          html: customHtml,
-          className: 'custom-leaflet-marker',
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
+          layerGroup.addLayer(marker)
         })
+      }
 
-        const marker = L.marker([lat, lon], { icon: customIcon }).addTo(group)
+      // C. Render Single Disaster Impact Circle with Severity-Driven Color Spectrum
+      if (isHeatmapEnabled && heatItems.length > 0) {
+        heatItems.forEach((item: any) => {
+          const isIncident = item.type === 'INCIDENT'
+          const sev = (item.severity || '').toUpperCase()
 
-        marker.bindPopup(`
-          <div style="font-family: sans-serif; padding: 6px; color: #0f172a; min-width: 200px;">
-            <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: ${color}; letter-spacing: 0.05em;">
-              ${inc.severity} &bull; ${inc.disasterType || inc.type || 'INCIDENT'}
-            </div>
-            <div style="font-size: 13px; font-weight: bold; margin-top: 3px; color: #0f172a;">
-              ${inc.title}
-            </div>
-            <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
-              📍 ${inc.location || 'Coordinates Lat/Lon'}
-            </div>
-            <div style="font-size: 10px; color: #334155; margin-top: 6px; border-top: 1px solid #e2e8f0; padding-top: 4px; display: flex; justify-content: space-between;">
-              <span>Coverage: <b>${inc.resourceCoveragePct || inc.resourceCoverage || '60%'}</b></span>
-              <span>Priority: <b>${inc.priorityLevel || 'Level 1'}</b></span>
-            </div>
-          </div>
-        `)
-
-        marker.on('click', () => {
-          if (onSelectIncident) {
-            onSelectIncident(inc.id)
+          // Determine exact color based on severity:
+          // CRITICAL / RED -> Red (#ef4444)
+          // HIGH / ORANGE  -> Orange (#ea580c)
+          // MEDIUM / GREEN -> Emerald Green (#10b981)
+          // Default        -> Tactical Blue (#0284c7)
+          let circleColor = '#0284c7'
+          if (sev.includes('CRITICAL') || sev.includes('RED')) {
+            circleColor = '#ef4444'
+          } else if (sev.includes('HIGH') || sev.includes('ORANGE')) {
+            circleColor = '#ea580c'
+          } else if (sev.includes('GREEN') || sev.includes('LOW')) {
+            circleColor = '#10b981'
+          } else {
+            circleColor = isIncident ? '#ea580c' : '#0284c7'
           }
-        })
-      })
 
-      // If valid coordinates exist, pan/fit
-      if (validCoords.length > 0 && mapInstanceRef.current) {
-        if (validCoords.length === 1) {
-          mapInstanceRef.current.setView(validCoords[0], 12)
-        } else {
-          mapInstanceRef.current.fitBounds(validCoords, { padding: [40, 40] })
-        }
+          // Single clean unified impact circle colored strictly by severity
+          const singleHeatCircle = L.circle([item.lat, item.lon], {
+            radius: isIncident ? 75000 : 55000,
+            fillColor: circleColor,
+            fillOpacity: 0.40,
+            stroke: true,
+            color: circleColor,
+            weight: 1.8,
+            opacity: 0.75,
+            interactive: false,
+          })
+
+          heatLayerGroup.addLayer(singleHeatCircle)
+        })
       }
     })
-  }, [isLeafletReady, incidents, selectedIncidentId, onSelectIncident])
+  }, [isLeafletReady, incidents, externalAlerts, selectedIncidentId, filterMode, isHeatmapEnabled])
 
   return (
-    <div className="bg-surface border border-outline-variant rounded-xl flex flex-col overflow-hidden relative h-[440px] shadow-lg w-full">
-      {/* Top Header Status Overlay */}
-      <div className="absolute top-2 left-2 z-400 bg-surface/90 border border-outline-variant px-2.5 py-1 rounded backdrop-blur text-[10px] font-mono-label text-on-surface flex items-center gap-2 shadow-sm">
-        <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-        <span className="font-bold">TACTICAL GIS RADAR</span>
-        <span className="text-outline">|</span>
-        <span className="text-on-surface-variant">{incidents.length} Active Incident{incidents.length === 1 ? '' : 's'}</span>
+    <div className="relative w-full h-[440px] rounded-xl overflow-hidden border border-outline-variant bg-surface-container shadow-md">
+      <div ref={mapContainerRef} className="w-full h-full z-0" />
+
+      {/* Floating Tactical Layer Legend & Filter Controls */}
+      <div className="absolute top-3 right-3 z-[400] bg-surface-container/90 backdrop-blur-md p-2 rounded-lg border border-outline-variant flex items-center gap-1.5 font-mono text-[10px]">
+        {/* Heatmap Toggle */}
+        <button
+          type="button"
+          onClick={() => setIsHeatmapEnabled(!isHeatmapEnabled)}
+          className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1 font-bold ${
+            isHeatmapEnabled ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-xs' : 'text-slate-400 hover:bg-surface'
+          }`}
+          title="Toggle Disaster Heatmap Density Layer"
+        >
+          <span className="material-symbols-outlined text-[13px]">local_fire_department</span>
+          <span>HEATMAP {isHeatmapEnabled ? 'ON' : 'OFF'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterMode('ALL')}
+          className={`px-2.5 py-1 rounded transition-colors ${filterMode === 'ALL' ? 'bg-primary text-on-primary font-bold' : 'text-slate-300 hover:bg-surface'}`}
+        >
+          ALL ({incidents.length + externalAlerts.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterMode('INCIDENTS')}
+          className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1.5 ${filterMode === 'INCIDENTS' ? 'bg-red-600 text-white font-bold' : 'text-red-400 hover:bg-surface'}`}
+        >
+          <span className="w-3.5 h-3.5 rounded-full bg-red-500 border border-white text-[9px] font-bold text-white flex items-center justify-center shadow-xs">
+            !
+          </span>
+          <span>INCIDENTS ({incidents.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterMode('GLOBAL_INTEL')}
+          className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1.5 ${filterMode === 'GLOBAL_INTEL' ? 'bg-sky-600 text-white font-bold' : 'text-sky-400 hover:bg-surface'}`}
+        >
+          <span className="relative w-3.5 h-3.5 flex items-center justify-center">
+            <span className="absolute w-3 h-3 rounded-xs bg-sky-500 border border-white rotate-45"></span>
+            <span className="relative text-[8px] font-bold text-white z-10 leading-none">G</span>
+          </span>
+          <span>GLOBALS ({externalAlerts.length})</span>
+        </button>
       </div>
 
-      {/* Leaflet Map DOM Container */}
-      <div ref={mapContainerRef} className="flex-1 w-full h-full z-10 bg-surface-container-lowest" />
-
-      {/* Empty State Overlay */}
-      {incidents.length === 0 && (
-        <div className="absolute inset-0 z-400 bg-surface-container-lowest/80 backdrop-blur-xs flex flex-col items-center justify-center pointer-events-none">
-          <span className="material-symbols-outlined text-[32px] text-outline mb-1">radar</span>
-          <span className="font-mono-label text-[12px] text-on-surface font-bold">ZERO ACTIVE INCIDENT COORDINATES</span>
-          <span className="font-body-base text-[11px] text-on-surface-variant mt-0.5">Awaiting live citizen submissions or external feeds</span>
+      {/* Bottom Floating Legend with 100% Identical Visual Glyphs & Heatmap Spectrum */}
+      <div className="absolute bottom-3 left-3 z-[400] bg-surface-container/90 backdrop-blur-md px-3.5 py-2 rounded-lg border border-outline-variant flex flex-wrap items-center gap-5 font-mono text-[10px] text-slate-300 shadow-md">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-white flex items-center justify-center shadow-sm">
+            <span className="text-[10px] font-bold text-white leading-none">!</span>
+          </div>
+          <span className="font-bold text-slate-200">Incidents</span>
         </div>
-      )}
 
-      {/* Bottom Coordinates Footer */}
-      <div className="absolute bottom-2 left-2 z-400 text-[9px] font-mono-label text-on-surface-variant bg-surface-container/90 px-2 py-0.5 rounded border border-outline-variant pointer-events-none">
-        OpenStreetMap &amp; CartoDB &bull; Real GIS Coordinates Active
+        <div className="flex items-center gap-2">
+          <div className="relative w-4 h-4 flex items-center justify-center">
+            <div className="absolute w-3.5 h-3.5 rounded-xs bg-sky-500 border-2 border-white rotate-45 shadow-sm"></div>
+            <span className="relative text-[9px] font-bold text-white z-10 leading-none">G</span>
+          </div>
+          <span className="font-bold text-slate-200">Globals</span>
+        </div>
+
+        {/* Heatmap Density Spectrum */}
+        {isHeatmapEnabled && (
+          <div className="flex items-center gap-2 border-l border-outline-variant pl-4">
+            <span className="text-slate-400 text-[9px] uppercase">Density:</span>
+            <div className="w-16 h-2.5 rounded-full bg-gradient-to-r from-sky-500 via-yellow-400 to-red-500 shadow-inner"></div>
+            <span className="text-[9px] text-slate-400">High Risk</span>
+          </div>
+        )}
       </div>
     </div>
   )

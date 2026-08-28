@@ -25,3 +25,4 @@ __all__ = [
     "Shelter",
     "User",
 ]
+from app.models.external_alert import ExternalAlert

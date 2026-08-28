@@ -1,3 +1,40 @@
+export interface ExternalAlert {
+  id: string
+  source: string
+  externalId: string
+  eventType: string
+  title: string
+  description?: string
+  country?: string
+  countries?: string
+  locationName?: string
+  latitude?: number
+  longitude?: number
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+  alertLevel?: string
+  alertScore?: number
+  populationAffectedEst?: string
+  publishedAt?: string
+  updatedAt?: string
+  sourceUrl?: string
+  status: 'NEW' | 'REVIEWED' | 'VALIDATED' | 'REJECTED' | 'CONVERTED_TO_INCIDENT' | 'EXPIRED'
+  convertedIncidentId?: string
+  createdAt?: string
+  lastSeenAt?: string
+  rawData?: any
+}
+
+export interface IngestionStatus {
+  source: string
+  status: string
+  lastSuccessfulSync?: string
+  lastAttemptedSync?: string
+  eventsFetched: number
+  newAlerts: number
+  updatedAlerts: number
+  lastError?: string
+}
+
 import {
   IncidentRequirementsResponse,
   IncidentCapabilityRequirement,
@@ -1157,6 +1194,172 @@ class PlatformDataService {
     } catch {
       // ignore
     }
+  }
+
+  // === WORLDWIDE EXTERNAL DISASTER INTELLIGENCE (GDACS) ===
+  async getExternalAlerts(params?: {
+    eventType?: string
+    severity?: string
+    status?: string
+    country?: string
+    limit?: number
+  }): Promise<ExternalAlert[]> {
+    try {
+      const q = new URLSearchParams()
+      if (params?.eventType && params.eventType !== 'ALL') q.set('event_type', params.eventType)
+      if (params?.severity && params.severity !== 'ALL') q.set('severity', params.severity)
+      if (params?.status && params.status !== 'ALL') q.set('status', params.status)
+      if (params?.country) q.set('country', params.country)
+      if (params?.limit) q.set('limit', String(params.limit))
+
+      const res = await fetch(`${API_BASE_URL}/api/external-alerts?${q.toString()}`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          return data.map((item: any) => ({
+            id: item.id,
+            source: item.source || 'GDACS',
+            externalId: item.external_id,
+            eventType: item.event_type,
+            title: item.title,
+            description: item.description,
+            country: item.country,
+            countries: item.countries,
+            locationName: item.location_name,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            severity: item.severity || 'MEDIUM',
+            alertLevel: item.alert_level,
+            alertScore: item.alert_score,
+            populationAffectedEst: item.population_affected_est,
+            publishedAt: item.published_at,
+            updatedAt: item.updated_at,
+            sourceUrl: item.source_url,
+            status: item.status || 'NEW',
+            convertedIncidentId: item.converted_incident_id,
+            createdAt: item.created_at,
+            lastSeenAt: item.last_seen_at,
+          }))
+        }
+      }
+    } catch (err) {
+      console.error('[DataService] Failed to fetch external alerts:', err)
+    }
+    return []
+  }
+
+  async getExternalAlertDetail(alertId: string): Promise<ExternalAlert | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/external-alerts/${alertId}`, { cache: 'no-store' })
+      if (res.ok) {
+        const item = await res.json()
+        return {
+          id: item.id,
+          source: item.source || 'GDACS',
+          externalId: item.external_id,
+          eventType: item.event_type,
+          title: item.title,
+          description: item.description,
+          country: item.country,
+          countries: item.countries,
+          locationName: item.location_name,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          severity: item.severity || 'MEDIUM',
+          alertLevel: item.alert_level,
+          alertScore: item.alert_score,
+          populationAffectedEst: item.population_affected_est,
+          publishedAt: item.published_at,
+          updatedAt: item.updated_at,
+          sourceUrl: item.source_url,
+          status: item.status || 'NEW',
+          convertedIncidentId: item.converted_incident_id,
+          createdAt: item.created_at,
+          lastSeenAt: item.last_seen_at,
+          rawData: item.raw_data,
+        }
+      }
+    } catch (err) {
+      console.error(`[DataService] Failed to fetch alert detail for ${alertId}:`, err)
+    }
+    return null
+  }
+
+  async updateExternalAlertStatus(alertId: string, status: string, notes?: string): Promise<boolean> {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authority_session_token') || 'token-dev-auth' : 'token-dev-auth'
+      const res = await fetch(`${API_BASE_URL}/api/external-alerts/${alertId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status, notes })
+      })
+      return res.ok
+    } catch (err) {
+      console.error(`[DataService] Failed to update external alert ${alertId} status:`, err)
+      return false
+    }
+  }
+
+  async convertExternalAlertToIncident(alertId: string): Promise<{
+    status: string
+    incident_id: string
+    incident_title: string
+    severity: string
+    location: string
+  }> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authority_session_token') || 'token-dev-auth' : 'token-dev-auth'
+    const res = await fetch(`${API_BASE_URL}/api/external-alerts/${alertId}/convert-to-incident`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to convert alert to incident' }))
+      throw new Error(err.detail || 'Failed to convert alert to incident')
+    }
+    return await res.json()
+  }
+
+  async getIngestionStatus(): Promise<IngestionStatus | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/external-alerts/ingestion-status`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        return {
+          source: data.source || 'GDACS',
+          status: data.status || 'CONNECTED',
+          lastSuccessfulSync: data.last_successful_sync,
+          lastAttemptedSync: data.last_attempted_sync,
+          eventsFetched: data.events_fetched || 0,
+          newAlerts: data.new_alerts || 0,
+          updatedAlerts: data.updated_alerts || 0,
+          lastError: data.last_error,
+        }
+      }
+    } catch (err) {
+      console.error('[DataService] Failed to fetch ingestion status:', err)
+    }
+    return null
+  }
+
+  async triggerManualIngest(): Promise<IngestionStatus | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/external-alerts/ingest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (err) {
+      console.error('[DataService] Failed to trigger manual ingest:', err)
+    }
+    return null
   }
 
 }

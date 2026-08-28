@@ -98,6 +98,8 @@ export default function App() {
   const [advisories, setAdvisories] = useState<AllocationAdvisory[]>([])
   const [aerialAssets, setAerialAssets] = useState<AerialAsset[]>([])
   const [reports, setReports] = useState<PlatformReport[]>([])
+  const [externalAlerts, setExternalAlerts] = useState<any[]>([])
+  const [focusedMapCoords, setFocusedMapCoords] = useState<{ lat: number; lon: number; zoom?: number } | null>(null)
   const [latestAssessment, setLatestAssessment] = useState<AssessmentSubmission | null>(null)
   
   const [isReassessed, setIsReassessed] = useState(false)
@@ -179,7 +181,7 @@ export default function App() {
   // Load initial data through service layer
   useEffect(() => {
     async function loadData() {
-      const [inc, alt, ops, res, adv, ast, rep] = await Promise.all([
+      const [inc, alt, ops, res, adv, ast, rep, extAlerts] = await Promise.all([
         platformDataService.getIncidents(),
         platformDataService.getAlerts(),
         platformDataService.getOperations(),
@@ -187,6 +189,7 @@ export default function App() {
         platformDataService.getAdvisories(),
         platformDataService.getAerialAssets(),
         platformDataService.getReports(),
+        platformDataService.getExternalAlerts({ limit: 100 }),
       ])
       setIncidents(inc)
       const validIncidentIds = new Set(inc.map(i => i.id))
@@ -205,6 +208,7 @@ export default function App() {
       setAdvisories(adv)
       setAerialAssets(ast)
       setReports(rep)
+      if (extAlerts) setExternalAlerts(extAlerts)
     }
     loadData()
   }, [])
@@ -655,6 +659,30 @@ export default function App() {
               setSelectedIncidentId(incId)
               setCurrentTab('incidents')
             }}
+            onViewOnMap={(lat: number, lon: number, title?: string) => {
+              setFocusedMapCoords({ lat, lon, zoom: 7 })
+              setCurrentTab('dashboard')
+              showNotification(`Tactical Map centered on ${title || 'Global Alert Zone'}.`, 'info')
+              setTimeout(() => {
+                const mapEl = document.getElementById('tactical-radar-map-section')
+                if (mapEl) {
+                  mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }
+              }, 150)
+            }}
+            onIncidentCreated={async (newIncId: string) => {
+              try {
+                const [updatedInc, updatedAlt] = await Promise.all([
+                  platformDataService.getIncidents(),
+                  platformDataService.getAlerts(),
+                ])
+                setIncidents(updatedInc)
+                setAlerts(updatedAlt)
+                setSelectedIncidentId(newIncId)
+              } catch (e) {
+                console.error(e)
+              }
+            }}
             onMarkReviewed={(altId: string) => {
               setAlerts((prev) =>
                 prev.map((a) => (a.id === altId ? { ...a, isReviewedByAuthority: true } : a))
@@ -827,8 +855,8 @@ export default function App() {
             />
 
             {/* 4. Full-Width Expanded Tactical GIS Map */}
-            <section className="w-full min-w-0">
-              <ContextualMapPreview incidents={incidents} resources={resources} selectedIncidentId={selectedIncidentId} onSelectIncident={(id) => setSelectedIncidentId(id)} />
+            <section id="tactical-radar-map-section" className="w-full min-w-0 scroll-mt-20">
+              <ContextualMapPreview incidents={incidents} resources={resources} externalAlerts={externalAlerts} selectedIncidentId={selectedIncidentId} focusedCoordinates={focusedMapCoords} onSelectIncident={(id) => setSelectedIncidentId(id)} />
             </section>
 
             <div className="h-6 shrink-0" aria-hidden="true" />
@@ -892,9 +920,9 @@ export default function App() {
         }}
       />
 
-      {/* 3. Main Content Area with Responsive Desktop Offset */}
+      {/* 3. Main Content Area with Responsive Desktop Offset and Full Vertical Scrolling */}
       <div
-        className={`flex-1 flex flex-col relative h-full pt-header-height bg-surface overflow-hidden transition-all duration-200 ${
+        className={`flex-1 flex flex-col relative h-full pt-header-height bg-surface overflow-y-auto overflow-x-hidden scrollbar-thin transition-all duration-200 ${
           /* Desktop layout offset */
           isSidebarCollapsed ? 'md:ml-16' : 'md:ml-sidebar-width'
         } ml-0`}

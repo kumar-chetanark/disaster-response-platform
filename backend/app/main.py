@@ -4,7 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import Base, engine
 import app.models  # Ensures all models and tables are registered in Base.metadata
+import asyncio
+import logging
+from app.core.database import SessionLocal
+from app.services.external_ingestion_service import global_ingestion_service
 from app.routers import (
+    external_alerts,
     auth,
     health,
     citizen_reports,
@@ -19,11 +24,30 @@ from app.routers import (
     sms_gateway,
 )
 
+async def periodic_gdacs_ingestion_worker():
+    """Background worker: Ingests global disaster events every 5 minutes."""
+    # Wait 2 seconds after startup for database initialization
+    await asyncio.sleep(2)
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                global_ingestion_service.run_ingestion(db)
+            finally:
+                db.close()
+        except Exception as e:
+            logging.error(f"[Background Ingestion Worker] Ingestion error: {e}")
+        # Run every 5 minutes (300 seconds)
+        await asyncio.sleep(300)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Deterministically ensure database tables exist on server startup
     Base.metadata.create_all(bind=engine)
+    # Start periodic worldwide disaster alert ingestion worker
+    ingestion_task = asyncio.create_task(periodic_gdacs_ingestion_worker())
     yield
+    ingestion_task.cancel()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -56,6 +80,7 @@ app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(allocations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(shelters.router, prefix=settings.API_V1_PREFIX)
 app.include_router(sms_gateway.router, prefix=settings.API_V1_PREFIX)
+app.include_router(external_alerts.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 def root():
