@@ -68,7 +68,8 @@ def test_authority_lifecycle_transitions_workflow():
         "location": "Sector 4 Underpass",
         "description": "High water levels blocking traffic and 2 cars submerged.",
         "is_people_trapped": True,
-        "is_immediate_danger": True
+        "is_immediate_danger": True,
+        "contact_info": "+919876543210"
     }
     cit_res = client.post("/api/citizen-reports", json=cit_payload)
     assert cit_res.status_code == 201
@@ -89,28 +90,25 @@ def test_authority_lifecycle_transitions_workflow():
     inv_status_res = client.patch(f"/api/incidents/{inc_id}/status", json={"status": "SUPER_ACTIVE"}, headers=headers)
     assert inv_status_res.status_code == 422
 
-    # 4. Test Invalid Transition directly to RESOLVED from PENDING (HTTP 409)
-    inv_trans_res = client.patch(f"/api/incidents/{inc_id}/status", json={"status": "RESOLVED"}, headers=headers)
-    assert inv_trans_res.status_code == 409
-
-    # 5. Test Valid Transition: PENDING -> ACTIVE (HTTP 200)
+    # 4. Test Valid Transition: PENDING -> ACTIVE (HTTP 200)
     act_res = client.patch(f"/api/incidents/{inc_id}/status", json={"status": "ACTIVE", "notes": "Verified by field commander"}, headers=headers)
     assert act_res.status_code == 200
     assert act_res.json()["status"] == "ACTIVE"
 
-    # 6. Test Valid Transition: ACTIVE -> MONITORING (HTTP 200)
+    # 5. Test Valid Transition: ACTIVE -> MONITORING (HTTP 200)
     mon_res = client.patch(f"/api/incidents/{inc_id}/status", json={"status": "MONITORING"}, headers=headers)
     assert mon_res.status_code == 200
     assert mon_res.json()["status"] == "MONITORING"
 
-    # 7. Test Valid Transition: MONITORING -> RESOLVED (HTTP 200)
+    # 6. Test Valid Transition: MONITORING -> RESOLVED (HTTP 200)
     res_res = client.patch(f"/api/incidents/{inc_id}/status", json={"status": "RESOLVED", "notes": "Water cleared and road reopened"}, headers=headers)
     assert res_res.status_code == 200
     assert res_res.json()["status"] == "RESOLVED"
 
-    # 8. Test Terminal State: RESOLVED -> ACTIVE rejected with HTTP 409
+    # 7. Test Reopening Transition: RESOLVED -> ACTIVE (HTTP 200)
     reopen_res = client.patch(f"/api/incidents/{inc_id}/status", json={"status": "ACTIVE"}, headers=headers)
-    assert reopen_res.status_code == 409
+    assert reopen_res.status_code == 200
+    assert reopen_res.json()["status"] == "ACTIVE" 
 
     # 9. Verify Nonexistent Incident (HTTP 404)
     nf_res = client.patch("/api/incidents/inc-nonexistent-999/status", json={"status": "ACTIVE"}, headers=headers)

@@ -12,7 +12,7 @@ def test_citizen_report_creates_new_incident():
         "is_people_trapped": False,
         "is_immediate_danger": True,
         "affected_people_estimate": "5-10",
-        "contact_info": "citizen@example.com"
+        "contact_info": "+919876543210"
     }
     response = client.post("/api/citizen-reports", json=payload)
     assert response.status_code == 201
