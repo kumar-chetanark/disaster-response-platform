@@ -169,13 +169,9 @@ export default function AlertsConsole({
       return true
     })
     .sort((a, b) => {
-      const rank = (s: string, l?: string) => {
-        if (s === 'CRITICAL' || (l && l.toLowerCase().includes('red'))) return 1
-        if (s === 'HIGH' || (l && l.toLowerCase().includes('orange'))) return 2
-        if (s === 'MEDIUM' || (l && l.toLowerCase().includes('green'))) return 3
-        return 4
-      }
-      return rank(a.severity, a.alertLevel) - rank(b.severity, b.alertLevel)
+      const timeA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
+      const timeB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
+      return timeB - timeA
     })
 
   // Selected Alert for Internal Sub-Tab

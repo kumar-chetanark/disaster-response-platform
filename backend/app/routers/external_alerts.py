@@ -77,17 +77,8 @@ def list_external_alerts(
     if country:
         query = query.filter(ExternalAlert.country.ilike(f"%{country.strip()}%"))
 
-    # Prioritize Tactical High-Severity Disasters (RED/CRITICAL -> ORANGE/HIGH -> GREEN/MEDIUM)
-    severity_rank = case(
-        (ExternalAlert.severity == 'CRITICAL', 1),
-        (ExternalAlert.alert_level.ilike('%red%'), 1),
-        (ExternalAlert.severity == 'HIGH', 2),
-        (ExternalAlert.alert_level.ilike('%orange%'), 2),
-        (ExternalAlert.severity == 'MEDIUM', 3),
-        (ExternalAlert.alert_level.ilike('%green%'), 4),
-        else_=5
-    )
-    query = query.order_by(severity_rank, desc(ExternalAlert.published_at), desc(ExternalAlert.created_at))
+    # Sort strictly by latest published / created timestamp
+    query = query.order_by(desc(ExternalAlert.published_at), desc(ExternalAlert.created_at))
     return query.offset(offset).limit(limit).all()
 
 @router.get("/ingestion-status", response_model=IngestionStatusResponse)
