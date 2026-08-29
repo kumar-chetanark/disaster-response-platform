@@ -88,6 +88,17 @@ def get_ingestion_status():
     """
     return global_ingestion_service.get_status()
 
+@router.post("/reset-and-resync", response_model=IngestionStatusResponse)
+def reset_and_resync(
+    db: Session = Depends(get_db)
+):
+    """
+    Clears stale historical external alert cache and populates with fresh curated GDACS disaster intelligence.
+    """
+    db.query(ExternalAlert).filter(ExternalAlert.status != "CONVERTED_TO_INCIDENT").delete()
+    db.commit()
+    return global_ingestion_service.run_ingestion(db=db)
+
 @router.post("/ingest", response_model=IngestionStatusResponse)
 def trigger_manual_ingest(
     db: Session = Depends(get_db)
