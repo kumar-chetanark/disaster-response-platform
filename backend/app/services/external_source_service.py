@@ -65,11 +65,12 @@ class GDACSAdapter(BaseExternalDisasterAdapter):
         return "GDACS"
 
     def fetch_events(self) -> List[NormalizedDisasterEvent]:
-        # Fetch high-priority curated GeoJSON events first, fallback to RSS
+        # Fetch official curated GDACS GeoJSON events (Earthquake in China, Flood in Nepal, Tropical Cyclone, etc.)
         events = []
         try:
             events = self._fetch_geojson()
-        except Exception:
+        except Exception as err:
+            logging.warning(f"[GDACS Adapter] GeoJSON primary fetch attempt failed ({err}), falling back to RSS...")
             try:
                 events = self._fetch_rss()
             except Exception as e:
@@ -210,9 +211,9 @@ class GDACSAdapter(BaseExternalDisasterAdapter):
     def _fetch_geojson(self) -> List[NormalizedDisasterEvent]:
         req = urllib.request.Request(
             self.GEOJSON_URL,
-            headers={"User-Agent": "DisasterResponsePlatformAI/2.0"}
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         )
-        with urllib.request.urlopen(req, timeout=12) as resp:
+        with urllib.request.urlopen(req, timeout=25) as resp:
             data = json.loads(resp.read().decode("utf-8"))
 
         features = data.get("features", [])
