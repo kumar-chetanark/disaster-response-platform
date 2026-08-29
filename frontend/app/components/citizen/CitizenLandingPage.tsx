@@ -94,7 +94,15 @@ export default function CitizenLandingPage({
     setIsSubmitting(true)
 
     const now = new Date()
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const timeStr = now.toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    })
     const reportRef = `CIT-${Date.now().toString().slice(-4)}`
 
     const submission: CitizenReportSubmission = {
