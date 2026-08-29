@@ -743,6 +743,8 @@ class PlatformDataService {
       body: JSON.stringify({
         disaster_type: submission.category || submission.whatHappened || 'Disaster',
         location: submission.location,
+        latitude: submission.latitude,
+        longitude: submission.longitude,
         description: submission.description,
         is_people_trapped: submission.isPeopleTrapped,
         is_immediate_danger: submission.isImmediateDanger,

@@ -95,6 +95,8 @@ export interface CitizenReportSubmission {
   whatHappened: string
   category: IncidentCategory
   location: string
+  latitude?: number
+  longitude?: number
   affectedPeople?: string
   isImmediateDanger: boolean
   isPeopleTrapped: boolean

@@ -15,6 +15,9 @@ export default function CitizenLandingPage({
   // Form State - Specific Location Structure
   const [whatHappened, setWhatHappened] = useState('Flood')
   const [location, setLocation] = useState('')
+  const [detectedCoords, setDetectedCoords] = useState<{ lat: number; lon: number } | null>(null)
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false)
+  const [locationSuccessMsg, setLocationSuccessMsg] = useState<string | null>(null)
   const [landmarkStreet, setLandmarkStreet] = useState('')
   const [cityDistrict, setCityDistrict] = useState('')
   const [pincodeState, setPincodeState] = useState('')
@@ -36,6 +39,60 @@ export default function CitizenLandingPage({
     status?: string
     time: string
   } | null>(null)
+
+  // GPS Current Location Detection with Reverse Geocoding
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setErrorMessage('Geolocation is not supported by your browser.')
+      return
+    }
+
+    setIsDetectingLocation(true)
+    setErrorMessage(null)
+    setLocationSuccessMsg(null)
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = parseFloat(pos.coords.latitude.toFixed(6))
+        const lon = parseFloat(pos.coords.longitude.toFixed(6))
+        setDetectedCoords({ lat, lon })
+
+        try {
+          // Reverse geocoding via OpenStreetMap Nominatim
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
+            { headers: { 'User-Agent': 'DisasterResponseCitizenApp/1.0' } }
+          )
+          if (res.ok) {
+            const data = await res.json()
+            if (data && data.display_name) {
+              setLocation(data.display_name)
+              setLocationSuccessMsg(`GPS Acquired: ${lat}, ${lon}`)
+              setIsDetectingLocation(false)
+              return
+            }
+          }
+        } catch {
+          // Fallback to formatted coordinates
+        }
+
+        setLocation(`GPS Location (${lat}, ${lon})`)
+        setLocationSuccessMsg(`GPS Coordinates Acquired: ${lat}, ${lon}`)
+        setIsDetectingLocation(false)
+      },
+      (err) => {
+        setIsDetectingLocation(false)
+        if (err.code === err.PERMISSION_DENIED) {
+          setErrorMessage('Location permission was denied. Please enter your location manually or allow location access in your browser settings.')
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          setErrorMessage('GPS signal unavailable. Please type your landmark/address.')
+        } else {
+          setErrorMessage('Could not determine current location. Please enter it manually.')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    )
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -110,6 +167,8 @@ export default function CitizenLandingPage({
       category: whatHappened as any,
       whatHappened,
       location: cleanLocation,
+      latitude: detectedCoords?.lat,
+      longitude: detectedCoords?.lon,
       description: cleanDescription,
       citizenName: citizenName.trim() || undefined,
       citizenContact: contactInfo.trim() || undefined,
@@ -246,11 +305,24 @@ export default function CitizenLandingPage({
                 </div>
               </div>
 
-              {/* Step 2: Location */}
+              {/* Step 2: Location with GPS Detection */}
               <div className="space-y-1.5">
-                <label className="block font-body-sm text-[12px] font-medium text-on-surface-variant uppercase tracking-wider">
-                  2. Location / Landmark / Address *
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block font-body-sm text-[12px] font-medium text-on-surface-variant uppercase tracking-wider">
+                    2. Location / Landmark / Address *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={isSubmitting || isDetectingLocation}
+                    className="flex items-center gap-1 text-[11px] font-mono font-bold text-sky-400 hover:text-sky-300 bg-sky-950/40 hover:bg-sky-900/60 border border-sky-500/40 px-2.5 py-1 rounded-md transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <span className={`material-symbols-outlined text-[14px] ${isDetectingLocation ? 'animate-spin' : ''}`}>
+                      {isDetectingLocation ? 'sync' : 'my_location'}
+                    </span>
+                    <span>{isDetectingLocation ? 'Locating GPS...' : 'Use Current Location'}</span>
+                  </button>
+                </div>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary text-[18px]">
                     pin_drop
@@ -260,11 +332,20 @@ export default function CitizenLandingPage({
                     required
                     disabled={isSubmitting}
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    onChange={(e) => {
+                      setLocation(e.target.value)
+                      setLocationSuccessMsg(null)
+                    }}
                     placeholder="e.g. Sector 7G school building near North Basin Bridge"
                     className="w-full bg-background border border-outline-variant text-on-surface font-body-base text-[13px] rounded pl-10 pr-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-outline disabled:opacity-60"
                   />
                 </div>
+                {locationSuccessMsg && (
+                  <p className="font-mono text-[11px] text-emerald-400 flex items-center gap-1 mt-1">
+                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                    <span>{locationSuccessMsg}</span>
+                  </p>
+                )}
               </div>
 
               {/* Step 3: Life Safety Triage Flags */}
