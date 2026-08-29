@@ -95,7 +95,8 @@ def reset_and_resync(
     """
     Clears stale historical external alert cache and populates with fresh curated GDACS disaster intelligence.
     """
-    db.query(ExternalAlert).filter(ExternalAlert.status != "CONVERTED_TO_INCIDENT").delete()
+    # Reset all converted records whose incidents no longer exist or clear all alerts for full clean slate
+    db.query(ExternalAlert).delete()
     db.commit()
     return global_ingestion_service.run_ingestion(db=db)
 

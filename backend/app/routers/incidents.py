@@ -399,7 +399,14 @@ def delete_incident(
     for rep in linked_reports:
         rep.incident_id = None
 
-    # 5. Delete the canonical incident itself
+    # 5. Reset any linked External Alerts back to NEW status so they can be re-converted
+    from app.models.external_alert import ExternalAlert
+    linked_external_alerts = db.query(ExternalAlert).filter(ExternalAlert.converted_incident_id == incident_id).all()
+    for ext_a in linked_external_alerts:
+        ext_a.status = "NEW"
+        ext_a.converted_incident_id = None
+
+    # 6. Delete the canonical incident itself
     db.delete(inc)
     db.commit()
 
