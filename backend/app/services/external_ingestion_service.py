@@ -90,16 +90,23 @@ class ExternalAlertIngestionService:
             ).first()
 
             if existing:
-                # Update existing record
+                # Update existing record with clean curated metadata
                 existing.last_seen_at = now
+                existing.title = ev.title
+                existing.country = ev.country
+                existing.countries = ev.countries
+                existing.location_name = ev.location_name
                 existing.severity = ev.severity
                 existing.alert_level = ev.alert_level or existing.alert_level
                 existing.alert_score = ev.alert_score if ev.alert_score is not None else existing.alert_score
+                existing.published_at = ev.published_at or existing.published_at
                 if ev.description:
                     existing.description = ev.description
                 if ev.latitude is not None and ev.longitude is not None:
                     existing.latitude = ev.latitude
                     existing.longitude = ev.longitude
+                if ev.source_url:
+                    existing.source_url = ev.source_url
                 if ev.raw_data:
                     existing.raw_data = json.dumps(ev.raw_data)
                 existing.updated_at = now
