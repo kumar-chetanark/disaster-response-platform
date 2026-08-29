@@ -152,21 +152,31 @@ export default function AlertsConsole({
   }
 
   // Filtered External Alerts
-  const filteredExternalAlerts = externalAlerts.filter(a => {
-    if (externalFilterType !== 'ALL' && a.eventType !== externalFilterType) return false
-    if (externalFilterSeverity !== 'ALL' && a.severity !== externalFilterSeverity) return false
-    if (externalFilterStatus !== 'ALL' && a.status !== externalFilterStatus) return false
-    if (externalSearchQuery) {
-      const q = externalSearchQuery.toLowerCase()
-      return (
-        a.title.toLowerCase().includes(q) ||
-        (a.country && a.country.toLowerCase().includes(q)) ||
-        (a.locationName && a.locationName.toLowerCase().includes(q)) ||
-        a.eventType.toLowerCase().includes(q)
-      )
-    }
-    return true
-  })
+  const filteredExternalAlerts = externalAlerts
+    .filter(a => {
+      if (externalFilterType !== 'ALL' && a.eventType !== externalFilterType) return false
+      if (externalFilterSeverity !== 'ALL' && a.severity !== externalFilterSeverity) return false
+      if (externalFilterStatus !== 'ALL' && a.status !== externalFilterStatus) return false
+      if (externalSearchQuery) {
+        const q = externalSearchQuery.toLowerCase()
+        return (
+          a.title.toLowerCase().includes(q) ||
+          (a.country && a.country.toLowerCase().includes(q)) ||
+          (a.locationName && a.locationName.toLowerCase().includes(q)) ||
+          a.eventType.toLowerCase().includes(q)
+        )
+      }
+      return true
+    })
+    .sort((a, b) => {
+      const rank = (s: string, l?: string) => {
+        if (s === 'CRITICAL' || (l && l.toLowerCase().includes('red'))) return 1
+        if (s === 'HIGH' || (l && l.toLowerCase().includes('orange'))) return 2
+        if (s === 'MEDIUM' || (l && l.toLowerCase().includes('green'))) return 3
+        return 4
+      }
+      return rank(a.severity, a.alertLevel) - rank(b.severity, b.alertLevel)
+    })
 
   // Selected Alert for Internal Sub-Tab
   const selectedAlert = alertsList.find(a => a.id === selectedAlertId) || alertsList[0] || null
@@ -370,7 +380,18 @@ export default function AlertsConsole({
                       </div>
 
                       <h3 className="font-body-base text-[13px] font-bold text-on-surface line-clamp-2 leading-tight">
-                        {alert.title.replace(`[${alert.source}] `, '')}
+                        {(() => {
+                        let t = alert.title.replace(`[${alert.source}] `, '').trim()
+                        // Clean redundant severity prefix text from RSS feed titles
+                        t = t.replace(/^(Green|Orange|Red)\s+(notification for\s+|alert in\s+|flood alert in\s+|forest fire notification in\s+|earthquake.*?in\s+|tropical cyclone\s+)/i, (match, p1) => {
+                          if (match.toLowerCase().includes('tropical cyclone')) return 'Tropical Cyclone '
+                          if (match.toLowerCase().includes('forest fire')) return 'Forest fires in '
+                          if (match.toLowerCase().includes('flood')) return 'Flood in '
+                          if (match.toLowerCase().includes('earthquake')) return 'Earthquake in '
+                          return ''
+                        })
+                        return t
+                      })()}
                       </h3>
 
                       <div className="flex items-center gap-2 mt-1 font-mono text-[11px] text-slate-300">

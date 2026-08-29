@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import case, desc
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
@@ -77,7 +77,17 @@ def list_external_alerts(
     if country:
         query = query.filter(ExternalAlert.country.ilike(f"%{country.strip()}%"))
 
-    query = query.order_by(desc(ExternalAlert.published_at), desc(ExternalAlert.created_at))
+    # Prioritize Tactical High-Severity Disasters (RED/CRITICAL -> ORANGE/HIGH -> GREEN/MEDIUM)
+    severity_rank = case(
+        (ExternalAlert.severity == 'CRITICAL', 1),
+        (ExternalAlert.alert_level.ilike('%red%'), 1),
+        (ExternalAlert.severity == 'HIGH', 2),
+        (ExternalAlert.alert_level.ilike('%orange%'), 2),
+        (ExternalAlert.severity == 'MEDIUM', 3),
+        (ExternalAlert.alert_level.ilike('%green%'), 4),
+        else_=5
+    )
+    query = query.order_by(severity_rank, desc(ExternalAlert.published_at), desc(ExternalAlert.created_at))
     return query.offset(offset).limit(limit).all()
 
 @router.get("/ingestion-status", response_model=IngestionStatusResponse)
