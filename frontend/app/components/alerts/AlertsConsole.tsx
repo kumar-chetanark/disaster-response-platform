@@ -445,10 +445,53 @@ export default function AlertsConsole({
       {/* ========================================================================= */}
       {activeSubTab === 'INTERNAL' && (
         <div className="space-y-4">
+          {/* Filter Bar Matching External View */}
+          <div className="p-3 bg-surface-container rounded-xl border border-outline-variant flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
+              <span className="text-slate-400 font-bold uppercase mr-1">Filter:</span>
+              
+              {/* Category Filter */}
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="bg-background border border-outline-variant rounded px-2.5 py-1 text-on-surface outline-none focus:border-primary"
+              >
+                <option value="ALL">All Categories</option>
+                <option value="CIVIL">Civil Protection</option>
+                <option value="SENSOR">Sensor Telemetry</option>
+                <option value="DISPATCH">Field Dispatch</option>
+                <option value="WEATHER">Meteorological</option>
+              </select>
+
+              {/* Severity Filter */}
+              <select
+                value={filterSeverity}
+                onChange={(e) => setFilterSeverity(e.target.value)}
+                className="bg-background border border-outline-variant rounded px-2.5 py-1 text-on-surface outline-none focus:border-primary"
+              >
+                <option value="ALL">All Severities</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="WARNING">Warning</option>
+                <option value="INFO">Info</option>
+              </select>
+            </div>
+
+            {/* Keyword Search */}
+            <div className="w-full sm:w-64">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search location, message..."
+                className="w-full bg-background border border-outline-variant rounded px-3 py-1 text-[12px] text-on-surface outline-none focus:border-primary placeholder:text-outline"
+              />
+            </div>
+          </div>
+
           {alertsList.length === 0 ? (
-            <div className="p-8 bg-surface-container rounded-xl border border-outline-variant text-center space-y-2">
-              <span className="material-symbols-outlined text-[32px] text-slate-500">notifications_off</span>
-              <p className="font-mono text-[12px] text-slate-400">
+            <div className="p-12 bg-surface rounded-xl border border-outline-variant text-center space-y-3">
+              <span className="material-symbols-outlined text-[36px] text-slate-500">notifications_off</span>
+              <p className="font-mono text-[13px] text-slate-400">
                 No active citizen or sensor alerts currently reported.
               </p>
             </div>
