@@ -84,7 +84,32 @@ export default function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
   // Current Active View inside Authority Platform
-  const [currentTab, setCurrentTab] = useState('dashboard')
+  // Current Active View inside Authority Platform (Restores tab from localStorage or URL hash across refreshes)
+  const [currentTab, setCurrentTab] = useState<string>('dashboard')
+
+  // Restore saved active tab on initial mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '').toLowerCase()
+      const validTabs = ['dashboard', 'incidents', 'operations', 'resources', 'assessment', 'alerts', 'reports', 'settings']
+      const savedTab = localStorage.getItem('active_authority_tab')
+      
+      if (hash && validTabs.includes(hash)) {
+        switchTab(hash)
+      } else if (savedTab && validTabs.includes(savedTab)) {
+        switchTab(savedTab)
+      }
+    }
+  }, [])
+
+  // Synchronize active tab with localStorage and URL hash
+  const switchTab = (tabId: string) => {
+    switchTab(tabId)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('active_authority_tab', tabId)
+      window.history.replaceState(null, '', `#${tabId}`)
+    }
+  }
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
   const [selectedOperationId, setSelectedOperationId] = useState<string | null>(null)
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>('alt-1')
@@ -496,7 +521,7 @@ export default function App() {
 
     setIsReassessed(true)
     setResourceCoverage('92%')
-    setCurrentTab('dashboard')
+    switchTab('dashboard')
     showNotification(
       `Assessment ${submission.id} Integrated! Incident A updated. Priority & advisory recommendations recalculated.`,
       'success'
@@ -551,7 +576,7 @@ export default function App() {
               markIncidentSeen(id)
             }}
             onDeleteIncident={handleDeleteIncidentGlobal}
-            onOpenAssessment={() => setCurrentTab('assessment')}
+            onOpenAssessment={() => switchTab('assessment')}
             onOpenReportPreview={async (incId) => {
               try {
                 const targetInc = incidents.find((i) => i.id === incId)
@@ -568,7 +593,7 @@ export default function App() {
                   const updatedReports = await platformDataService.getReports()
                   setReports(updatedReports)
                   setSelectedReportId(newReport.id)
-                  setCurrentTab('reports')
+                  switchTab('reports')
                 }
               } catch (err: any) {
                 console.error('Failed to generate SITREP from Incident Console:', err)
@@ -587,7 +612,7 @@ export default function App() {
               setSelectedOperationId(id)
               markOperationSeen(id)
             }}
-            onOpenAssessment={() => setCurrentTab('assessment')}
+            onOpenAssessment={() => switchTab('assessment')}
           />
         )
 
@@ -601,10 +626,10 @@ export default function App() {
             onModifyAdvisory={handleModifyAdvisory}
             onUpdateResourceStatus={handleUpdateResourceStatus}
             onAddResource={handleAddResource}
-            onOpenOperations={() => setCurrentTab('operations')}
+            onOpenOperations={() => switchTab('operations')}
             onNavigateToIncident={(id) => {
               setSelectedIncidentId(id)
-              setCurrentTab('incidents')
+              switchTab('incidents')
             }}
             onDispatchSuccess={async () => {
               try {
@@ -634,9 +659,9 @@ export default function App() {
             onSubmit={handleAssessmentSubmit}
             onBackToDashboard={() => {
               if (selectedIncidentId) {
-                setCurrentTab('incidents')
+                switchTab('incidents')
               } else {
-                setCurrentTab('dashboard')
+                switchTab('dashboard')
               }
             }}
           />
@@ -657,11 +682,11 @@ export default function App() {
             }}
             onNavigateToIncident={(incId: string) => {
               setSelectedIncidentId(incId)
-              setCurrentTab('incidents')
+              switchTab('incidents')
             }}
             onViewOnMap={(lat: number, lon: number, title?: string) => {
               setFocusedMapCoords({ lat, lon, zoom: 7 })
-              setCurrentTab('dashboard')
+              switchTab('dashboard')
               showNotification(`Tactical Map centered on ${title || 'Global Alert Zone'}.`, 'info')
               setTimeout(() => {
                 const mapEl = document.getElementById('tactical-radar-map-section')
@@ -710,7 +735,7 @@ export default function App() {
             }}
             onNavigateToIncident={(incId: string) => {
               setSelectedIncidentId(incId)
-              setCurrentTab('incidents')
+              switchTab('incidents')
             }}
           />
         )
@@ -793,14 +818,14 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setCurrentTab('incidents')}
+                    onClick={() => switchTab('incidents')}
                     className="px-3 py-1.5 bg-surface-container-lowest border border-outline-variant hover:bg-surface-container text-on-surface font-mono-label text-[11px] rounded transition-colors shrink-0 uppercase tracking-wider cursor-pointer"
                   >
                     View Incident Dossier
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCurrentTab('assessment')}
+                    onClick={() => switchTab('assessment')}
                     className="px-3 py-1.5 bg-primary/15 border border-primary/40 hover:bg-primary/25 text-primary font-mono-label text-[11px] rounded transition-colors shrink-0 uppercase tracking-wider font-bold cursor-pointer"
                   >
                     View Recon Form
@@ -816,10 +841,10 @@ export default function App() {
                 if (incidents.length > 0) {
                   setSelectedIncidentId(incidents[0].id)
                 }
-                setCurrentTab('incidents')
+                switchTab('incidents')
               }}
               onViewRecommendations={() => {
-                setCurrentTab('resources')
+                switchTab('resources')
               }}
             />
 
@@ -829,7 +854,7 @@ export default function App() {
                 incidents={incidents}
                 onSelectIncident={(id) => {
                   setSelectedIncidentId(id)
-                  setCurrentTab('incidents')
+                  switchTab('incidents')
                 }}
                 onDeleteIncident={handleDeleteIncidentGlobal}
               />
@@ -839,10 +864,10 @@ export default function App() {
                 onSelectAlert={(id) => {
                   setSelectedAlertId(id)
                   markAlertSeen(id)
-                  setCurrentTab('alerts')
+                  switchTab('alerts')
                 }}
                 onDeleteAlert={handleDeleteAlertGlobal}
-                onNavigateToAlerts={() => setCurrentTab('alerts')}
+                onNavigateToAlerts={() => switchTab('alerts')}
               />
             </section>
 
@@ -869,7 +894,7 @@ export default function App() {
     localStorage.removeItem('authority_session_token')
     localStorage.removeItem('authority_session_user')
     setSession({ role: 'CITIZEN' })
-    setCurrentTab('dashboard')
+    switchTab('dashboard')
     showNotification('Logged out successfully. Returned to Citizen Portal view.', 'info')
   }
 
@@ -902,7 +927,7 @@ export default function App() {
         operationCount={unreadOperationCount}
         reportCount={unreadReportCount}
         onSelectTab={(tabId) => {
-          setCurrentTab(tabId)
+          switchTab(tabId)
           if (tabId === 'alerts') {
             markAllAlertsSeen()
           } else if (tabId === 'incidents') {
