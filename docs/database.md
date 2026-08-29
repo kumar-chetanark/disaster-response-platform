@@ -1,172 +1,134 @@
-# Database Architecture (Phase 1 — Backend Foundation)
+# Database Architecture — Disaster Response Platform (PS-07)
 
-## Technology
-- **Database**: PostgreSQL (Supabase compatible) / SQLite development engine.
-- **ORM**: SQLAlchemy 2.0.
-- **Migrations**: Alembic with auto-generation support.
+## Production Database
+- **Engine**: Supabase PostgreSQL (Port 5432 Session Pooler)
+- **Host**: `aws-0-ap-southeast-1.pooler.supabase.com`
+- **ORM**: SQLAlchemy 2.0 (Declarative Base)
+- **Local Fallback**: SQLite (`disaster_response_dev.db`)
 
-## Core Schema & Tables
+## Schema & Core Entities (13 Relational Tables)
 
-### 1. `users`
-Authority and citizen user identities and permission levels.
-- `id` (VARCHAR(36), PK): UUID
-- `email` (VARCHAR(255), UNIQUE, INDEX)
-- `hashed_password` (VARCHAR(255), NULLABLE)
-- `full_name` (VARCHAR(255))
-- `role` (VARCHAR(50)): `CITIZEN`, `AUTHORITY`, `FIRST_RESPONDER`, `ADMIN`
-- `authority_level` (INTEGER): e.g., Level 5 Command
-- `badge_number` (VARCHAR(50), NULLABLE)
-- `is_active` (BOOLEAN)
-- `created_at`, `updated_at` (DATETIME)
+### 1. `external_alerts`
+Persistent worldwide disaster early warning feed from GDACS.
+- `id` (VARCHAR(64), PK)
+- `source` (VARCHAR(32), INDEX): e.g. "GDACS"
+- `external_id` (VARCHAR(64), INDEX): Source-assigned unique ID
+- `event_type` (VARCHAR(64), INDEX): EARTHQUAKE, FLOOD, TROPICAL_CYCLONE, WILDFIRE, DROUGHT, etc.
+- `title` (TEXT)
+- `description` (TEXT)
+- `country` (TEXT)
+- `countries` (TEXT): Comma-separated list of affected countries
+- `location_name` (TEXT)
+- `latitude`, `longitude` (FLOAT)
+- `severity` (VARCHAR(32), INDEX): CRITICAL, HIGH, MEDIUM, LOW
+- `alert_level` (VARCHAR(32)): Red, Orange, Green
+- `alert_score` (FLOAT)
+- `population_affected_est` (VARCHAR(128))
+- `published_at` (DATETIME): Real disaster event detection time from source
+- `updated_at`, `created_at`, `last_seen_at` (DATETIME)
+- `source_url` (TEXT)
+- `status` (VARCHAR(32), INDEX): NEW, REVIEWED, VALIDATED, REJECTED, CONVERTED_TO_INCIDENT
+- `converted_incident_id` (VARCHAR(64), FK -> `incidents.id`, NULLABLE)
+- `raw_data` (TEXT): JSON payload
 
 ### 2. `incidents`
-Canonical, deduplicated disaster incident records.
-- `id` (VARCHAR(36), PK): UUID
-- `title` (VARCHAR(255), INDEX)
+Canonical active disaster incident registry.
+- `id` (VARCHAR(36), PK)
+- `title` (VARCHAR(255))
 - `description` (TEXT)
-- `disaster_type` (VARCHAR(50), INDEX): cyclone, flood, earthquake, infrastructure, fire
-- `severity` (VARCHAR(20), INDEX): `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
-- `priority_level` (VARCHAR(20)): `Level 1`, `Level 2`, `Level 3`
-- `status` (VARCHAR(20), INDEX): `ACTIVE`, `MONITORING`, `RESOLVED`
+- `disaster_type` (VARCHAR(50)): flood, earthquake, cyclone, fire, etc.
+- `severity` (VARCHAR(50)): CRITICAL, HIGH, MEDIUM, LOW
+- `priority_level` (VARCHAR(50)): Level 1, Level 2, Level 3
+- `status` (VARCHAR(50)): PENDING, ACTIVE, MONITORING, RESOLVED
 - `latitude`, `longitude` (FLOAT)
-- `location_name` (VARCHAR(255))
-- `sector` (VARCHAR(50))
-- `affected_population` (VARCHAR(50))
+- `location_name`, `sector` (VARCHAR(255))
+- `affected_population` (VARCHAR(100))
 - `affected_area_sq_km` (FLOAT)
 - `resource_coverage_pct` (INTEGER)
 - `is_field_verified` (BOOLEAN)
 - `created_at`, `updated_at` (DATETIME)
 
 ### 3. `incident_sources`
-Corroboration source ledger storing distinct multi-channel intelligence contributing to a canonical incident.
-- `id` (VARCHAR(36), PK): UUID
-- `incident_id` (VARCHAR(36), FK -> incidents.id, INDEX)
-- `source_type` (VARCHAR(50)): `CITIZEN`, `WEATHER`, `NEWS`, `GOVERNMENT`, `FIELD_ASSESSMENT`, `SATELLITE`
-- `source_label` (VARCHAR(255))
-- `channel_badge` (VARCHAR(50)): `CELL_SMS`, `IVR_VOICE`, `WEB_APP`, `IMD_METEO`, `GOV_BULLETIN`
+Corroboration audit trail linked to incidents.
+- `id` (VARCHAR(36), PK)
+- `incident_id` (VARCHAR(36), FK -> `incidents.id`, CASCADE)
+- `source_type` (VARCHAR(50)): CITIZEN, GOVERNMENT, SENSOR
+- `channel_badge` (VARCHAR(50)): GLOBAL_INTEL, SMS, WEB, SENSOR
 - `confidence_score` (FLOAT)
 - `summary` (TEXT)
 - `raw_content` (TEXT)
+- `is_contradiction` (BOOLEAN)
+- `contradiction_reason` (VARCHAR(255))
 - `created_at` (DATETIME)
 
-### 4. `citizen_reports`
-Raw public citizen intakes prior to/post correlation.
-- `id` (VARCHAR(36), PK): UUID
-- `incident_id` (VARCHAR(36), FK -> incidents.id, NULLABLE, INDEX)
-- `location_text` (VARCHAR(255))
-- `disaster_type` (VARCHAR(50))
-- `description` (TEXT)
-- `is_people_trapped` (BOOLEAN)
-- `is_immediate_danger` (BOOLEAN)
-- `affected_people_estimate` (VARCHAR(50))
-- `citizen_contact` (VARCHAR(100))
-- `status` (VARCHAR(50)): `INGESTED`, `CORROBORATED`, `RESOLVED`
-- `created_at` (DATETIME)
-
-### 5. `assessments`
-Generalized multi-mode field reconnaissance records (Drone, Helicopter, Land, Water).
-- `id` (VARCHAR(36), PK): UUID
-- `incident_id` (VARCHAR(36), FK -> incidents.id, INDEX)
-- `assessment_mode` (VARCHAR(50)): `Aerial — Drone`, `Aerial — Helicopter`, `Land Team / Vehicle`, `Water / Boat Team`
-- `mission_type` (VARCHAR(100)): Area Scan, Damage Assessment, Search & Rescue Support, Resource Delivery, Route Assessment, Communication
-- `asset_id` (VARCHAR(100))
-- `asset_name` (VARCHAR(255))
-- `assessment_time` (VARCHAR(50))
-- `weather_conditions` (VARCHAR(255))
-- `area_surveyed` (VARCHAR(255))
-- `hazards_detected` (TEXT)
-- `structures_damaged_count` (INTEGER)
-- `road_accessibility_status` (VARCHAR(100))
-- `people_observed` (VARCHAR(255))
-- `recommended_resources` (TEXT)
-- `evacuation_route_status` (VARCHAR(100))
-- `operator_observations` (TEXT)
-- `confidence_score` (FLOAT)
-- `media_file_urls` (TEXT)
-- `submitted_at` (DATETIME)
-
-### 6. `resources`
-Operational emergency asset inventory.
-- `id` (VARCHAR(36), PK): UUID
-- `name` (VARCHAR(255), INDEX)
-- `category` (VARCHAR(50), INDEX): medical, police_army, rescue, aerial, water, land, shelter, supplies
-- `status` (VARCHAR(50), INDEX): `AVAILABLE`, `IN OPERATION`, `DISPATCHED`, `MAINTENANCE`, `UNAVAILABLE`
-- `base_location` (VARCHAR(255), INDEX)
-- `personnel_count` (INTEGER)
-- `equipment_details` (TEXT)
-- `shelter_capacity`, `shelter_occupied` (INTEGER)
-- `supplies_food_days`, `supplies_food_people`, `supplies_medicine_count`, `supplies_clothing_count` (INTEGER)
-- `created_at`, `updated_at` (DATETIME)
-
-### 7. `resource_allocations`
-Decision records linking incidents to resources.
-- `id` (VARCHAR(36), PK): UUID
-- `incident_id` (VARCHAR(36), FK -> incidents.id, INDEX)
-- `resource_id` (VARCHAR(36), FK -> resources.id, INDEX)
-- `status` (VARCHAR(50)): `RECOMMENDED`, `APPROVED`, `MODIFIED`, `REJECTED`, `ALLOCATED`
-- `match_score` (INTEGER)
-- `travel_time_est` (VARCHAR(50))
-- `reason` (TEXT)
-- `decided_by` (VARCHAR(255))
-- `decided_at` (DATETIME)
-- `created_at` (DATETIME)
-
-### 8. `operations`
-Active operational mission tracks created upon Authority dispatch.
-- `id` (VARCHAR(36), PK): UUID
-- `incident_id` (VARCHAR(36), FK -> incidents.id, INDEX)
-- `resource_id` (VARCHAR(36), FK -> resources.id, INDEX)
-- `operation_type` (VARCHAR(100))
-- `state` (VARCHAR(50), INDEX): `DISPATCHED`, `IN TRANSIT`, `IN OPERATION`, `COMPLETED`
-- `destination_location` (VARCHAR(255))
-- `authorized_by` (VARCHAR(255))
-- `mission_objective` (TEXT)
-- `dispatched_time` (VARCHAR(50))
-- `estimated_completion` (VARCHAR(50))
-- `field_updates_log` (TEXT)
-- `created_at`, `updated_at` (DATETIME)
-
-### 9. `alerts`
-External early warnings and SCADA alerts.
-- `id` (VARCHAR(36), PK): UUID
-- `incident_id` (VARCHAR(36), FK -> incidents.id, NULLABLE, INDEX)
-- `category` (VARCHAR(50)): `METEO`, `CIVIL`, `INFRASTRUCTURE`, `MEDICAL`, `GOVERNMENT`
-- `source` (VARCHAR(255))
-- `location` (VARCHAR(255))
-- `message` (TEXT)
-- `severity` (VARCHAR(20)): `critical`, `warning`, `info`
+### 4. `alerts`
+Broadcast and internal alerts for command operators.
+- `id` (VARCHAR(36), PK)
+- `incident_id` (VARCHAR(36), FK -> `incidents.id`, CASCADE)
+- `category` (VARCHAR(50)): CIVIL, SENSOR, DISPATCH
+- `source`, `location`, `message` (TEXT)
+- `severity` (VARCHAR(50))
 - `is_reviewed_by_authority` (BOOLEAN)
 - `alert_time` (VARCHAR(50))
 - `created_at` (DATETIME)
 
-### 10. `shelters`
-Dedicated shelter capacity tracking.
-- `id` (VARCHAR(36), PK): UUID
-- `name` (VARCHAR(255), INDEX)
-- `location` (VARCHAR(255))
-- `total_capacity` (INTEGER)
-- `current_occupancy` (INTEGER)
-- `contact_phone` (VARCHAR(50))
-- `created_at` (DATETIME)
+### 5. `resources`
+Personnel, vehicle squads, aerial drones, and relief shelters.
+- `id` (VARCHAR(36), PK)
+- `name`, `type`, `category` (VARCHAR)
+- `status` (VARCHAR): AVAILABLE, ASSIGNED, DISPATCHED, EN_ROUTE
+- `base_location` (VARCHAR)
+- `latitude`, `longitude` (FLOAT)
+- `capabilities`, `capacity`, `personnel_count`, `equipment_details` (TEXT)
+- `shelter_capacity`, `shelter_occupied` (INTEGER)
 
-### 11. `inventory`
-Supplies and stockpile tracking.
-- `id` (VARCHAR(36), PK): UUID
-- `item_name` (VARCHAR(255), INDEX)
-- `category` (VARCHAR(50)): food, medicine, clothing, power, shelter_supplies
-- `quantity` (INTEGER)
-- `unit` (VARCHAR(50))
-- `storage_location` (VARCHAR(255))
-- `created_at` (DATETIME)
+### 6. `resource_allocations`
+Capability-matched recommendation advisories.
+- `id` (VARCHAR(36), PK)
+- `incident_id` (VARCHAR(36), FK -> `incidents.id`)
+- `resource_id` (VARCHAR(36), FK -> `resources.id`)
+- `status` (VARCHAR): RECOMMENDED, APPROVED, MODIFIED, REJECTED
+- `match_score` (INTEGER)
+- `travel_time_est`, `reason` (TEXT)
+- `decided_by`, `decided_at` (DATETIME)
 
-### 12. `reports`
-Historical debriefs and after-action logs.
-- `id` (VARCHAR(36), PK): UUID
-- `incident_id` (VARCHAR(36), FK -> incidents.id, NULLABLE, INDEX)
-- `report_type` (VARCHAR(100))
-- `title` (VARCHAR(255))
-- `author` (VARCHAR(255))
-- `summary` (TEXT)
-- `metrics_summary` (VARCHAR(255))
-- `tags` (VARCHAR(255))
-- `created_at` (DATETIME)
+### 7. `operations`
+Active consolidated tactical missions.
+- `id` (VARCHAR(36), PK)
+- `incident_id` (VARCHAR(36), FK -> `incidents.id`)
+- `resource_id` (VARCHAR(36), FK -> `resources.id`)
+- `operation_type`, `state` (VARCHAR): DISPATCHED, IN TRANSIT, ON SCENE, ACTIVE, COMPLETED
+- `destination_location`, `authorized_by`, `mission_objective` (TEXT)
+- `dispatched_time`, `estimated_completion`, `field_updates_log` (TEXT)
+
+### 8. `assessments`
+Field and aerial damage reconnaissance records.
+- `id` (VARCHAR(36), PK)
+- `incident_id` (VARCHAR(36), FK -> `incidents.id`)
+- `assessor_id`, `assessor_role`, `hazard_type` (VARCHAR)
+- `severity_score` (FLOAT), `structural_damage_pct` (FLOAT), `road_blocked` (BOOLEAN), `survivors_observed` (INTEGER)
+- `notes` (TEXT), `created_at` (DATETIME)
+
+### 9. `reports`
+Official SITREP debrief documents and PDF downloads.
+- `id` (VARCHAR(36), PK)
+- `incident_id` (VARCHAR(36), FK -> `incidents.id`, NULLABLE)
+- `report_type`, `title`, `author`, `summary`, `metrics_summary`, `tags`, `status` (TEXT)
+
+### 10. `citizen_reports`
+Direct civilian distress submissions.
+- `id` (VARCHAR(36), PK)
+- `citizen_name`, `phone_number`, `disaster_type`, `severity`, `address`, `description` (TEXT)
+- `latitude`, `longitude` (FLOAT), `people_count` (INTEGER), `medical_attention_required` (BOOLEAN)
+
+### 11. `shelters`
+Relief centers and emergency medical facilities.
+- `id` (VARCHAR(36), PK), `name`, `location`, `total_capacity`, `current_occupancy`, `available_beds`, `icu_beds`, `water_litres`, `food_person_days`, `medicine_days_stock`
+
+### 12. `inventory`
+Relief stockpile items.
+- `id` (VARCHAR(36), PK), `item_name`, `category`, `quantity`, `unit`, `storage_location`
+
+### 13. `users`
+Authority personnel identities.
+- `id` (VARCHAR(36), PK), `email`, `hashed_password`, `full_name`, `role`, `authority_level`, `badge_number`, `is_active`

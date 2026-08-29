@@ -1,54 +1,52 @@
-# Hackathon Demonstration Flow: Disaster Response Platform
+# Live Demonstration Walkthrough — Disaster Response Platform (PS-07)
 
-## 1. Demonstration Storyline
-This demonstration showcases a full closed-loop emergency response scenario: from initial disaster notification, to AI aerial imagery analysis, priority ranking, and life-saving resource dispatch.
+## Demonstration Overview
+This walkthrough demonstrates the complete 20-step closed-loop disaster intelligence and response lifecycle, verified against the live production deployment.
 
-- **Scenario**: *Flash Flood & Structural Damage at Coastal Metro Sector 4*
+- **Frontend URL**: `https://disaster-response-platform-eta.vercel.app`
+- **Backend API**: `https://disaster-response-api-wrn2.onrender.com`
 - **Total Demo Duration**: 3 to 5 minutes
-- **Resilience Guarantee**: Full deterministic demo mode available via UI toggle in case external network fails.
 
 ---
 
-## 2. Step-by-Step Live Walkthrough
+## Step-by-Step Live Flow
 
-### Step 1: Ingestion & Incident Overview (0:00 - 0:45)
-1. Open the **Command Dashboard**.
-2. Point out the live telemetry stream showing incoming flood alerts.
-3. Select the active incident: **"Coastal Metro - Sector 4 Flood Emergency"**.
-4. Observe the high-level KPI bar: Severity is marked **CRITICAL**, affecting an estimated 12,000 residents across 3 sub-sectors.
+### Phase 1: Authentication & Global Disaster Intelligence Intake
+1. **Hackathon Access**:
+   - Open `https://disaster-response-platform-eta.vercel.app`.
+   - Click `[AUTHORITY LOGIN]` in the top header.
+   - Click the green `[ENTER DEMO COMMAND CENTER]` button (authenticated securely by backend `DEMO_MODE=True` without exposing passwords).
+2. **Global Disaster Alerts Console**:
+   - Navigate to the **Alerts** tab.
+   - Observe the live `GDACS • CONNECTED` status badge and `EXTERNAL DISASTER INTELLIGENCE (GDACS)` sub-tab displaying 100 worldwide disaster events.
+   - Point out real-time disaster alerts: *Earthquake in China*, *Flood in Nepal*, *Tropical Cyclone SAUDEL-26*, *Earthquake in Indonesia*.
+   - Click `[MAP]` on any alert to demonstrate automated coordinate centering (`flyTo`) on the Tactical Radar Map.
+   - Click `[REVIEW]` on an alert (e.g. *Earthquake in China*) to open the structured Global Disaster Dossier.
 
-### Step 2: Spatial Inspection & Map View (0:45 - 1:30)
-1. Switch to the **Operational Map View**.
-2. Show the affected geographic boundaries and river overflow polygon.
-3. Highlight that ground inspection is blocked due to submerged access roads.
-4. Click **"Launch Aerial Drone Assessment"** to trigger overhead inspection.
+### Phase 2: Authority Incident Creation & 16-Dimension Intelligence
+3. **Convert Alert to Incident**:
+   - In the Dossier modal, click `[CONVERT TO INCIDENT]`.
+   - Observe the confirmation and instant conversion to a canonical incident.
+   - Demonstrate double-conversion protection (clicking again safely returns `HTTP 409 Conflict`).
+4. **Incidents Console**:
+   - Navigate to the **Incidents** tab.
+   - View the newly created incident with full point-wise situational awareness: damaged structures, hazard vectors, population at risk, and corroboration confidence.
 
-### Step 3: Aerial Damage Assessment & AI Analysis (1:30 - 2:45) [CORE HIGHLIGHT]
-1. Open the **Aerial Assessment Interface**.
-2. Select the pre-loaded **Sector 4 Aerial Drone Survey (Pre vs. Post)**.
-3. Run **Analyze Imagery**:
-   - Show the interactive slider comparing before-and-after satellite photography.
-   - Observe AI-detected damage bounding boxes: Submerged Residential Grid (High), Collapsed Causeway (Critical).
-   - Point out the quantitative metrics: **78% Damage Index** with **92.4% Model Confidence**.
-4. Click **"Generate Priority Response Zones"**.
+### Phase 3: 25km Location-Based Resource Intelligence & Dispatch
+5. **Proximity Search & Capability Matching**:
+   - Navigate to the **Resources** tab.
+   - Search the incident sector or click the radar map to view available squads within the 25km proximity radius.
+   - Click `[BUILD RESPONSE TEAM]` to review capability-scored squad recommendations (Water Rescue, Medical Squads, Extrication Units).
+6. **Consolidated Tactical Operation**:
+   - Approve the allocation and click `[DISPATCH SQUAD]`.
+   - Navigate to the **Operations** tab and observe the single consolidated operational mission created for the incident with real-time state tracking (`DISPATCHED` -> `IN TRANSIT` -> `ON SCENE`).
 
-### Step 4: Priority Ranking & Resource Allocation (2:45 - 3:45)
-1. Transition to the **Resource Allocation Center**.
-2. The AI Priority Engine ranks **Sector 4B (Bridge/Causeway)** as Priority #1 due to trapped civilians.
-3. Review the AI Recommendation:
-   - Suggests dispatching **Swift-Water SAR Team Alpha** + **Air Evacuation Chopper 1**.
-   - Transparent rationale provided: *Access roads blocked; rooftop extraction required.*
-4. Click **"Confirm & Deploy Units"**.
-5. Observe the status change to **DISPATCHED** with live dispatch audit log entry created.
-
-### Step 5: Field Reassessment Loop & Conclusion (3:45 - 4:30)
-1. Ingest a simulated field update: *"Water levels stabilizing in Sector 4A"*.
-2. Click **"Trigger AI Reassessment"**.
-3. Watch the system dynamically re-rank zones, freeing up medical units for Sector 4B.
-4. Conclude with summary of impact: *Reduced decision-to-dispatch latency from 45 minutes to under 3 minutes with verified explainable AI.*
-
----
-
-## 3. Fallback & Backup Contingencies
-- **No Internet Connectivity**: Flip the **"Demo Mode"** switch in the top navigation bar to run fully simulated local data.
-- **External AI Rate-Limit**: FallbackSimulationEngine produces identical deterministic outputs without API calls.
+### Phase 4: Aerial Assessment, Dynamic Priority Recalculation & SITREP PDF
+7. **Field Reconnaissance**:
+   - In the Incidents tab, click `[SUBMIT ASSESSMENT]`.
+   - Input structural damage percentage (`75%`), mark road blocked (`YES`), and casualties observed.
+   - Submit assessment: observe the incident severity score dynamically recalculate from Level 2 to Level 1.
+8. **Situation Report & PDF Export**:
+   - Navigate to the **Reports** tab.
+   - Click `[GENERATE SITREP]` to produce a comprehensive debrief summarizing operational metrics and casualty figures.
+   - Click `[EXPORT PDF]` to download the official binary debrief document with command authorization formatting.
