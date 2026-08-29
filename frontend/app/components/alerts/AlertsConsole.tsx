@@ -675,7 +675,7 @@ export default function AlertsConsole({
                 <div className="p-3 bg-[#090d1a] rounded-xl border border-[#1e293b] flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-slate-400">
                   <div className="flex items-center gap-4">
                     <span>
-                      Detected: <strong className="text-slate-200">{reviewingAlert.publishedAt ? new Date(reviewingAlert.publishedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent'}</strong>
+                      Published: <strong className="text-slate-200">{reviewingAlert.publishedAt ? new Date(reviewingAlert.publishedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent'}</strong>
                     </span>
                     <span>
                       Feed: <strong className="text-sky-300">{sourceAgency} Global API</strong>

@@ -94,6 +94,7 @@ class GDACSAdapter(BaseExternalDisasterAdapter):
             link = item.findtext("link") or "https://www.gdacs.org"
             desc = item.findtext("description") or ""
 
+            from email.utils import parsedate_to_datetime
             ext_id = None
             event_type_code = None
             alert_level = None
@@ -102,6 +103,7 @@ class GDACSAdapter(BaseExternalDisasterAdapter):
             episode_id = None
             lat = None
             lon = None
+            pub_date = None
 
             for child in item:
                 tag = child.tag.split("}")[-1].lower()
@@ -129,6 +131,15 @@ class GDACSAdapter(BaseExternalDisasterAdapter):
                             lon = float(parts[1])
                         except ValueError:
                             pass
+                elif tag in ["pubdate", "fromdate", "dateadded"]:
+                    if val and not pub_date:
+                        try:
+                            pub_date = parsedate_to_datetime(val)
+                        except Exception:
+                            try:
+                                pub_date = datetime.fromisoformat(val.replace("Z", "+00:00"))
+                            except Exception:
+                                pass
 
             if not ext_id:
                 ext_id = str(abs(hash(link)))[:8]
@@ -187,8 +198,8 @@ class GDACSAdapter(BaseExternalDisasterAdapter):
                 alert_level=alert_level,
                 alert_score=alert_score,
                 population_affected_est=pop_est,
-                published_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                published_at=pub_date or datetime.now(timezone.utc),
+                updated_at=pub_date or datetime.now(timezone.utc),
                 source_url=link,
                 raw_data=raw_payload,
             )
