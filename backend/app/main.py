@@ -40,10 +40,31 @@ async def periodic_gdacs_ingestion_worker():
         # Run every 5 minutes (300 seconds)
         await asyncio.sleep(300)
 
+def _ensure_schema_compatibility():
+    """
+    Ensures all PostgreSQL tables and columns match the latest SQLAlchemy models.
+    Automatically alters legacy VARCHAR(255) columns to TEXT in Supabase PostgreSQL without data loss.
+    """
+    Base.metadata.create_all(bind=engine)
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        try:
+            with engine.connect() as conn:
+                from sqlalchemy import text
+                # Widen columns in external_alerts to TEXT for long international disaster event titles/locations/URLs
+                conn.execute(text("ALTER TABLE external_alerts ALTER COLUMN title TYPE TEXT;"))
+                conn.execute(text("ALTER TABLE external_alerts ALTER COLUMN country TYPE TEXT;"))
+                conn.execute(text("ALTER TABLE external_alerts ALTER COLUMN countries TYPE TEXT;"))
+                conn.execute(text("ALTER TABLE external_alerts ALTER COLUMN location_name TYPE TEXT;"))
+                conn.execute(text("ALTER TABLE external_alerts ALTER COLUMN source_url TYPE TEXT;"))
+                conn.commit()
+                logging.info("[Database Schema] PostgreSQL column types safely upgraded to TEXT.")
+        except Exception as e:
+            logging.warning(f"[Database Schema] Column upgrade notice (non-fatal): {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Deterministically ensure database tables exist on server startup
-    Base.metadata.create_all(bind=engine)
+    # Deterministically ensure database tables & columns exist on server startup
+    _ensure_schema_compatibility()
     # Start periodic worldwide disaster alert ingestion worker
     ingestion_task = asyncio.create_task(periodic_gdacs_ingestion_worker())
     yield
