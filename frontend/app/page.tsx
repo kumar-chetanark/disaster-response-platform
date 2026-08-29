@@ -104,7 +104,7 @@ export default function App() {
 
   // Synchronize active tab with localStorage and URL hash
   const switchTab = (tabId: string) => {
-    switchTab(tabId)
+    setCurrentTab(tabId)
     if (typeof window !== 'undefined') {
       localStorage.setItem('active_authority_tab', tabId)
       window.history.replaceState(null, '', `#${tabId}`)
