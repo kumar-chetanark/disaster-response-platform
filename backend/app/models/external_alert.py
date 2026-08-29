@@ -14,25 +14,25 @@ class ExternalAlert(Base):
     id = Column(String(64), primary_key=True, default=lambda: f"ext-{str(uuid.uuid4())[:8]}")
     source = Column(String(32), nullable=False, index=True, default="GDACS")
     external_id = Column(String(64), nullable=False, index=True)
-    event_type = Column(String(32), nullable=False, index=True)  # EARTHQUAKE, FLOOD, TROPICAL_CYCLONE, VOLCANIC_ACTIVITY, WILDFIRE, DROUGHT, STORM, TSUNAMI, LANDSLIDE, OTHER
+    event_type = Column(String(64), nullable=False, index=True)  # EARTHQUAKE, FLOOD, TROPICAL_CYCLONE, VOLCANIC_ACTIVITY, WILDFIRE, DROUGHT, STORM, TSUNAMI, LANDSLIDE, OTHER
     
-    title = Column(String(255), nullable=False)
+    title = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
-    country = Column(String(128), nullable=True, index=True)
+    country = Column(Text, nullable=True, index=True)
     countries = Column(Text, nullable=True)  # Comma-separated list of affected countries
-    location_name = Column(String(255), nullable=True)
+    location_name = Column(Text, nullable=True)
     
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     
-    severity = Column(String(16), nullable=False, default="MEDIUM", index=True)  # CRITICAL, HIGH, MEDIUM, LOW
-    alert_level = Column(String(16), nullable=True)  # Red, Orange, Green
+    severity = Column(String(32), nullable=False, default="MEDIUM", index=True)  # CRITICAL, HIGH, MEDIUM, LOW
+    alert_level = Column(String(32), nullable=True)  # Red, Orange, Green
     alert_score = Column(Float, nullable=True)
-    population_affected_est = Column(String(64), nullable=True)
+    population_affected_est = Column(String(128), nullable=True)
     
     published_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=True)
-    source_url = Column(String(512), nullable=True)
+    source_url = Column(Text, nullable=True)
     
     status = Column(String(32), nullable=False, default="NEW", index=True)  # NEW, REVIEWED, VALIDATED, REJECTED, CONVERTED_TO_INCIDENT, EXPIRED
     converted_incident_id = Column(String(64), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)

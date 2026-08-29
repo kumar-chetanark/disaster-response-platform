@@ -18,6 +18,19 @@ class Settings(BaseSettings):
     # Database connection URL - default to absolute SQLite path in backend directory
     DATABASE_URL: str = f"sqlite:///{DEFAULT_DB_PATH.as_posix()}"
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_database_url(cls, v: Union[str, None]) -> str:
+        if not v or not str(v).strip():
+            return f"sqlite:///{DEFAULT_DB_PATH.as_posix()}"
+        url = str(v).strip()
+        # Normalize postgres:// and standard postgresql:// to postgresql+psycopg2:// for SQLAlchemy
+        if url.startswith("postgres://"):
+            return "postgresql+psycopg2://" + url[len("postgres://"):]
+        if url.startswith("postgresql://") and not url.startswith("postgresql+"):
+            return "postgresql+psycopg2://" + url[len("postgresql://"):]
+        return url
+
     # Supabase credentials (for future auth/realtime services)
     SUPABASE_URL: str = "https://your-supabase-project.supabase.co"
     SUPABASE_ANON_KEY: str = "your-anon-key"
