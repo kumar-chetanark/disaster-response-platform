@@ -128,7 +128,7 @@ export default function CitizenLandingPage({
           incidentId: result.incidentId || 'PENDING',
           incidentTitle: result.incidentTitle || 'Emergency Incident Registered',
           status: result.status === 'CORROBORATED' ? 'CORROBORATED WITH ACTIVE INCIDENT' : 'REGISTERED (PENDING REVIEW)',
-          time: result.submittedAt || timeStr,
+          time: timeStr,
         })
       }
     } catch (err: any) {

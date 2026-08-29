@@ -749,6 +749,7 @@ class PlatformDataService {
         affected_people_estimate: submission.affectedPeople || 'N/A',
         name: submission.citizenName,
         contact_info: submission.citizenContact,
+        reported_time: submission.submittedAt,
       }),
     })
 
