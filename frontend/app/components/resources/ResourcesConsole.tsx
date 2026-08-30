@@ -603,7 +603,44 @@ const [modalAreaName, setModalAreaName] = useState('')
     })
   }
   // Open "Add / Update Local Resource Picture" Modal (Pre-fills existing values if center has allocations)
-  const handleOpenAddModal = () => {
+    // Reset / Clear all values in the modal form
+  const handleClearModalForm = () => {
+    setFormPersonnel({
+      rescue: 0,
+      police: 0,
+      doctors: 0,
+      firefighters: 0,
+      nurses: 0,
+      engineers: 0,
+      otherStaff: 0,
+    })
+    setFormVehicles({
+      fireTrucks: 0,
+      ambulances: 0,
+      rescueBoats: 0,
+      helicopters: 0,
+      drones: 0,
+      buses: 0,
+      logistics: 0,
+      otherVehicles: 0,
+    })
+    setFormFacilities({
+      shelters: 0,
+      shelterCapacity: 0,
+      shelterAvailable: 0,
+      hospitals: 0,
+      hospitalBeds: 0,
+      emergencyBeds: 0,
+      icuBeds: 0,
+      waterLitres: 0,
+      foodPersonDays: 0,
+      medicineDays: 0,
+    })
+    setModalNotes('')
+    toast.info('Form cleared: All numbers reset to 0.', { theme: 'dark' })
+  }
+
+const handleOpenAddModal = () => {
     setModalCoverageRadius(radiusKm)
     setModalAreaName(activeLocation || '')
     setModalLocationSearch(activeLocation || '')
@@ -2299,6 +2336,15 @@ const [modalAreaName, setModalAreaName] = useState('')
               </div>
 
               <div className="flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleClearModalForm}
+                  className="px-3.5 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 font-mono text-[11px] font-bold rounded-lg uppercase cursor-pointer flex items-center gap-1.5 transition-colors"
+                  title="Clear all personnel, vehicle and facility numbers"
+                >
+                  <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+                  CLEAR ALL
+                </button>
                 <button
                   type="button"
                   onClick={() => setIsPictureModalOpen(false)}
