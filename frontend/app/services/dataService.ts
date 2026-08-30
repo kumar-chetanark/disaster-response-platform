@@ -611,7 +611,19 @@ class PlatformDataService {
   }
 
   // 8. Reports
-    async createShelter(shelter: any): Promise<any> {
+      async deleteShelter(shelterId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/shelters/${encodeURIComponent(shelterId)}`, {
+        method: 'DELETE',
+      })
+      return res.ok
+    } catch (err) {
+      console.error(`Error deleting shelter ${shelterId}:`, err)
+      return false
+    }
+  }
+
+  async createShelter(shelter: any): Promise<any> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/shelters`, {
         method: 'POST',

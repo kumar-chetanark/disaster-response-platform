@@ -43,6 +43,14 @@ class ShelterCreate(BaseModel):
     longitude: Optional[float] = None
     facility_type: Optional[str] = "Shelter"
     resource_center_id: Optional[str] = None
+    available_beds: Optional[int] = 0
+    emergency_beds: Optional[int] = 0
+    icu_beds: Optional[int] = 0
+    doctors_count: Optional[int] = 0
+    nurses_count: Optional[int] = 0
+    water_litres: Optional[int] = 0
+    food_person_days: Optional[int] = 0
+    medicine_days_stock: Optional[int] = 0
 
 class ShelterUpdate(BaseModel):
     current_occupancy: Optional[int] = None
@@ -103,6 +111,14 @@ def create_shelter(s_in: ShelterCreate, db: Session = Depends(get_db)):
         longitude=s_in.longitude,
         facility_type=s_in.facility_type or "Shelter",
         resource_center_id=s_in.resource_center_id,
+        available_beds=s_in.available_beds or 0,
+        emergency_beds=s_in.emergency_beds or 0,
+        icu_beds=s_in.icu_beds or 0,
+        doctors_count=s_in.doctors_count or 0,
+        nurses_count=s_in.nurses_count or 0,
+        water_litres=s_in.water_litres or 0,
+        food_person_days=s_in.food_person_days or 0,
+        medicine_days_stock=s_in.medicine_days_stock or 0,
     )
     db.add(new_s)
     db.commit()
@@ -175,3 +191,16 @@ def update_shelter(shelter_id: str, s_up: ShelterUpdate, db: Session = Depends(g
         "medicine_days_stock": s.medicine_days_stock or 0,
         "created_at": s.created_at,
     }
+
+
+@router.delete("/{shelter_id}", status_code=status.HTTP_200_OK)
+def delete_shelter(shelter_id: str, db: Session = Depends(get_db)):
+    """
+    Permanently deletes a relief shelter / hospital facility from inventory.
+    """
+    s = db.query(Shelter).filter(Shelter.id == shelter_id).first()
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Shelter '{shelter_id}' not found")
+    db.delete(s)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Shelter '{shelter_id}' deleted successfully."}

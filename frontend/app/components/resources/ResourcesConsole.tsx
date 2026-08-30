@@ -392,25 +392,25 @@ const [modalAreaName, setModalAreaName] = useState('')
 
   const totalVehiclesAvailable = Object.values(availableVehicles).reduce((a, b) => a + b, 0)
 
-  // Facilities & Relief Capacity from database (1:1 exact match)
+  // Facilities & Relief Capacity from database (1:1 exact match with entered values)
   const reliefMetrics = useMemo(() => {
-    const shelterUnits = nearbyShelters.filter(s => s.facility_type !== 'Hospital' && !s.name?.toLowerCase().includes('hospital'))
-    const hospitalUnits = nearbyShelters.filter(s => s.facility_type === 'Hospital' || (s.name && s.name.toLowerCase().includes('hospital')))
+    const shelterUnits = nearbyShelters.filter(s => s.facility_type === 'Shelter' || (!s.facility_type?.includes('Hospital') && !s.name?.toLowerCase().includes('hospital')))
+    const hospitalUnits = nearbyShelters.filter(s => s.facility_type === 'Hospital' || s.name?.toLowerCase().includes('hospital'))
 
     const primaryShelter = shelterUnits[0]
     const primaryHospital = hospitalUnits[0]
 
     return {
-      shelterCount: primaryShelter ? (primaryShelter.emergency_beds || shelterUnits.length) : 0,
-      shelterCapacity: primaryShelter ? (primaryShelter.total_capacity || 0) : 0,
-      shelterAvailable: primaryShelter ? (primaryShelter.available_beds !== undefined ? primaryShelter.available_beds : (primaryShelter.total_capacity || 0) - (primaryShelter.current_occupancy || 0)) : 0,
-      hospitalCount: primaryHospital ? (primaryHospital.doctors_count || hospitalUnits.length) : 0,
-      hospitalBeds: primaryHospital ? (primaryHospital.available_beds || 0) : 0,
-      emergencyBeds: primaryHospital ? (primaryHospital.emergency_beds || 0) : 0,
-      icuBeds: primaryHospital ? (primaryHospital.icu_beds || 0) : 0,
-      waterLitres: primaryShelter ? (primaryShelter.water_litres || 0) : (primaryHospital ? (primaryHospital.water_litres || 0) : 0),
-      foodPersonDays: primaryShelter ? (primaryShelter.food_person_days || 0) : (primaryHospital ? (primaryHospital.food_person_days || 0) : 0),
-      medicineDays: primaryShelter ? (primaryShelter.medicine_days_stock || 0) : (primaryHospital ? (primaryHospital.medicine_days_stock || 0) : 0),
+      shelterCount: primaryShelter ? (primaryShelter.emergency_beds ?? shelterUnits.length) : 0,
+      shelterCapacity: primaryShelter ? (primaryShelter.total_capacity ?? 0) : 0,
+      shelterAvailable: primaryShelter ? (primaryShelter.available_beds ?? (primaryShelter.total_capacity ?? 0) - (primaryShelter.current_occupancy ?? 0)) : 0,
+      hospitalCount: primaryHospital ? (primaryHospital.doctors_count ?? hospitalUnits.length) : 0,
+      hospitalBeds: primaryHospital ? (primaryHospital.total_capacity ?? primaryHospital.available_beds ?? 0) : 0,
+      emergencyBeds: primaryHospital ? (primaryHospital.emergency_beds ?? 0) : 0,
+      icuBeds: primaryHospital ? (primaryHospital.icu_beds ?? 0) : 0,
+      waterLitres: primaryShelter ? (primaryShelter.water_litres ?? 0) : (primaryHospital ? (primaryHospital.water_litres ?? 0) : 0),
+      foodPersonDays: primaryShelter ? (primaryShelter.food_person_days ?? 0) : (primaryHospital ? (primaryHospital.food_person_days ?? 0) : 0),
+      medicineDays: primaryShelter ? (primaryShelter.medicine_days_stock ?? 0) : (primaryHospital ? (primaryHospital.medicine_days_stock ?? 0) : 0),
     }
   }, [nearbyShelters])
 
@@ -553,19 +553,19 @@ const [modalAreaName, setModalAreaName] = useState('')
       const sName = (s.name || '').toLowerCase()
 
       if (fType.includes('hospital') || sName.includes('hospital')) {
-        hospitalsCount += 1
-        totalHospBeds += s.total_capacity || s.capacity || 0
-        totalEmergBeds += s.emergency_beds || 0
-        totalIcuBeds += s.icu_beds || 0
+        hospitalsCount = s.doctors_count !== undefined ? s.doctors_count : (hospitalsCount + 1)
+        totalHospBeds = s.total_capacity !== undefined ? s.total_capacity : (s.available_beds || totalHospBeds)
+        totalEmergBeds = s.emergency_beds !== undefined ? s.emergency_beds : totalEmergBeds
+        totalIcuBeds = s.icu_beds !== undefined ? s.icu_beds : totalIcuBeds
       } else {
-        sheltersCount += 1
-        totalShelterCap += s.total_capacity || s.capacity || 0
-        totalShelterAvail += s.available_beds || s.capacity || 0
+        sheltersCount = s.emergency_beds !== undefined ? s.emergency_beds : (sheltersCount + 1)
+        totalShelterCap = s.total_capacity !== undefined ? s.total_capacity : totalShelterCap
+        totalShelterAvail = s.available_beds !== undefined ? s.available_beds : totalShelterAvail
       }
 
-      totalWater += s.water_litres || 0
-      totalFood += s.food_person_days || 0
-      totalMeds += s.medicine_days_stock || 0
+      totalWater = s.water_litres !== undefined ? s.water_litres : totalWater
+      totalFood = s.food_person_days !== undefined ? s.food_person_days : totalFood
+      totalMeds = s.medicine_days_stock !== undefined ? s.medicine_days_stock : totalMeds
     })
 
     setFormPersonnel({
@@ -636,6 +636,15 @@ const [modalAreaName, setModalAreaName] = useState('')
         if (exUnit.id) {
           try {
             await platformDataService.deleteResource(exUnit.id)
+          } catch {}
+        }
+      }
+
+      const existingSheltersForCenter = sheltersList.filter(s => s.resourceCenterId === targetCenterId || s.resource_center_id === targetCenterId)
+      for (const exShl of existingSheltersForCenter) {
+        if (exShl.id) {
+          try {
+            await platformDataService.deleteShelter(exShl.id)
           } catch {}
         }
       }
