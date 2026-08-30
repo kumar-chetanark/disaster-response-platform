@@ -87,6 +87,8 @@ class IncidentListItemSchema(BaseModel):
     is_field_verified: bool
     last_updated: str
     time_reported: str
+    updated_at: Optional[str] = None
+    created_at: Optional[str] = None
     total_sources_count: int
     source_counts: Dict[str, int]
     latitude: Optional[float] = None

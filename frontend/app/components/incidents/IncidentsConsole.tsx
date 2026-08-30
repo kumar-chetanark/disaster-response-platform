@@ -179,7 +179,7 @@ export default function IncidentsConsole({
         incident_id: inc.id,
         author: 'Command Operations Authority',
         status: 'COMPLETED' as any,
-        summary: `INCIDENT OPERATIONAL REPORT\n- Incident ID: ${inc.id}\n- Title: ${inc.title}\n- Location: ${inc.location || 'Noida, Uttar Pradesh'}\n- Disaster Type: ${(inc.type || 'Disaster').toUpperCase()}\n- Severity: ${inc.severity}\n- Priority Level: ${inc.priorityLevel || 'Level 1'}\n- Status: ${inc.status}\n- Affected Population: ${inc.affectedPopulationEst || 45}\n- Last Updated: ${inc.lastUpdated || 'Just now'}\n- Description: ${inc.impact || inc.title}`,
+        summary: `INCIDENT OPERATIONAL REPORT\n- Incident ID: ${inc.id}\n- Title: ${inc.title}\n- Location: ${inc.location || 'Noida, Uttar Pradesh'}\n- Disaster Type: ${(inc.type || 'Disaster').toUpperCase()}\n- Severity: ${inc.severity}\n- Priority Level: ${inc.priorityLevel || 'Level 1'}\n- Status: ${inc.status}\n- Affected Population: ${inc.affectedPopulationEst || 45}\n- Last Updated: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}\n- Description: ${inc.impact || inc.title}`,
         metrics_summary: `Severity: ${inc.severity} | Status: ${inc.status} | Population: ${inc.affectedPopulationEst || 45}`,
         tags: `${inc.type || 'disaster'}, ${inc.severity}, ${inc.status}, SITREP`,
       })

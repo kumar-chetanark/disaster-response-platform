@@ -164,6 +164,9 @@ def create_operation_dispatch(
     )
     db.add(alert)
 
+    # 7. Update Incident timestamp
+    incident.updated_at = now
+
     db.commit()
     db.refresh(operation)
     return to_operation_response(operation)
@@ -219,6 +222,8 @@ def update_operation(
         op.estimated_completion = op_update.estimated_completion
 
     op.updated_at = now
+    if op.incident:
+        op.incident.updated_at = now
     db.commit()
     db.refresh(op)
     return to_operation_response(op)

@@ -84,6 +84,8 @@ def get_incidents_list(
                 is_field_verified=inc.is_field_verified,
                 last_updated=format_time_ago(inc.updated_at),
                 time_reported=format_time_ago(inc.created_at),
+                updated_at=inc.updated_at.isoformat() if inc.updated_at else None,
+                created_at=inc.created_at.isoformat() if inc.created_at else None,
                 total_sources_count=len(sources),
                 source_counts={
                     "citizenReports": citizen_count,
@@ -283,6 +285,8 @@ def get_incident_detail(db: Session, incident_id: str) -> Optional[IncidentDetai
         is_field_verified=inc.is_field_verified,
         last_updated=format_time_ago(inc.updated_at),
         time_reported=format_time_ago(inc.created_at),
+        updated_at=inc.updated_at.isoformat() if inc.updated_at else None,
+        created_at=inc.created_at.isoformat() if inc.created_at else None,
         total_sources_count=len(sources),
         source_counts={
             "citizenReports": citizen_count,

@@ -1,3 +1,15 @@
+// Helper to format ISO timestamp dynamically in client's local time
+export const formatClientTime = (isoString?: string | null, fallback?: string): string => {
+  if (!isoString) return fallback || 'Just now'
+  try {
+    const d = new Date(isoString)
+    if (isNaN(d.getTime())) return fallback || 'Just now'
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+  } catch {
+    return fallback || 'Just now'
+  }
+}
+
 export interface ExternalAlert {
   id: string
   source: string
@@ -81,8 +93,10 @@ class PlatformDataService {
             impact: item.impact,
             severity: item.severity,
             status: item.status,
-            timeReported: item.time_reported,
-            lastUpdated: item.last_updated,
+            timeReported: item.created_at ? formatClientTime(item.created_at, item.time_reported) : item.time_reported,
+            lastUpdated: item.updated_at ? formatClientTime(item.updated_at, item.last_updated) : item.last_updated,
+            updatedAt: item.updated_at,
+            createdAt: item.created_at,
             affectedPopulationEst: item.affected_population_est,
             affectedAreaSqKm: item.affected_area_sq_km,
             priorityLevel: item.priority_level,
