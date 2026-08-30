@@ -442,11 +442,30 @@ export default function ReportsConsole({
                         .map((line, idx) => {
                           const clean = line.replace(/^-\s*/, '')
                           const [k, ...v] = clean.split(':')
-                          const val = v.join(':').trim()
+                          const keyName = k.trim()
+                          let val = v.join(':').trim()
+
+                          // If this is Last Updated, dynamically resolve from linked incident or localized report timestamp
+                          if (keyName.toLowerCase().includes('last updated')) {
+                            const linkedInc = (incidents || []).find(i => i.id === selectedReport.incidentId || i.id === selectedReport.relatedIncidentId)
+                            if (linkedInc && linkedInc.lastUpdated) {
+                              val = linkedInc.lastUpdated
+                            } else if (selectedReport.timestamp || selectedReport.generatedAt || selectedReport.date) {
+                              try {
+                                const d = new Date(selectedReport.timestamp || selectedReport.generatedAt || selectedReport.date || '')
+                                if (!isNaN(d.getTime())) {
+                                  val = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+                                }
+                              } catch {
+                                // keep val
+                              }
+                            }
+                          }
+
                           return (
                             <div key={idx} className="bg-[#0b1329] border border-[#1e293b] rounded-lg p-2.5 flex flex-col justify-between">
-                              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">{k.trim()}</span>
-                              <span className={`text-[12px] font-bold mt-1 ${k.toLowerCase().includes('severity') ? 'text-red-400' : k.toLowerCase().includes('status') ? 'text-amber-400' : k.toLowerCase().includes('location') ? 'text-sky-300' : 'text-white'}`}>
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">{keyName}</span>
+                              <span className={`text-[12px] font-bold mt-1 ${keyName.toLowerCase().includes('severity') ? 'text-red-400' : keyName.toLowerCase().includes('status') ? 'text-amber-400' : keyName.toLowerCase().includes('location') ? 'text-sky-300' : 'text-white'}`}>
                                 {val || 'N/A'}
                               </span>
                             </div>
