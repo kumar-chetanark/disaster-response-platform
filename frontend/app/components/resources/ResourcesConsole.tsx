@@ -352,20 +352,20 @@ const [modalAreaName, setModalAreaName] = useState('')
   }, [incidentsList, nearbyShelters, mapCenterCoord, radiusKm])
 
   // Human Resource Inventory - Calculated purely from active database records
-  // Available Personnel breakdown (Squads Only - 1:1 match)
+  // Available Personnel breakdown (Sum of all squads under this Resource Center)
   const availablePersonnel = useMemo(() => {
-    const getPersonnel = (categoryName: string) => {
-      const unit = nearbyResources.find(
+    const getPersonnelSum = (categoryName: string) => {
+      const squads = nearbyResources.filter(
         r => (r.status || 'AVAILABLE').toUpperCase() === 'AVAILABLE' && r.type === 'Squad' && String(r.category || '').toLowerCase() === categoryName.toLowerCase()
       )
-      return unit ? (unit.personnelCount || 0) : 0
+      return squads.reduce((acc, s) => acc + (s.personnelCount || 0), 0)
     }
 
     return {
-      rescue: getPersonnel('rescue'),
-      police: getPersonnel('police'),
-      doctors: getPersonnel('medical'),
-      firefighters: getPersonnel('fire'),
+      rescue: getPersonnelSum('rescue'),
+      police: getPersonnelSum('police'),
+      doctors: getPersonnelSum('medical'),
+      firefighters: getPersonnelSum('fire'),
     }
   }, [nearbyResources])
 
@@ -505,18 +505,17 @@ const [modalAreaName, setModalAreaName] = useState('')
       const name = (r.name || '').toLowerCase()
       const pCount = r.personnelCount || 0
 
-      if (cat === 'rescue' || name.includes('rescue')) {
-        rescueCount += pCount > 0 ? pCount : 1
-      } else if (cat === 'police' || name.includes('police')) {
-        policeCount += pCount > 0 ? pCount : 1
-      } else if (cat === 'medical' || name.includes('medical') || name.includes('doctor')) {
-        doctorsCount += pCount > 0 ? pCount : 1
-      } else if (cat === 'fire' || name.includes('fire contingent') || name.includes('firefighter')) {
-        firefightersCount += pCount > 0 ? pCount : 1
-      } else if (name.includes('nurse')) {
-        nursesCount += pCount > 0 ? pCount : 1
-      } else if (name.includes('engineer')) {
-        engineersCount += pCount > 0 ? pCount : 1
+      if (r.type === 'Squad') {
+        if (cat === 'rescue' || name.includes('rescue')) {
+          rescueCount += pCount
+        } else if (cat === 'police' || name.includes('police')) {
+          policeCount += pCount
+        } else if (cat === 'medical' || name.includes('medical') || name.includes('doctor')) {
+          doctorsCount += pCount
+        } else if (cat === 'fire' || name.includes('fire contingent') || name.includes('firefighter')) {
+          firefightersCount += pCount
+        }
+        return
       }
 
       // Vehicles
@@ -631,8 +630,15 @@ const [modalAreaName, setModalAreaName] = useState('')
         setMapCenterCoord(modalSelectedCoords)
       }
 
-      // First, clean up previous units saved under this Resource Center to avoid duplicate accumulation
+      // Clean up previous units and shelters saved under this Resource Center to prevent duplication and ensure clean state updates
       const existingForCenter = resourcesList.filter(r => r.resourceCenterId === targetCenterId)
+      for (const exUnit of existingForCenter) {
+        if (exUnit.id) {
+          try {
+            await platformDataService.deleteResource(exUnit.id)
+          } catch {}
+        }
+      }
       // Save Personnel Squads
       const unitsToCreate: any[] = []
 
