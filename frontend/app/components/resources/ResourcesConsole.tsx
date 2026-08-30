@@ -475,12 +475,146 @@ const [modalAreaName, setModalAreaName] = useState('')
     }
   }
 
-  // Open "Add / Update Local Resource Picture" Modal
+  // Helper to pre-populate modal counters with existing resources/shelters for a Resource Center
+  const populateModalFormForCenter = (centerId: string) => {
+    const centerResources = resourcesList.filter(r => r.resourceCenterId === centerId)
+    const centerShelters = sheltersList.filter(s => s.resourceCenterId === centerId || s.resource_center_id === centerId)
+
+    // Count Personnel
+    let rescueCount = 0
+    let policeCount = 0
+    let doctorsCount = 0
+    let firefightersCount = 0
+    let nursesCount = 0
+    let engineersCount = 0
+    let otherStaffCount = 0
+
+    // Count Vehicles
+    let fireTrucks = 0
+    let ambulances = 0
+    let rescueBoats = 0
+    let helicopters = 0
+    let drones = 0
+    let buses = 0
+    let logistics = 0
+    let otherVehicles = 0
+
+    centerResources.forEach(r => {
+      const cat = (r.category || '').toLowerCase()
+      const type = (r.type || '').toLowerCase()
+      const name = (r.name || '').toLowerCase()
+      const pCount = r.personnelCount || 0
+
+      if (cat === 'rescue' || name.includes('rescue')) {
+        rescueCount += pCount > 0 ? pCount : 1
+      } else if (cat === 'police' || name.includes('police')) {
+        policeCount += pCount > 0 ? pCount : 1
+      } else if (cat === 'medical' || name.includes('medical') || name.includes('doctor')) {
+        doctorsCount += pCount > 0 ? pCount : 1
+      } else if (cat === 'fire' || name.includes('fire contingent') || name.includes('firefighter')) {
+        firefightersCount += pCount > 0 ? pCount : 1
+      } else if (name.includes('nurse')) {
+        nursesCount += pCount > 0 ? pCount : 1
+      } else if (name.includes('engineer')) {
+        engineersCount += pCount > 0 ? pCount : 1
+      }
+
+      // Vehicles
+      if (cat === 'fire_truck' || type.includes('fire truck') || name.includes('fire tender')) {
+        fireTrucks += 1
+      } else if (cat === 'ambulance' || type.includes('ambulance') || name.includes('ambulance')) {
+        ambulances += 1
+      } else if (cat === 'boat' || type.includes('boat') || name.includes('boat')) {
+        rescueBoats += 1
+      } else if (cat === 'helicopter' || type.includes('helicopter') || name.includes('helicopter')) {
+        helicopters += 1
+      } else if (cat === 'drone' || type.includes('drone') || name.includes('drone') || name.includes('uav')) {
+        drones += 1
+      } else if (cat === 'bus' || type.includes('bus') || name.includes('bus')) {
+        buses += 1
+      } else if (cat === 'logistics' || type.includes('logistics') || name.includes('logistics')) {
+        logistics += 1
+      }
+    })
+
+    // Facilities & Shelters
+    let sheltersCount = 0
+    let totalShelterCap = 0
+    let totalShelterAvail = 0
+    let hospitalsCount = 0
+    let totalHospBeds = 0
+    let totalEmergBeds = 0
+    let totalIcuBeds = 0
+    let totalWater = 0
+    let totalFood = 0
+    let totalMeds = 0
+
+    centerShelters.forEach(s => {
+      const fType = (s.facility_type || s.facilityType || '').toLowerCase()
+      const sName = (s.name || '').toLowerCase()
+
+      if (fType.includes('hospital') || sName.includes('hospital')) {
+        hospitalsCount += 1
+        totalHospBeds += s.total_capacity || s.capacity || 0
+        totalEmergBeds += s.emergency_beds || 0
+        totalIcuBeds += s.icu_beds || 0
+      } else {
+        sheltersCount += 1
+        totalShelterCap += s.total_capacity || s.capacity || 0
+        totalShelterAvail += s.available_beds || s.capacity || 0
+      }
+
+      totalWater += s.water_litres || 0
+      totalFood += s.food_person_days || 0
+      totalMeds += s.medicine_days_stock || 0
+    })
+
+    setFormPersonnel({
+      rescue: rescueCount,
+      police: policeCount,
+      doctors: doctorsCount,
+      firefighters: firefightersCount,
+      nurses: nursesCount,
+      engineers: engineersCount,
+      otherStaff: otherStaffCount,
+    })
+
+    setFormVehicles({
+      fireTrucks,
+      ambulances,
+      rescueBoats,
+      helicopters,
+      drones,
+      buses,
+      logistics,
+      otherVehicles,
+    })
+
+    setFormFacilities({
+      shelters: sheltersCount,
+      shelterCapacity: totalShelterCap,
+      shelterAvailable: totalShelterAvail,
+      hospitals: hospitalsCount,
+      hospitalBeds: totalHospBeds,
+      emergencyBeds: totalEmergBeds,
+      icuBeds: totalIcuBeds,
+      waterLitres: totalWater,
+      foodPersonDays: totalFood,
+      medicineDays: totalMeds,
+    })
+  }
+  // Open "Add / Update Local Resource Picture" Modal (Pre-fills existing values if center has allocations)
   const handleOpenAddModal = () => {
     setModalCoverageRadius(radiusKm)
     setModalAreaName(activeLocation || '')
     setModalLocationSearch(activeLocation || '')
     setModalSelectedCoords(mapCenterCoord)
+
+    const targetCenterId = selectedResourceCenterId || (resourceCenters[0]?.id || '')
+    if (targetCenterId) {
+      populateModalFormForCenter(targetCenterId)
+    }
+
     setIsPictureModalOpen(true)
   }
 
@@ -1842,6 +1976,7 @@ const [modalAreaName, setModalAreaName] = useState('')
                     onChange={(e) => {
                       const chosenId = e.target.value
                       setSelectedResourceCenterId(chosenId)
+                      populateModalFormForCenter(chosenId)
                       const found = resourceCenters.find(rc => rc.id === chosenId)
                       if (found) {
                         setModalAreaName(found.name)
