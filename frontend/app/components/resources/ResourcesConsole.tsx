@@ -188,12 +188,28 @@ const [modalAreaName, setModalAreaName] = useState('')
       { dy: 0, dx: -2, idNum: '013', suffix: 'Far West Base', tier: 100 },
     ]
 
+    // Stable prefix: If location contains Rourkela / NIT / Koel Nagar / Sundargarh, always anchor as RC-NITR
+    let prefix = 'NITR'
+    const lower = locName.toLowerCase()
+    if (lower.includes('rourkela') || lower.includes('nit') || lower.includes('sundargarh') || lower.includes('technology')) {
+      prefix = 'NITR'
+    } else if (lower.includes('delhi') || lower.includes('noida')) {
+      prefix = 'DEL'
+    } else if (lower.includes('mumbai')) {
+      prefix = 'MUM'
+    } else if (lower.includes('bengaluru') || lower.includes('bangalore')) {
+      prefix = 'BLR'
+    } else {
+      const words = cleanBaseName.split(/\s+/).filter(w => !['resource', 'center', 'hub', 'sector', 'the', 'of', 'and'].includes(w.toLowerCase()))
+      prefix = words.length > 0 ? words[0].slice(0, 4).toUpperCase() : 'NITR'
+    }
+
     const centers: ResourceCenter[] = []
     for (const cell of STATIC_GRID_OFFSETS) {
       if (cell.tier <= rKm) {
         centers.push({
-          id: `RC-${cell.idNum}`,
-          name: `Resource Center ${cell.idNum} — ${cleanBaseName} ${cell.suffix}`,
+          id: `RC-${prefix}-${cell.idNum}`,
+          name: `Resource Center — ${cleanBaseName} ${cell.suffix}`,
           locationName: `${cleanBaseName} (${cell.suffix}), Operational Sector`,
           latitude: Number((centerLat + cell.dy * spacingLat).toFixed(4)),
           longitude: Number((centerLon + cell.dx * spacingLon).toFixed(4)),
@@ -655,7 +671,7 @@ const handleOpenAddModal = () => {
   // Save full Resource Picture
   const handleSaveResourcePicture = async () => {
     try {
-      const targetCenterId = selectedResourceCenterId || (resourceCenters[0]?.id || 'RC-001')
+      const targetCenterId = selectedResourceCenterId || (resourceCenters[0]?.id || 'RC-NITR-001')
       const baseLat = modalSelectedCoords?.lat ?? mapCenterCoord?.lat ?? 28.6139
       const baseLon = modalSelectedCoords?.lon ?? mapCenterCoord?.lon ?? 77.2090
       const locName = modalAreaName.trim() || activeLocation || 'Operational Area'
