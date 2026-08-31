@@ -158,15 +158,13 @@ const [modalAreaName, setModalAreaName] = useState('')
     return R * c
   }
 
-  // Deterministic Fixed Resource Center Grid Generator (Anchor RC-001 always stays fixed at center)
+  // Deterministic Fixed Resource Center Grid Generator (Fixed Universal IDs: RC-001, RC-002, etc. Never changes across addresses)
   const generateResourceCentersForArea = (centerLat: number, centerLon: number, locName: string, radius: number): ResourceCenter[] => {
     let raw = locName.split(',')[0].trim()
     while (raw.toLowerCase().startsWith('resource center') || raw.startsWith('—') || raw.startsWith('-')) {
       raw = raw.replace(/^resource center/i, '').replace(/^[—\-:\s]+/, '').trim()
     }
     const cleanBaseName = raw || 'Sector'
-    const words = cleanBaseName.split(/\s+/).filter(w => !['resource', 'center', 'hub', 'sector', 'the', 'of', 'and'].includes(w.toLowerCase()))
-    const codePrefix = words.length > 0 ? words[0].slice(0, 3).toUpperCase() : cleanBaseName.slice(0, 3).toUpperCase()
     const rKm = radius || 25
     
     // Spacing between centers (~25 km)
@@ -176,26 +174,26 @@ const [modalAreaName, setModalAreaName] = useState('')
     // STATIC FIXED OFFSET DEFINITIONS (1 center at 25km inside the circle, 5 at 50km, 13 at 100km)
     const STATIC_GRID_OFFSETS = [
       { dy: 0, dx: 0, idNum: '001', suffix: 'Central Hub', tier: 10 },
-      { dy: 1, dx: 0, idNum: '002', suffix: 'North', tier: 50 },
-      { dy: -1, dx: 0, idNum: '003', suffix: 'South', tier: 50 },
-      { dy: 0, dx: 1, idNum: '004', suffix: 'East', tier: 50 },
-      { dy: 0, dx: -1, idNum: '005', suffix: 'West', tier: 50 },
-      { dy: 1, dx: 1, idNum: '006', suffix: 'North-East', tier: 100 },
-      { dy: 1, dx: -1, idNum: '007', suffix: 'North-West', tier: 100 },
-      { dy: -1, dx: 1, idNum: '008', suffix: 'South-East', tier: 100 },
-      { dy: -1, dx: -1, idNum: '009', suffix: 'South-West', tier: 100 },
-      { dy: 2, dx: 0, idNum: '010', suffix: 'Far North', tier: 100 },
-      { dy: -2, dx: 0, idNum: '011', suffix: 'Far South', tier: 100 },
-      { dy: 0, dx: 2, idNum: '012', suffix: 'Far East', tier: 100 },
-      { dy: 0, dx: -2, idNum: '013', suffix: 'Far West', tier: 100 },
+      { dy: 1, dx: 0, idNum: '002', suffix: 'North Station', tier: 50 },
+      { dy: -1, dx: 0, idNum: '003', suffix: 'South Station', tier: 50 },
+      { dy: 0, dx: 1, idNum: '004', suffix: 'East Station', tier: 50 },
+      { dy: 0, dx: -1, idNum: '005', suffix: 'West Station', tier: 50 },
+      { dy: 1, dx: 1, idNum: '006', suffix: 'North-East Base', tier: 100 },
+      { dy: 1, dx: -1, idNum: '007', suffix: 'North-West Base', tier: 100 },
+      { dy: -1, dx: 1, idNum: '008', suffix: 'South-East Base', tier: 100 },
+      { dy: -1, dx: -1, idNum: '009', suffix: 'South-West Base', tier: 100 },
+      { dy: 2, dx: 0, idNum: '010', suffix: 'Far North Base', tier: 100 },
+      { dy: -2, dx: 0, idNum: '011', suffix: 'Far South Base', tier: 100 },
+      { dy: 0, dx: 2, idNum: '012', suffix: 'Far East Base', tier: 100 },
+      { dy: 0, dx: -2, idNum: '013', suffix: 'Far West Base', tier: 100 },
     ]
 
     const centers: ResourceCenter[] = []
     for (const cell of STATIC_GRID_OFFSETS) {
       if (cell.tier <= rKm) {
         centers.push({
-          id: `RC-${codePrefix}-${cell.idNum}`,
-          name: `Resource Center — ${cleanBaseName} ${cell.suffix}`,
+          id: `RC-${cell.idNum}`,
+          name: `Resource Center ${cell.idNum} — ${cleanBaseName} ${cell.suffix}`,
           locationName: `${cleanBaseName} (${cell.suffix}), Operational Sector`,
           latitude: Number((centerLat + cell.dy * spacingLat).toFixed(4)),
           longitude: Number((centerLon + cell.dx * spacingLon).toFixed(4)),
@@ -657,7 +655,7 @@ const handleOpenAddModal = () => {
   // Save full Resource Picture
   const handleSaveResourcePicture = async () => {
     try {
-      const targetCenterId = selectedResourceCenterId || (resourceCenters[0]?.id || 'RC-BAN-001')
+      const targetCenterId = selectedResourceCenterId || (resourceCenters[0]?.id || 'RC-001')
       const baseLat = modalSelectedCoords?.lat ?? mapCenterCoord?.lat ?? 28.6139
       const baseLon = modalSelectedCoords?.lon ?? mapCenterCoord?.lon ?? 77.2090
       const locName = modalAreaName.trim() || activeLocation || 'Operational Area'
