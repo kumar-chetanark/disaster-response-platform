@@ -204,3 +204,15 @@ def delete_shelter(shelter_id: str, db: Session = Depends(get_db)):
     db.delete(s)
     db.commit()
     return {"status": "SUCCESS", "message": f"Shelter '{shelter_id}' deleted successfully."}
+
+@router.delete("/by-center/{center_id}", status_code=status.HTTP_200_OK)
+def delete_shelters_by_center(
+    center_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently removes all shelters linked to a specific resource center ID.
+    """
+    db.query(Shelter).filter(Shelter.resource_center_id == center_id).delete(synchronize_session=False)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"All shelters for center '{center_id}' removed."}

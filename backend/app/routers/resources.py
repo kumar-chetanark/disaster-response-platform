@@ -113,6 +113,20 @@ def patch_resource_status(
     return updated
 
 
+
+@router.delete("/by-center/{center_id}", status_code=status.HTTP_200_OK)
+def delete_resources_by_center(
+    center_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently removes all resource units linked to a specific resource center ID.
+    """
+    from app.models.resource import Resource
+    db.query(Resource).filter(Resource.resource_center_id == center_id).delete(synchronize_session=False)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"All resources for center '{center_id}' removed."}
+
 @router.delete("/{resource_id}", status_code=status.HTTP_200_OK)
 def delete_resource(
     resource_id: str,

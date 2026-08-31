@@ -1133,6 +1133,30 @@ class PlatformDataService {
     return false
   }
 
+    async deleteResourcesByCenter(centerId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/resources/by-center/${encodeURIComponent(centerId)}`, {
+        method: 'DELETE',
+      })
+      return res.ok
+    } catch (err) {
+      console.error(`Error deleting resources for center ${centerId}:`, err)
+      return false
+    }
+  }
+
+  async deleteSheltersByCenter(centerId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/shelters/by-center/${encodeURIComponent(centerId)}`, {
+        method: 'DELETE',
+      })
+      return res.ok
+    } catch (err) {
+      console.error(`Error deleting shelters for center ${centerId}:`, err)
+      return false
+    }
+  }
+
   async deleteResource(resourceId: string): Promise<boolean> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/resources/${encodeURIComponent(resourceId)}`, {

@@ -681,23 +681,12 @@ const handleOpenAddModal = () => {
         setMapCenterCoord(modalSelectedCoords)
       }
 
-      // Clean up previous units and shelters saved under this Resource Center to prevent duplication and ensure clean state updates
-      const existingForCenter = resourcesList.filter(r => r.resourceCenterId === targetCenterId)
-      for (const exUnit of existingForCenter) {
-        if (exUnit.id) {
-          try {
-            await platformDataService.deleteResource(exUnit.id)
-          } catch {}
-        }
-      }
-
-      const existingSheltersForCenter = sheltersList.filter(s => s.resourceCenterId === targetCenterId || s.resource_center_id === targetCenterId)
-      for (const exShl of existingSheltersForCenter) {
-        if (exShl.id) {
-          try {
-            await platformDataService.deleteShelter(exShl.id)
-          } catch {}
-        }
+      // Atomic cleanup of any prior records for this Resource Center before saving updated picture
+      try {
+        await platformDataService.deleteResourcesByCenter(targetCenterId)
+        await platformDataService.deleteSheltersByCenter(targetCenterId)
+      } catch (e) {
+        console.warn('Center cleanup notice:', e)
       }
       // Save Personnel Squads
       const unitsToCreate: any[] = []
